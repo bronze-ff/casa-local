@@ -1,0 +1,11 @@
+{
+  "lights": {
+    "quarto-luz": {"providerId": "ID_FISICO_LAMPADA_QUARTO", "ip": "192.168.0.101", "protocol": 3.3},
+    "banheiro-luz": {"providerId": "ID_FISICO_LAMPADA_BANHEIRO", "ip": "192.168.0.102", "protocol": 3.5}
+  },
+  "irHub": {"providerId": "ID_FISICO_CENTRAL_IR", "ip": "192.168.0.103", "protocol": 3.3, "controlType": 2},
+  "irRemotes": {
+    "ar-quarto": {"deviceId": "ID_CONTROLE_VIRTUAL_AR", "remoteId": 0, "brand": "Electrolux", "category": 5},
+    "tv-quarto": {"deviceId": "ID_CONTROLE_VIRTUAL_TV", "remoteId": 0, "brand": "Samsung", "category": 2}
+  }
+}

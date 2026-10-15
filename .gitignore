@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.venv/
+.data/
+__pycache__/
+*.pyc
+.env
+*.log
+coverage/
+*.tsbuildinfo
+.impeccable/mocks/
+artifacts/
+scripts/servidor-oculto.cmd
+
+# Dados da casa (IDs, IPs, controles): só na máquina local
+/site.json
