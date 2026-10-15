@@ -1,19 +1,22 @@
 import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from 'react';
-import { AirVent, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Cctv, Check, Copy, Droplets, Fan, Film, Flame, Home, House, Lightbulb, LoaderCircle, Minus, Monitor, Moon, Plus, Power, Radio, RefreshCw, Settings2, ShieldCheck, Snowflake, Sparkles, Thermometer, Tv, Undo2, Volume2, VolumeX, Wind, X } from 'lucide-react';
+import { AirVent, Leaf, MoveVertical, SunDim, Zap, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Cctv, Check, Copy, Droplets, Fan, Film, Flame, Home, House, Lightbulb, LoaderCircle, MapPin, Minus, Monitor, Moon, Plus, Power, Radio, RefreshCw, Settings2, ShieldCheck, Snowflake, Sparkles, Thermometer, Tv, Undo2, Volume2, VolumeX, Wind, X } from 'lucide-react';
 import Cameras from './components/Cameras';
 import type { Device } from './types';
 import { useCasa } from './useCasa';
 
 const RoomScene = lazy(() => import('./components/RoomScene'));
+const Location = lazy(() => import('./components/Location'));
 type Casa = ReturnType<typeof useCasa>;
-type Tab = 'luzes' | 'clima' | 'tv' | 'cameras';
-const TABS: [Tab, string, typeof Lightbulb][] = [['luzes', 'Luzes', Lightbulb], ['clima', 'Clima', AirVent], ['tv', 'TV', Tv], ['cameras', 'Câmeras', Cctv]];
+type Tab = 'luzes' | 'clima' | 'tv' | 'cameras' | 'local';
+const TABS: [Tab, string, typeof Lightbulb][] = [['luzes', 'Luzes', Lightbulb], ['clima', 'Clima', AirVent], ['tv', 'TV', Tv], ['cameras', 'Câmeras', Cctv], ['local', 'Local', MapPin]];
 
 const PALETTE: [string, string][] = [
   ['#FF3B30', 'Vermelho'], ['#FF6A2B', 'Laranja'], ['#FFA51F', 'Âmbar'], ['#FFD84D', 'Amarelo'], ['#9BE15D', 'Lima'], ['#34C759', 'Verde'], ['#2ED3B7', 'Turquesa'], ['#FFFFFF', 'Branco frio'],
   ['#34C8FF', 'Ciano'], ['#64A8FF', 'Céu'], ['#2F6BFF', 'Azul'], ['#5E5CE6', 'Índigo'], ['#9B5CF6', 'Violeta'], ['#F25FD0', 'Magenta'], ['#FF7EA6', 'Rosa'], ['#FFD6A0', 'Branco quente'],
 ];
 const MODES: [string, string, typeof Snowflake][] = [['cool', 'Resfriar', Snowflake], ['heat', 'Aquecer', Flame], ['dry', 'Desumidificar', Droplets], ['fan', 'Ventilar', Wind], ['auto', 'Automático', Sparkles]];
+// Botões do controle original que não existem no perfil Geonav: funcionam depois de gravados com Aprender.
+const AC_EXTRAS: [string, string, typeof Zap][] = [['turbo', 'Turbo', Zap], ['eco', 'Eco', Leaf], ['brisa', 'Brisa', MoveVertical], ['display', 'Display', SunDim]];
 const FANS: [string, string][] = [['auto', 'Auto'], ['low', 'Baixa'], ['medium', 'Média'], ['high', 'Alta']];
 
 function initialTab(): Tab {
@@ -142,7 +145,8 @@ function Climate({casa}: {casa: Casa}) {
   const canStart = !summary || has('cool', 'auto', 24);
   const canLearn = casa.data?.mode === 'local' && !!ac?.configured && !casa.busy && !casa.error;
   const shownTemp = learning ? target.temperature : draft;
-  const fill = ((shownTemp - 17) / 13) * 100;
+  const fraction = Math.max(0, Math.min(1, (shownTemp - 17) / 13));
+  const [dragging, setDragging] = useState(false);
   const shownModeIndex = learning ? Math.max(0, MODES.findIndex(([id]) => id === target.mode)) : modeIndex;
   const shownFanIndex = learning ? Math.max(0, FANS.findIndex(([id]) => id === target.fan)) : fanIndex;
   const [, shownModeLabel, ShownModeIcon] = MODES[shownModeIndex];
@@ -157,19 +161,19 @@ function Climate({casa}: {casa: Casa}) {
       {learning ? null : <PowerCircle on={on} label={on ? 'Desligar ar-condicionado' : 'Ligar ar-condicionado'} disabled={disabled || unknown} busy={casa.busy === ac?.id} onClick={() => void send({power: !on})} />}
     </div>
     {learning ? <LearnBanner text="Escolha o estado abaixo, toque em Gravar e, em até 25 s, aperte Ligar no controle do ar já nesse estado, apontado para a central." /> : null}
-    <div className={`ac-unit ${on ? 'running' : ''}`} aria-hidden="true">
+    <div className={`ac-unit ${on ? 'running' : ''}`} data-fan={ac?.state.turbo ? 'turbo' : ac?.state.fan ?? 'auto'} data-mode={ac?.state.mode ?? 'cool'} aria-hidden="true">
       <div className="ac-body"><span className="ac-led">{temperature ?? '—'}</span><span className="ac-flap" /></div>
       <div className="ac-air">{Array.from({length: 14}, (_, i) => <i key={i} style={{'--i': i} as CSSProperties} />)}</div>
     </div>
     {noTemp
       ? <p className="big-temp no-temp"><output>Auto</output></p>
-      : <p className={`big-temp ${unknown && !learning ? 'unknown' : ''}`}><output>{unknown && !learning ? '--' : shownTemp}</output><span>°C</span></p>}
+      : <p className={`big-temp ${unknown && !learning ? 'unknown' : ''}`}><output key={unknown && !learning ? 'unknown' : shownTemp}>{unknown && !learning ? '--' : shownTemp}</output><span>°C</span></p>}
     {noTemp ? <p className="climate-note">No automático o controle do ar não envia temperatura: o próprio ar decide. Para escolher a temperatura, use Resfriar ou Aquecer.</p> : null}
     <div className="temp-row">
       <button className="round" aria-label="Diminuir temperatura" disabled={tempOff || shownTemp <= tempMin} onClick={() => setTemp(shownTemp - 1)}><Minus size={18} /></button>
-      <div className="temp-track">
-        <input type="range" min={17} max={30} step={1} value={shownTemp} aria-label={noTemp ? 'Temperatura não enviada no automático' : 'Temperatura ajustada'} disabled={tempOff} style={{'--fill': `${fill}%`} as CSSProperties}
-          onPointerDown={() => { editing.current = !learning; }} onChange={event => { if (learning) setTarget(t => ({...t, temperature: Number(event.target.value)})); else setDraft(Number(event.target.value)); }} onPointerUp={() => { if (!learning) void commit(draft); }} onKeyUp={() => { if (!learning) void commit(draft); }} onBlur={() => { if (!learning && editing.current) void commit(draft); }} />
+      <div className={`temp-track ${dragging ? 'dragging' : ''} ${on || learning ? '' : 'idle'} ${tempOff ? 'off' : ''}`} style={{'--f': fraction} as CSSProperties}>
+        <span className="temp-rail" aria-hidden="true"><span className="temp-fill" /></span>
+        <input type="range" min={17} max={30} step={1} value={shownTemp} aria-label={noTemp ? 'Temperatura não enviada no automático' : 'Temperatura ajustada'} disabled={tempOff} onPointerDown={() => { editing.current = !learning; setDragging(true); }} onLostPointerCapture={() => setDragging(false)} onChange={event => { if (learning) setTarget(t => ({...t, temperature: Number(event.target.value)})); else setDraft(Number(event.target.value)); }} onPointerUp={() => { setDragging(false); if (!learning) void commit(draft); }} onKeyUp={() => { if (!learning) void commit(draft); }} onBlur={() => { if (!learning && editing.current) void commit(draft); }} />
         <div className="temp-scale"><span>17°</span><span>30°</span></div>
       </div>
       <button className="round" aria-label="Aumentar temperatura" disabled={tempOff || shownTemp >= tempMax} onClick={() => setTemp(shownTemp + 1)}><Plus size={18} /></button>
@@ -179,11 +183,30 @@ function Climate({casa}: {casa: Casa}) {
       <button className="tile" disabled={controlsOff} onClick={() => { if (learning) setTarget(t => ({...t, mode: MODES[(shownModeIndex + 1) % MODES.length][0]})); else moveTo(nextMode(), ac?.state.fan ?? 'auto'); }} aria-label={`Modo: ${shownModeLabel}. Tocar para trocar.`}><ShownModeIcon size={18} /><span>Modo</span><strong>{unknown && !learning ? '—' : shownModeLabel}</strong></button>
       <button className="tile" disabled={controlsOff} onClick={() => { if (learning) setTarget(t => ({...t, fan: FANS[(shownFanIndex + 1) % FANS.length][0]})); else moveTo(ac?.state.mode ?? 'cool', nextFan()); }} aria-label={`Ventilação: ${FANS[shownFanIndex][1]}. Tocar para trocar.`}><Fan size={18} /><span>Ventilação</span><strong>{unknown && !learning ? '—' : FANS[shownFanIndex][1]}</strong></button>
     </div>
+    <div className="ac-extras" role="group" aria-label="Funções do controle original">
+      {AC_EXTRAS.map(([id, label, Icon]) => {
+        const learned = !!summary?.extras?.[id];
+        // Turbo calibrado é um bit sobre o estado atual: liga e desliga de verdade, com estado estimado.
+        if (id === 'turbo' && summary?.turbo && !learning) {
+          const active = !!ac?.state.turbo;
+          return <button key={id} className={`extra learned ${active ? 'on' : ''}`} aria-pressed={active} disabled={disabled || !on}
+            title={!on ? 'Ligue o ar para usar o turbo' : active ? 'Turbo ligado (estimado). Toque para desligar.' : 'Ligar turbo no estado atual'}
+            onClick={() => void send({turbo: !active})}>
+            <Icon size={16} /><span>{active ? 'Turbo ligado' : label}</span>
+          </button>;
+        }
+        return <button key={id} className={`extra ${learned ? 'learned' : 'missing'}`} disabled={learning ? !canLearn : disabled || !learned}
+          title={learning ? `Gravar ${label}: toque aqui e aperte ${label} no controle original` : learned ? `${label}: alterna no aparelho (estado não confirmado)` : `${label} ainda não gravado: use Aprender`}
+          onClick={() => { if (!ac) return; if (learning) void casa.learn(ac.id, {key: id}, label); else void casa.key(ac.id, id); }}>
+          <Icon size={16} /><span>{label}</span>
+        </button>;
+      })}
+    </div>
     {learning ? <div className="learn-actions">
       <button className="primary" disabled={!canLearn} onClick={learnState}>{casa.busy === ac?.id ? <LoaderCircle className="spin" size={16} /> : <Radio size={16} />}Gravar ligar neste estado</button>
       <button className="pill" disabled={!canLearn} onClick={() => { if (ac) void casa.learn(ac.id, {key: 'off'}, 'desligar'); }}><Power size={16} />{learnedOff ? 'Regravar desligar' : 'Gravar desligar'}</button>
     </div> : null}
-    <Footer device={ac} casa={casa} extra={`${profileStates} estados do perfil Geonav · ${learnedStates} aprendidos · desligar ${learnedOff ? 'cadastrado' : 'não cadastrado'} · nenhum validado olhando o ar`} />
+    <Footer device={ac} casa={casa} extra={summary ? `Perfil Geonav: ${profileStates} estados${learnedOff ? ' + desligar' : ''}${learnedStates ? ` · ${learnedStates} aprendidos` : ''} · ainda não confirmado olhando o ar` : undefined} />
   </section>;
 }
 
@@ -295,10 +318,10 @@ export default function App() {
   if (tray && asleep) return <div className="tray-panel" />;
   if (tray) {
     // Bandeja: cada ícone abre um painel próprio (Ar, Lâmpadas e dispositivos, Câmeras), sem moldura nem abas.
-    const panel = tab === 'cameras' ? 'cameras' : tab === 'clima' ? 'clima' : 'dispositivos';
+    const panel = tab === 'cameras' ? 'cameras' : tab === 'clima' ? 'clima' : tab === 'local' ? 'local' : 'dispositivos';
     return <div className={`tray-panel tray-${panel}`}>
-      {casa.error && panel !== 'cameras' ? <div className="alert" role="alert"><p>{casa.error}</p><button onClick={() => void casa.connect()}><RefreshCw size={15} />Tentar de novo</button></div> : null}
-      {panel === 'cameras' ? <Cameras /> : !casa.data ? <div className="empty"><LoaderCircle className={casa.error ? '' : 'spin'} size={24} /><p>{casa.error ? 'Aguardando a central' : 'Abrindo sua casa'}</p></div>
+      {casa.error && panel !== 'cameras' && panel !== 'local' ? <div className="alert" role="alert"><p>{casa.error}</p><button onClick={() => void casa.connect()}><RefreshCw size={15} />Tentar de novo</button></div> : null}
+      {panel === 'cameras' ? <Cameras /> : panel === 'local' ? <Suspense fallback={null}><Location casa={casa} /></Suspense> : !casa.data ? <div className="empty"><LoaderCircle className={casa.error ? '' : 'spin'} size={24} /><p>{casa.error ? 'Aguardando a central' : 'Abrindo sua casa'}</p></div>
         : panel === 'clima' ? <Climate casa={casa} />
         : <>
           <div className="segmented device-switch" role="tablist" aria-label="Dispositivos">
@@ -318,8 +341,8 @@ export default function App() {
         <button className="round ghost" aria-label="Central e últimas ações" onClick={() => setSheet(true)}><Settings2 size={18} /></button>
       </header>
       <main className="body">
-        {casa.error && tab !== 'cameras' ? <div className="alert" role="alert"><p>{casa.error}</p><button onClick={() => void casa.connect()}><RefreshCw size={15} />Tentar de novo</button></div> : null}
-        {tab === 'cameras' ? <Cameras /> : !casa.data ? <div className="empty"><LoaderCircle className={casa.error ? '' : 'spin'} size={24} /><p>{casa.error ? 'Aguardando a central' : 'Abrindo sua casa'}</p></div> : tab === 'luzes' ? <Lights casa={casa} /> : tab === 'clima' ? <Climate casa={casa} /> : <Television casa={casa} />}
+        {casa.error && tab !== 'cameras' && tab !== 'local' ? <div className="alert" role="alert"><p>{casa.error}</p><button onClick={() => void casa.connect()}><RefreshCw size={15} />Tentar de novo</button></div> : null}
+        {tab === 'cameras' ? <Cameras /> : tab === 'local' ? <Suspense fallback={null}><Location casa={casa} /></Suspense> : !casa.data ? <div className="empty"><LoaderCircle className={casa.error ? '' : 'spin'} size={24} /><p>{casa.error ? 'Aguardando a central' : 'Abrindo sua casa'}</p></div> : tab === 'luzes' ? <Lights casa={casa} /> : tab === 'clima' ? <Climate casa={casa} /> : <Television casa={casa} />}
       </main>
       <nav className="tabs" aria-label="Seções">
         {TABS.map(([id, label, Icon]) => <button key={id} className={tab === id ? 'active' : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => choose(id)}><Icon size={20} /><span>{label}</span></button>)}

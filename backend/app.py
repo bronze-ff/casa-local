@@ -10,7 +10,7 @@ import time
 from . import adapters
 from .config import DATA_DIR, load_config, save_config, validate_config
 from .ir_codes import climate_summary, origin_of
-from .models import AppError, INVENTORY, SCENES, SCENE_COMMANDS, TV_KEYS, VERSION, now, validate_command
+from .models import AC_EXTRA_KEYS, AppError, INVENTORY, SCENES, SCENE_COMMANDS, TV_KEYS, VERSION, now, validate_command
 
 
 class CasaApp:
@@ -18,6 +18,7 @@ class CasaApp:
         if mode not in {"preview", "local"}:
             raise ValueError("Invalid mode")
         self.mode, self.data_dir = mode, Path(data_dir)
+        self.scenes = self._load_scene_names()
         self.config = validate_config(config) if config is not None else load_config(self.data_dir) if mode == "local" else {}
         self.csrf_token = secrets.token_urlsafe(32)
         self.lock = threading.RLock()
@@ -87,6 +88,29 @@ class CasaApp:
         except (OSError, ValueError, AppError, AttributeError):
             pass
 
+    def _load_scene_names(self):
+        """Nomes personalizados das cenas, só desta instalação (.data/scenes.json, fora do Git).
+
+        Formato: {"boa-noite": {"name": "...", "description": "..."}}. Só troca textos; os
+        comandos de cada cena continuam os de SCENE_COMMANDS.
+        """
+        scenes = deepcopy(SCENES)
+        try:
+            custom = json.loads((self.data_dir / "scenes.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return scenes
+        if not isinstance(custom, dict):
+            return scenes
+        for scene in scenes:
+            override = custom.get(scene["id"])
+            if not isinstance(override, dict):
+                continue
+            for field in ("name", "description"):
+                value = override.get(field)
+                if isinstance(value, str) and 1 <= len(value.strip()) <= 60:
+                    scene[field] = value.strip()
+        return scenes
+
     def _climate_summary(self, schema):
         # O cadastro só muda no aprendizado/importação (troca do objeto), então a identidade basta.
         cached = getattr(self, "_climate_cache", None)
@@ -97,14 +121,14 @@ class CasaApp:
 
     def snapshot(self, bootstrap=False):
         with self.lock:
-            result = {"mode": self.mode, "devices": deepcopy(self.devices), "scenes": deepcopy(SCENES), "recentActions": list(self.recent), "hub": {"name": "Casa Local", "connection": "preview" if self.mode == "preview" else "local", "status": "preview" if self.mode == "preview" else "ready", "message": "Prévia: nenhum comando físico" if self.mode == "preview" else "Servidor privado · configuração pelo terminal", "configuredCount": len(self.config), "version": VERSION}}
+            result = {"mode": self.mode, "devices": deepcopy(self.devices), "scenes": deepcopy(self.scenes), "recentActions": list(self.recent), "hub": {"name": "Casa Local", "connection": "preview" if self.mode == "preview" else "local", "status": "preview" if self.mode == "preview" else "ready", "message": "Prévia: nenhum comando físico" if self.mode == "preview" else "Servidor privado · configuração pelo terminal", "configuredCount": len(self.config), "version": VERSION}}
             for device in result["devices"]:
                 item = self.config.get(device["id"])
                 if item and item["adapter"] == "ir":
                     # Só origens e cobertura; os códigos nunca saem do servidor.
                     if device["kind"] == "climate":
                         # O ar tem ~280 estados: um resumo evita ~27 KB a cada consulta de 5 s.
-                        device["irClimate"] = self._climate_summary(item["schema"])
+                        device["irClimate"] = {**self._climate_summary(item["schema"]), "turbo": "turbo" in item.get("frameFix", {}), "calibrated": bool(item.get("frameFix"))}
                     else:
                         device["irKeys"] = {key: origin_of(entry) for key, entry in item["schema"].items()}
             if bootstrap:
@@ -170,6 +194,9 @@ class CasaApp:
             label = key
         elif body.get("key") == "off":
             key, label = "off", "desligar"
+        elif body.get("key") in AC_EXTRA_KEYS:
+            key = body["key"]
+            label = {"turbo": "turbo", "eco": "eco", "brisa": "brisa", "display": "display"}[key]
         else:
             state = body.get("state")
             command = validate_command("climate", {"action": "set", "values": state})
@@ -186,7 +213,7 @@ class CasaApp:
                 save_config(updated, self.data_dir)
                 self.config = updated
                 self.recent.appendleft({"id": secrets.token_hex(6), "deviceId": device_id, "name": device["name"], "message": f"Botão aprendido: {label}. Teste olhando o aparelho.", "status": "learned", "createdAt": now()})
-        return {"state": self.snapshot(), "learned": key if device_id == "tv-quarto" or key == "off" else label}
+        return {"state": self.snapshot(), "learned": key if device_id == "tv-quarto" or key == "off" or key in AC_EXTRA_KEYS else label}
 
     def scene(self, scene_id):
         if scene_id not in SCENE_COMMANDS:

@@ -7,10 +7,15 @@ VERSION = "0.1.0"
 TV_KEYS = {"power", "volume_up", "volume_down", "mute", "up", "down", "left", "right", "ok", "home", "back", "source"}
 MODES = {"cool", "heat", "dry", "fan", "auto"}
 FANS = {"auto", "low", "medium", "high"}
+# Botões do controle Electrolux que não existem no perfil Geonav: só funcionam depois de gravados
+# com Aprender. São alternâncias no aparelho (o estado físico não é conhecido pelo painel).
+AC_EXTRA_KEYS = {"turbo", "eco", "brisa", "display"}
+# Campos do estado do ar que escolhem o quadro no cadastro; "turbo" é um bit aplicado por cima.
+AC_STATE_FIELDS = ("power", "temperature", "mode", "fan")
 INVENTORY = [
     {"id": "quarto-luz", "kind": "light", "roomId": "quarto", "name": "Luz do quarto", "brand": "Intelbras", "state": {"power": True, "brightness": 87, "colorHex": "#FFD6A0"}},
     {"id": "banheiro-luz", "kind": "light", "roomId": "banheiro", "name": "Luz do banheiro", "brand": "Intelbras", "state": {"power": False, "brightness": 100, "colorHex": "#FFFFFF"}},
-    {"id": "ar-quarto", "kind": "climate", "roomId": "quarto", "name": "Ar do quarto", "brand": "Electrolux · Geonav IR", "state": {"power": False, "temperature": 24, "mode": "cool", "fan": "auto"}},
+    {"id": "ar-quarto", "kind": "climate", "roomId": "quarto", "name": "Ar do quarto", "brand": "Electrolux · Geonav IR", "state": {"power": False, "temperature": 24, "mode": "cool", "fan": "auto", "turbo": False}},
     {"id": "tv-quarto", "kind": "tv", "roomId": "quarto", "name": "TV do quarto", "brand": "Samsung · Geonav IR", "state": {"power": False, "volume": 18, "source": "HDMI 1", "muted": False}},
 ]
 SCENES = [
@@ -42,15 +47,19 @@ def validate_command(kind, body):
         if set(body) != {"action", "key"} or body.get("action") != "key" or not isinstance(body.get("key"), str) or body.get("key") not in TV_KEYS:
             raise AppError("Tecla não permitida.")
         return deepcopy(body)
+    if kind == "climate" and body.get("action") == "key":
+        if set(body) != {"action", "key"} or body.get("key") not in AC_EXTRA_KEYS:
+            raise AppError("Função do ar não permitida.")
+        return deepcopy(body)
     if set(body) != {"action", "values"} or body.get("action") != "set":
         raise AppError("Comando inválido.")
     values = body.get("values")
-    allowed = {"power", "brightness", "colorHex"} if kind == "light" else {"power", "temperature", "mode", "fan"}
+    allowed = {"power", "brightness", "colorHex"} if kind == "light" else {"power", "temperature", "mode", "fan", "turbo"}
     if not isinstance(values, dict) or not values or not set(values).issubset(allowed):
         raise AppError("Ajustes não permitidos.")
     for key, value in values.items():
         valid = False
-        if key == "power":
+        if key in {"power", "turbo"}:
             valid = type(value) is bool
         elif key in {"brightness", "temperature"}:
             lo, hi = (0, 100) if key == "brightness" else (17, 30)

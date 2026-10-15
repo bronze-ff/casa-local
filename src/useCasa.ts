@@ -92,5 +92,7 @@ export function useCasa() {
   // Aprender um botão do controle original: a central espera até 25 s pelo sinal, então o
   // navegador espera mais que isso antes de desistir.
   const learn = (id: string, body: Record<string, unknown>, label: string) => send(id, `/api/devices/${encodeURIComponent(id)}/learn`, body, `Aprendido: ${label}`, 40000);
-  return {data, error, busy, notice, connect, command, key, scene, discover, learn};
+  // Ações fora dos aparelhos (localização): mesmo token, mesma fila de ocupado e mesmos avisos.
+  const post = (id: string, path: string, body: Record<string, unknown>, success?: string) => send(id, path, body, success);
+  return {data, error, busy, notice, connect, command, key, scene, discover, learn, post};
 }

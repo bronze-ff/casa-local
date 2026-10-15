@@ -1,4 +1,4 @@
-"""Casa Local na bandeja do Windows: três ícones fixos (Ar, Lâmpadas e dispositivos, Câmeras),
+"""Casa Local na bandeja do Windows: quatro ícones fixos (Ar, Lâmpadas e dispositivos, Câmeras, Localização),
 cada um abre o seu painel acima do relógio, como os painéis do Windows 11.
 
 Uso: pythonw casa_tray.py --url https://pc.tailnet.ts.net [--servicos C:\\caminho\\CasaLocal]
@@ -64,11 +64,34 @@ def glyph_camera():
     return image
 
 
+def glyph_pin():
+    image, pen = tile((236, 92, 140))
+    pen.ellipse((18, 9, 46, 37), fill=WHITE)
+    pen.polygon([(20, 29), (44, 29), (32, 55)], fill=WHITE)
+    pen.ellipse((26, 17, 38, 29), fill=(236, 92, 140))
+    return image
+
+
 PANELS = {
     "clima": {"title": "Ar-condicionado", "size": (380, 560), "glyph": glyph_ac, "hash": "clima"},
     "dispositivos": {"title": "Lâmpadas e dispositivos", "size": (400, 700), "glyph": glyph_bulb, "hash": "luzes"},
     "cameras": {"title": "Câmeras", "size": (600, 620), "glyph": glyph_camera, "hash": "cameras"},
+    "local": {"title": "Localização", "size": (420, 680), "glyph": glyph_pin, "hash": "local"},
 }
+
+
+def ago(seconds):
+    return "agora" if seconds < 60 else f"há {round(seconds / 60)} min" if seconds < 3600 else f"há {seconds // 3600} h"
+
+
+def describe(status):
+    """Texto curto para a dica do ícone: onde ela está e quando chegou a última posição."""
+    last = status.get("last")
+    if not last:
+        return "aguardando o primeiro envio"
+    names = {p["id"]: p["name"] for p in status.get("places", [])}
+    where = f"em {names[status['place']]}" if status.get("place") in names else "a caminho" if (last.get("vel") or 0) >= 3 else "fora dos lugares"
+    return f"{where} · {ago(max(0, status['now'] - last['tst']))}"
 
 
 def with_status(base, state):
@@ -144,6 +167,7 @@ class Tray:
         self.services = Path(services) if services else None
         self.server_state = "?"
         self.camera_state = "?"
+        self.location_state, self.location_text, self.location_seen = "?", "Verificando…", None
         self.current = None
         self.visible = False
         self.hidden_at = 0.0
@@ -155,6 +179,8 @@ class Tray:
     def label(self, key):
         if self.server_state == "fora":
             return "Central indisponível"
+        if key == "local":
+            return self.location_text
         if key == "cameras":
             return "Câmeras funcionando" if self.camera_state == "ok" else "Câmeras paradas" if self.camera_state == "aviso" else "Verificando…"
         return "Central funcionando" if self.server_state == "ok" else "Verificando…"
@@ -241,13 +267,35 @@ class Tray:
                 cameras = "aviso"
         except (OSError, ValueError):
             server, cameras = "fora", "fora"
-        if (server, cameras) != (self.server_state, self.camera_state):
-            self.server_state, self.camera_state = server, cameras
+        location, text = self.poll_location() if server == "ok" else ("fora", "Central indisponível")
+        if (server, cameras, location, text) != (self.server_state, self.camera_state, self.location_state, self.location_text):
+            self.server_state, self.camera_state, self.location_state, self.location_text = server, cameras, location, text
             for key, icon in self.icons.items():
-                state = cameras if key == "cameras" else server
+                state = cameras if key == "cameras" else location if key == "local" else server
                 icon.icon = with_status(PANELS[key]["glyph"](), state)
                 icon.title = f"Casa · {PANELS[key]['title']} · {self.label(key)}"
                 icon.update_menu()
+
+    def poll_location(self):
+        try:
+            status = self.fetch("/api/location")
+        except (OSError, ValueError):
+            return "aviso", "Localização indisponível"
+        if not status.get("configured"):
+            return "?", "Localização não configurada"
+        text = f"{status['name']} {describe(status)}"
+        # Aviso do Windows quando ela sai ou chega de um lugar (não repete o que já existia ao abrir).
+        events = status.get("events", [])
+        newest = max((e["tst"] for e in events), default=0)
+        if self.location_seen is not None:
+            names = {p["id"]: p["name"] for p in status.get("places", [])}
+            for event in events:
+                if event["tst"] > self.location_seen:
+                    verb = "saiu de" if event["kind"] == "saiu" else "chegou em"
+                    when = time.strftime("%H:%M", time.localtime(event["tst"]))
+                    self.icons["local"].notify(f"{status['name']} {verb} {names.get(event['place'], 'um lugar')} às {when}", "Casa · Localização")
+        self.location_seen = max(newest, self.location_seen or 0)
+        return ("aviso" if status.get("stale") or not status.get("last") else "ok"), text
 
     def poll(self):
         while not self.stop.is_set():
@@ -312,8 +360,8 @@ class Tray:
         self.window.events.closing += lambda: (self.hide(), False)[1]
         threading.Thread(target=self.poll, daemon=True).start()
         threading.Thread(target=self.watch_focus, daemon=True).start()
-        # Ordem da direita para a esquerda ao lado do relógio: câmeras, dispositivos, ar.
-        for key in ("clima", "dispositivos", "cameras"):
+        # Ordem da direita para a esquerda ao lado do relógio: localização, câmeras, dispositivos, ar.
+        for key in ("clima", "dispositivos", "cameras", "local"):
             self.icons[key].run_detached()
         # O Windows registra os ícones em NotifyIconSettings com atraso; tenta fixá-los nos primeiros minutos.
         def keep_pinning():

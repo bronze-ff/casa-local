@@ -133,3 +133,35 @@ class LearnPrecedenceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExtraKeyTests(unittest.TestCase):
+    def test_learn_turbo_then_send_once_keeping_estimate(self):
+        with tempfile.TemporaryDirectory() as data:
+            app = CasaApp(mode="local", data_dir=data, config={"ar-quarto": ir_config(profile_schema())})
+            with patch("backend.adapters.learn", return_value=code(555)), patch("backend.app.save_config"):
+                result = app.learn("ar-quarto", {"key": "turbo"})
+            climate = next(d for d in result["state"]["devices"] if d["id"] == "ar-quarto")
+            self.assertEqual(climate["irClimate"]["extras"], {"turbo": "aprendido"})
+            self.assertNotIn(code(555), json.dumps(result))
+            with patch("tinytuya.Contrib.IRRemoteControlDevice.IRRemoteControlDevice.send_button") as button, \
+                 patch("tinytuya.Device.set_retry"), patch("tinytuya.Device.close"):
+                sent = adapters.send(app.config["ar-quarto"], {"action": "key", "key": "turbo"}, {"power": True, "temperature": 24, "mode": "cool", "fan": "high"})
+            button.assert_called_once_with(code(555))
+            self.assertEqual(sent["confidence"], "estimated")
+
+    def test_unlearned_or_unknown_extra_is_refused(self):
+        from backend.models import validate_command
+        with self.assertRaises(AppError):
+            validate_command("climate", {"action": "key", "key": "autodestruir"})
+        with patch("tinytuya.Contrib.IRRemoteControlDevice.IRRemoteControlDevice.send_button") as button:
+            with self.assertRaises(AppError):
+                adapters.send(ir_config(profile_schema()), {"action": "key", "key": "eco"}, {"power": True, "temperature": 24, "mode": "cool", "fan": "auto"})
+        button.assert_not_called()
+
+    def test_extras_do_not_break_config_validation(self):
+        from backend.config import validate_config
+        schema = {**profile_schema(), "turbo": {"code": code(1), "origem": "aprendido", "validado": False}}
+        validate_config({"ar-quarto": ir_config(schema)})
+        with self.assertRaises(AppError):
+            validate_config({"ar-quarto": ir_config({**profile_schema(), "foguete": code(2)})})

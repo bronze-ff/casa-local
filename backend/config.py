@@ -125,10 +125,15 @@ def validate_config(config):
                     validate_code(entry["code"])
                 else:
                     validate_code(entry)
+            if "frameFix" in item:
+                from .ac_frames import validate as valid_fix
+                if logical_id != "ar-quarto" or not valid_fix(item["frameFix"]):
+                    raise AppError("Calibração do ar inválida.")
             if logical_id == "ar-quarto":
                 from .adapters import climate_code_key
+                from .models import AC_EXTRA_KEYS
                 for state_key in schema:
-                    if state_key == "off":
+                    if state_key == "off" or state_key in AC_EXTRA_KEYS:
                         continue
                     try:
                         state = json.loads(state_key)

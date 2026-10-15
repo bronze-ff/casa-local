@@ -63,10 +63,13 @@ def climate_summary(schema):
     o controle não envia temperatura (caso do automático no perfil Electrolux). Calculado pelos
     próprios códigos, então também vale para sinais aprendidos manualmente.
     """
-    coverage, codes, origins = {}, {}, {}
+    coverage, codes, origins, extras = {}, {}, {}, {}
     for key, entry in schema.items():
         origins[origin_of(entry)] = origins.get(origin_of(entry), 0) + 1
         if key == "off":
+            continue
+        if not key.startswith("{"):
+            extras[key] = origin_of(entry)
             continue
         try:
             state = json.loads(key)
@@ -81,4 +84,4 @@ def climate_summary(schema):
     templess = sorted(f"{mode}/{fan}" for (mode, fan), distinct in codes.items()
                       if len(distinct) == 1 and len(coverage[mode][fan]) > 1)
     return {"off": origin_of(schema["off"]) if "off" in schema else None, "origins": origins,
-            "coverage": coverage, "templess": templess}
+            "coverage": coverage, "templess": templess, "extras": extras}

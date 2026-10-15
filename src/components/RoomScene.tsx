@@ -203,283 +203,353 @@ function addLightSource(
   return bulbMaterial;
 }
 
-function addShell(
-  scene: THREE.Scene,
-  wallColor: number,
-  sideWallColor: number,
-  floorBaseColor: number,
-): void {
+// Planta tirada das fotos do quarto e do banheiro reais. Eixos da maquete: x vai da parede da
+// escrivaninha (x = -3, sul) até a cabeceira da cama (x = +3, norte); z vai da parede do mangá
+// (z = -2.4, oeste) até o guarda-roupa (z = +2.4, leste). No banheiro, a parede da esquerda é a do
+// box e a do fundo é a do espelho. Paredes "cortadas" (frente e direita) ficam abertas.
+const WALL_HEIGHT = 3.08;
+
+/** Textura gerada no navegador (sem imagens externas), com sorteio fixo para sair sempre igual. */
+function canvasTexture(width: number, height: number, draw: (pen: CanvasRenderingContext2D, random: () => number) => void): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const pen = canvas.getContext("2d");
+  let seed = 7;
+  const random = () => {
+    seed = (seed * 16807) % 2147483647;
+    return seed / 2147483647;
+  };
+  if (pen) draw(pen, random);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
+}
+
+function mangaTexture(): THREE.CanvasTexture {
+  return canvasTexture(512, 384, (pen, random) => {
+    pen.fillStyle = "#e9e6df";
+    pen.fillRect(0, 0, 512, 384);
+    // Páginas de mangá coladas lado a lado, cada uma dividida em quadrinhos.
+    for (let page = 0; page < 48; page += 1) {
+      const px = (page % 8) * 64;
+      const py = Math.floor(page / 8) * 64;
+      const rows = 2 + Math.floor(random() * 2);
+      for (let row = 0; row < rows; row += 1) {
+        const cols = 1 + Math.floor(random() * 2);
+        for (let col = 0; col < cols; col += 1) {
+          const x = px + 3 + (col * 58) / cols;
+          const y = py + 3 + (row * 58) / rows;
+          const w = 58 / cols - 3;
+          const h = 58 / rows - 3;
+          const tone = 150 + Math.floor(random() * 95);
+          pen.fillStyle = `rgb(${tone},${tone},${tone})`;
+          pen.fillRect(x, y, w, h);
+          pen.fillStyle = random() > 0.5 ? "#1c1c1c" : "#5a5a5a";
+          pen.beginPath();
+          pen.ellipse(x + w * (0.3 + random() * 0.4), y + h * (0.4 + random() * 0.3), w * 0.22, h * 0.28, 0, 0, Math.PI * 2);
+          pen.fill();
+          pen.strokeStyle = "#111";
+          pen.lineWidth = 1.4;
+          pen.strokeRect(x, y, w, h);
+        }
+      }
+    }
+    // As marcas vermelhas pintadas perto da cabeceira.
+    pen.strokeStyle = "#b3262c";
+    pen.lineWidth = 5;
+    pen.beginPath();
+    pen.moveTo(440, 250); pen.lineTo(470, 236); pen.lineTo(492, 262);
+    pen.moveTo(452, 300); pen.lineTo(458, 340); pen.moveTo(470, 300); pen.lineTo(482, 336);
+    pen.stroke();
+  });
+}
+
+function concreteTexture(): THREE.CanvasTexture {
+  return canvasTexture(256, 64, (pen, random) => {
+    pen.fillStyle = "#7d827f";
+    pen.fillRect(0, 0, 256, 64);
+    for (let index = 0; index < 220; index += 1) {
+      const tone = 90 + Math.floor(random() * 80);
+      pen.fillStyle = `rgba(${tone},${tone + 4},${tone},0.45)`;
+      pen.beginPath();
+      pen.ellipse(random() * 256, random() * 64, 2 + random() * 14, 1 + random() * 6, random() * 3, 0, Math.PI * 2);
+      pen.fill();
+    }
+  });
+}
+
+function screenTexture(): THREE.CanvasTexture {
+  return canvasTexture(256, 160, (pen, random) => {
+    pen.fillStyle = "#1d1830";
+    pen.fillRect(0, 0, 256, 160);
+    pen.fillStyle = "#2a2342";
+    pen.fillRect(0, 0, 54, 160);
+    pen.fillRect(196, 0, 60, 160);
+    for (let line = 0; line < 22; line += 1) {
+      pen.fillStyle = ["#c9c3ff", "#8f7bff", "#e6e1f5", "#6cc4ff"][Math.floor(random() * 4)];
+      pen.fillRect(62, 8 + line * 6.6, 30 + random() * 96, 2.4);
+    }
+  });
+}
+
+function addShell(scene: THREE.Scene, depth: number, wallColor: number, sideWallColor: number, floorBaseColor: number): void {
+  const half = depth / 2;
   const slab = standardMaterial(0x101821, { roughness: 0.9 });
   const rearWall = standardMaterial(wallColor, { roughness: 0.92 });
   const sideWall = standardMaterial(sideWallColor, { roughness: 0.92 });
-  const trim = standardMaterial(0x805d49, { roughness: 0.68 });
   const cutEdge = standardMaterial(0x9a755c, { roughness: 0.64, metalness: 0.08 });
 
-  addBox(scene, slab, 0, -0.17, 0, 6.02, 0.28, 4.82, false, true);
-  addBox(scene, rearWall, 0, 1.54, -2.4, 6.02, 3.08, 0.18, false, true);
-  addBox(scene, sideWall, -3.0, 1.54, 0, 0.18, 3.08, 4.82, false, true);
-
-  addBox(scene, trim, 0, 0.135, -2.285, 5.92, 0.27, 0.10, false, true);
-  addBox(scene, trim, -2.885, 0.135, 0, 0.10, 0.27, 4.62, false, true);
-  addBox(scene, cutEdge, 3.015, 1.54, -2.4, 0.09, 3.08, 0.22, false, true);
-  addBox(scene, cutEdge, -3.0, 1.54, 2.405, 0.22, 3.08, 0.09, false, true);
-
-  const floorBase = standardMaterial(floorBaseColor, { roughness: 0.92 });
-  addBox(scene, floorBase, 0, -0.015, 0, 5.86, 0.05, 4.64, false, true);
+  addBox(scene, slab, 0, -0.17, 0, 6.02, 0.28, depth + 0.02, false, true);
+  addBox(scene, rearWall, 0, WALL_HEIGHT / 2, -half, 6.02, WALL_HEIGHT, 0.18, false, true);
+  addBox(scene, sideWall, -3.0, WALL_HEIGHT / 2, 0, 0.18, WALL_HEIGHT, depth, false, true);
+  addBox(scene, cutEdge, 3.015, WALL_HEIGHT / 2, -half, 0.09, WALL_HEIGHT, 0.22, false, true);
+  addBox(scene, cutEdge, -3.0, WALL_HEIGHT / 2, half + 0.005, 0.22, WALL_HEIGHT, 0.09, false, true);
+  addBox(scene, standardMaterial(floorBaseColor, { roughness: 0.92 }), 0, -0.015, 0, 5.86, 0.05, depth - 0.16, false, true);
 }
 
-function addBedroomFloor(scene: THREE.Scene): void {
-  const boards = [0x704b38, 0x79513a, 0x835840, 0x744b35, 0x8a5d43].map((color) =>
-    standardMaterial(color, { roughness: 0.84 }),
-  );
-  const seamMaterial = standardMaterial(0x3c2b26, { roughness: 0.96 });
-  const boardWidth = 0.36;
-  const boardDepth = 4.56;
-  const count = 16;
-
-  for (let index = 0; index < count; index += 1) {
-    const x = -2.7 + boardWidth * index + boardWidth / 2;
-    addBox(scene, boards[(index * 3 + Math.floor(index / 4)) % boards.length], x, 0.018, 0, boardWidth - 0.014, 0.034, boardDepth, false, true);
-    const seamZ = index % 2 === 0 ? -0.76 : 0.68;
-    addBox(scene, seamMaterial, x, 0.036, seamZ, boardWidth - 0.014, 0.004, 0.015, false, false);
-  }
-}
-
-function addBathroomFloor(scene: THREE.Scene): void {
-  const grout = standardMaterial(0x273543, { roughness: 0.9 });
-  const tiles = [0x3b5264, 0x40596b, 0x354b5c].map((color) =>
-    standardMaterial(color, { roughness: 0.72 }),
-  );
-  addBox(scene, grout, 0, 0.017, 0, 5.82, 0.04, 4.58, false, true);
-  const tileSize = 0.72;
-  for (let row = 0; row < 6; row += 1) {
-    for (let column = 0; column < 8; column += 1) {
-      const x = -2.53 + column * 0.75;
-      const z = -1.98 + row * 0.76;
-      addBox(scene, tiles[(column + row * 2) % tiles.length], x, 0.047, z, tileSize, 0.035, tileSize, false, true);
+/** Porcelanato claro em placas grandes, como no chão do quarto e do banheiro. */
+function addTileFloor(scene: THREE.Scene, depth: number, colors: number[], grout: number, size: number): void {
+  const half = depth / 2;
+  addBox(scene, standardMaterial(grout, { roughness: 0.9 }), 0, 0.017, 0, 5.82, 0.034, depth - 0.2, false, true);
+  const tiles = colors.map((color) => standardMaterial(color, { roughness: 0.38, metalness: 0.04 }));
+  const columns = Math.ceil(5.82 / size);
+  const rows = Math.ceil((depth - 0.2) / size);
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const x0 = -2.91 + column * size;
+      const z0 = -half + 0.1 + row * size;
+      const w = Math.min(size, 2.91 - x0) - 0.02;
+      const d = Math.min(size, half - 0.1 - z0) - 0.02;
+      if (w <= 0.02 || d <= 0.02) continue;
+      addBox(scene, tiles[(row * 2 + column) % tiles.length], x0 + w / 2 + 0.01, 0.045, z0 + d / 2 + 0.01, w, 0.024, d, false, true);
     }
   }
 }
 
-function addBedroomArt(scene: THREE.Scene): void {
-  const frameMaterial = standardMaterial(0x493d3b, { roughness: 0.55, metalness: 0.08 });
-  const canvasMaterial = standardMaterial(0x12233a, { roughness: 0.98 });
-  const coral = standardMaterial(0xd28a72, { roughness: 0.8 });
-  const moon = standardMaterial(0x89b8c6, { roughness: 0.55 });
-  const art = new THREE.Group();
-  art.position.set(-2.77, 2.02, 0.62);
-  art.rotation.y = Math.PI / 2;
-  scene.add(art);
-
-  const frame = new THREE.Mesh(roundedBoxGeometry(1.08, 0.82, 0.09, 0.035), frameMaterial);
-  frame.castShadow = true;
-  art.add(frame);
-  const canvas = new THREE.Mesh(roundedBoxGeometry(0.94, 0.68, 0.018, 0.02), canvasMaterial);
-  canvas.position.z = 0.058;
-  art.add(canvas);
-  const arch = new THREE.Mesh(new THREE.CircleGeometry(0.23, 28), coral);
-  arch.position.set(-0.13, -0.05, 0.073);
-  art.add(arch);
-  const smallMoon = new THREE.Mesh(new THREE.CircleGeometry(0.13, 28), moon);
-  smallMoon.position.set(0.2, 0.14, 0.077);
-  art.add(smallMoon);
-}
-
-function addPlant(
-  scene: THREE.Scene,
-  x: number,
-  z: number,
-  potColor: number,
-  leafColor: number,
-): void {
-  const pot = standardMaterial(potColor, { roughness: 0.74 });
-  const soil = standardMaterial(0x382e2b, { roughness: 1 });
-  const leaves = standardMaterial(leafColor, { roughness: 0.8 });
-  addCylinder(scene, pot, x, 0.23, z, 0.2, 0.15, 0.36, 24);
-  addCylinder(scene, soil, x, 0.414, z, 0.154, 0.154, 0.025, 24);
-  addCylinder(scene, standardMaterial(0x516a4c, { roughness: 0.9 }), x, 0.82, z, 0.027, 0.035, 0.82, 10);
-
-  const placements: Array<[number, number, number, number]> = [
-    [-0.2, 0.91, 0.03, -0.7],
-    [0.2, 1.03, 0.03, 0.7],
-    [-0.18, 1.25, -0.01, -0.4],
-    [0.17, 1.38, -0.02, 0.45],
-    [0, 1.5, -0.02, 0.05],
-  ];
-  for (const [offsetX, height, offsetZ, rotation] of placements) {
-    const leaf = addSphere(scene, leaves, x + offsetX, height, z + offsetZ, 0.13, 0.34, 0.075, 16);
-    leaf.rotation.z = rotation;
-  }
+function addPendantBulb(scene: THREE.Scene, x: number, z: number, lights: LightTarget[], emissive: EmissiveTarget[]): void {
+  const cord = standardMaterial(0x1c1c20, { roughness: 0.8 });
+  addCylinder(scene, cord, x, 3.0, z, 0.008, 0.008, 0.36, 6).castShadow = false;
+  addCylinder(scene, standardMaterial(0xe8e8e8, { roughness: 0.5 }), x, 2.8, z, 0.05, 0.05, 0.1, 14);
+  addLightSource(scene, x, 2.66, z, 11, lights, emissive);
 }
 
 function addBedroom(scene: THREE.Scene, lights: LightTarget[], emissive: EmissiveTarget[]): void {
-  addBedroomFloor(scene);
-  addBedroomArt(scene);
+  addTileFloor(scene, 4.8, [0xa49c90, 0x9e968a, 0xa8a094], 0x6f6a63, 0.98);
 
-  const wood = standardMaterial(0x523c35, { roughness: 0.68 });
-  const woodLight = standardMaterial(0x89654c, { roughness: 0.62 });
-  const upholstery = standardMaterial(0x263b52, { roughness: 0.95 });
-  const mattress = standardMaterial(0xc2ccd2, { roughness: 0.96 });
-  const duvet = standardMaterial(0x344d65, { roughness: 0.94 });
-  const pillow = standardMaterial(0xe0ded4, { roughness: 1 });
-  const rug = standardMaterial(0x38414a, { roughness: 1 });
-  const darkDetail = standardMaterial(0x1b2837, { roughness: 0.86 });
+  const panel = standardMaterial(0x7e6650, { roughness: 0.7 });
+  const panelSeam = standardMaterial(0x5d4a3a, { roughness: 0.8 });
+  const white = standardMaterial(0xd9d6cf, { roughness: 0.55 });
+  const black = standardMaterial(0x17171a, { roughness: 0.6 });
+  const pine = standardMaterial(0xb08a5c, { roughness: 0.82 });
+  const pineDark = standardMaterial(0x8c6a43, { roughness: 0.86 });
+  const doorWood = standardMaterial(0xa87645, { roughness: 0.7 });
+  const chrome = standardMaterial(0xb6bcc2, { roughness: 0.25, metalness: 0.75 });
+  const vansRed = standardMaterial(0x9e2a2b, { roughness: 0.75 });
 
-  addRoundedBox(scene, rug, 0.95, 0.035, 0.52, 3.18, 0.045, 3.56, 0.13);
+  // ---- Parede do mangá (fundo): porta de correr de madeira e papel de parede de mangá.
+  addBox(scene, standardMaterial(0x7a5a3c, { roughness: 0.74 }), 0, 2.86, -2.29, 5.8, 0.36, 0.05, false, true);
+  addBox(scene, doorWood, -1.86, 1.3, -2.25, 1.74, 2.5, 0.07);
+  addBox(scene, standardMaterial(0x936538, { roughness: 0.72 }), -1.6, 2.6, -2.24, 2.5, 0.2, 0.09);
+  addSphere(scene, chrome, -1.12, 1.25, -2.205, 0.035, 0.035, 0.02, 12);
+  for (const [x, y] of [[-1.98, 1.95], [-1.45, 1.86]]) addCylinder(scene, standardMaterial(0xf2f2f2, { roughness: 0.6 }), x, y, -2.21, 0.045, 0.045, 0.006, 16).rotation.x = Math.PI / 2;
+  addBox(scene, standardMaterial(0xff8fb6, { roughness: 0.9 }), -1.62, 1.7, -2.212, 0.12, 0.12, 0.006, false, false);
+  const manga = new THREE.Mesh(new THREE.PlaneGeometry(3.9, 2.62), new THREE.MeshStandardMaterial({ map: mangaTexture(), roughness: 0.9 }));
+  manga.position.set(0.98, 1.36, -2.302);
+  manga.receiveShadow = true;
+  scene.add(manga);
 
-  // Bed frame, upholstered headboard, layered linen, pillows, and a folded throw.
-  addRoundedBox(scene, wood, 1.02, 0.22, 0.48, 2.72, 0.38, 3.08, 0.11);
-  for (const x of [-0.12, 2.16]) {
-    for (const z of [-0.82, 1.78]) addBox(scene, wood, x, 0.065, z, 0.15, 0.17, 0.16);
+  // ---- Parede da escrivaninha (esquerda): painel de madeira, ar, TV, monitor, prateleira e tênis.
+  addBox(scene, panel, -2.88, 1.26, -0.64, 0.05, 2.5, 3.34, false, true);
+  for (const z of [-1.55, 0.25]) addBox(scene, panelSeam, -2.852, 1.26, z, 0.008, 2.5, 0.018, false, false);
+  const ac = standardMaterial(0xdfe5e7, { roughness: 0.6 });
+  addRoundedBox(scene, ac, -2.74, 2.76, 0.35, 0.3, 0.38, 1.46, 0.08);
+  addBox(scene, standardMaterial(0x8ea1a8, { roughness: 0.52 }), -2.585, 2.63, 0.35, 0.02, 0.02, 1.2, false, false);
+  addBox(scene, standardMaterial(0x2a3036, { roughness: 0.4 }), -2.585, 2.84, 0.62, 0.012, 0.05, 0.22, false, false);
+
+  // Mesa branca suspensa, com gaveteiro branco embaixo da ponta perto da porta.
+  addRoundedBox(scene, white, -2.46, 1.06, -0.78, 0.86, 0.07, 3.06, 0.03);
+  addRoundedBox(scene, white, -2.5, 0.53, -1.82, 0.74, 0.98, 0.72, 0.04);
+  for (const y of [0.85, 0.55, 0.25]) addBox(scene, standardMaterial(0xb9b5ad, { roughness: 0.6 }), -2.125, y, -1.82, 0.012, 0.012, 0.62, false, false);
+
+  // TV na parede acima do monitor; monitor com o editor aberto.
+  addRoundedBox(scene, black, -2.82, 2.16, -0.52, 0.06, 0.74, 1.3, 0.02);
+  addRoundedBox(scene, black, -2.64, 1.44, -0.52, 0.06, 0.58, 0.98, 0.02);
+  const screenGlow = new THREE.MeshStandardMaterial({ map: screenTexture(), emissive: 0x6a5cff, emissiveIntensity: 0.32, roughness: 0.35 });
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.92, 0.52), screenGlow);
+  screen.position.set(-2.605, 1.44, -0.52);
+  screen.rotation.y = Math.PI / 2;
+  scene.add(screen);
+  emissive.push({ material: screenGlow, maxIntensity: 0.32 });
+  addCylinder(scene, standardMaterial(0xcfd2d6, { roughness: 0.4 }), -2.7, 1.16, -0.52, 0.06, 0.08, 0.16, 16);
+  addRoundedBox(scene, black, -2.32, 1.115, -0.6, 0.26, 0.035, 0.74, 0.015);
+  addBox(scene, standardMaterial(0xe0662b, { roughness: 0.6 }), -2.32, 1.135, -0.88, 0.2, 0.01, 0.16, false, false);
+  addRoundedBox(scene, standardMaterial(0x141416, { roughness: 0.95 }), -2.38, 1.103, 0.25, 0.5, 0.012, 0.66, 0.02);
+  addBox(scene, standardMaterial(0x9b1d22, { roughness: 0.9 }), -2.38, 1.11, 0.22, 0.24, 0.004, 0.3, false, false);
+  addSphere(scene, standardMaterial(0xc6e83a, { roughness: 0.5 }), -2.3, 1.15, 0.5, 0.08, 0.04, 0.06, 14);
+
+  // Gabinete preto sobre a mesa e prateleira de mangás acima dele.
+  addRoundedBox(scene, black, -2.6, 1.5, -1.62, 0.6, 0.82, 0.32, 0.03);
+  addCylinder(scene, standardMaterial(0x2a2a2e, { roughness: 0.5 }), -2.295, 1.66, -1.62, 0.1, 0.1, 0.01, 18).rotation.z = Math.PI / 2;
+  const led = standardMaterial(0xff3b30, { emissive: 0xff3b30, emissiveIntensity: 0.9 });
+  addBox(scene, led, -2.295, 1.86, -1.62, 0.01, 0.03, 0.1, false, false);
+  addRoundedBox(scene, white, -2.72, 2.12, -1.6, 0.36, 0.05, 1.32, 0.02);
+  const spines = [0xe07a2e, 0xe07a2e, 0xd96d22, 0xf2efe8, 0x1d1d20, 0x26262a, 0x1d1d20, 0x2f2f33, 0x1d1d20, 0xc9302c, 0x26262a, 0x1d1d20];
+  spines.forEach((color, index) => addBox(scene, standardMaterial(color, { roughness: 0.8 }), -2.72, 2.3, -2.16 + index * 0.095, 0.28, 0.3, 0.085));
+  addBox(scene, standardMaterial(0xe9e4e4, { roughness: 0.7 }), -2.845, 1.9, -1.6, 0.012, 0.16, 0.4, false, false);
+
+  // Caixas de tênis vermelhas presas na parede, com os tênis em cima.
+  for (const y of [1.42, 1.86, 2.3]) {
+    addBox(scene, vansRed, -2.7, y, 0.86, 0.36, 0.2, 0.56);
+    addRoundedBox(scene, standardMaterial(0x26262a, { roughness: 0.8 }), -2.7, y + 0.16, 0.86, 0.28, 0.1, 0.48, 0.05);
+    addBox(scene, standardMaterial(0xe8e4dc, { roughness: 0.8 }), -2.7, y + 0.115, 0.86, 0.29, 0.02, 0.49, false, false);
   }
-  addRoundedBox(scene, upholstery, 1.02, 0.88, -1.105, 2.82, 1.16, 0.19, 0.12);
-  for (const x of [0.08, 0.56, 1.04, 1.52, 2.0]) {
-    addBox(scene, standardMaterial(0x304860, { roughness: 0.98 }), x, 0.88, -0.998, 0.018, 0.95, 0.012, false, false);
+
+  // Cadeira preta de escritório virada para a mesa.
+  addRoundedBox(scene, black, -1.72, 0.68, -0.45, 0.62, 0.12, 0.62, 0.08);
+  addRoundedBox(scene, black, -1.38, 1.1, -0.45, 0.12, 0.78, 0.6, 0.08);
+  addCylinder(scene, chrome, -1.72, 0.4, -0.45, 0.035, 0.035, 0.5, 10);
+  for (let leg = 0; leg < 5; leg += 1) {
+    const angle = (leg / 5) * Math.PI * 2;
+    const spoke = addBox(scene, chrome, -1.72 + Math.cos(angle) * 0.2, 0.12, -0.45 + Math.sin(angle) * 0.2, 0.4, 0.035, 0.05);
+    spoke.rotation.y = -angle;
   }
-  addRoundedBox(scene, mattress, 1.02, 0.47, 0.48, 2.58, 0.33, 2.89, 0.14);
-  addRoundedBox(scene, duvet, 1.02, 0.655, 0.63, 2.47, 0.12, 2.35, 0.13);
-  addRoundedBox(scene, standardMaterial(0x536b7e, { roughness: 0.96 }), 1.02, 0.737, 1.48, 2.45, 0.085, 0.62, 0.09);
-  addRoundedBox(scene, pillow, 0.42, 0.68, -0.48, 1.02, 0.18, 0.66, 0.14);
-  addRoundedBox(scene, pillow, 1.62, 0.68, -0.48, 1.02, 0.18, 0.66, 0.14);
 
-  const bedside = standardMaterial(0x5b4038, { roughness: 0.72 });
-  addRoundedBox(scene, bedside, -0.61, 0.405, -1.14, 0.76, 0.66, 0.67, 0.07);
-  addRoundedBox(scene, woodLight, -0.61, 0.77, -1.14, 0.82, 0.09, 0.72, 0.045);
-  addRoundedBox(scene, standardMaterial(0x684d41, { roughness: 0.7 }), -0.61, 0.48, -0.79, 0.58, 0.18, 0.035, 0.025);
-  addSphere(scene, standardMaterial(0xc99b70, { metalness: 0.36, roughness: 0.35 }), -0.61, 0.48, -0.76, 0.035, 0.035, 0.026, 14);
+  // Passagem para o banheiro no canto, ao lado da mesa (porta aberta, banheiro aceso ao fundo).
+  addBox(scene, standardMaterial(0x1d2a2c, { roughness: 0.9 }), -2.86, 1.2, 1.78, 0.03, 2.3, 0.92, false, false);
+  addBox(scene, doorWood, -2.84, 2.4, 1.78, 0.08, 0.1, 1.06);
+  for (const z of [1.27, 2.29]) addBox(scene, doorWood, -2.84, 1.2, z, 0.08, 2.4, 0.08);
+  const bathGlow = standardMaterial(0x7fb3a8, { roughness: 0.6, emissive: 0x3c6e66, emissiveIntensity: 0.25 });
+  addBox(scene, bathGlow, -2.855, 1.0, 1.78, 0.02, 1.4, 0.7, false, false);
 
-  const lampBase = standardMaterial(0x9f8269, { metalness: 0.52, roughness: 0.35 });
-  addCylinder(scene, lampBase, -0.61, 0.86, -1.15, 0.12, 0.14, 0.075, 24);
-  addCylinder(scene, lampBase, -0.61, 1.045, -1.15, 0.022, 0.022, 0.31, 16);
-  addCylinder(scene, standardMaterial(0xd7c1a1, { roughness: 0.87 }), -0.61, 1.25, -1.15, 0.14, 0.24, 0.28, 28);
-  addLightSource(scene, -0.61, 1.31, -1.15, 10, lights, emissive);
-
-  // Narrow desk and monitor tucked into the back-left corner.
-  addRoundedBox(scene, woodLight, -1.78, 0.82, -1.63, 1.62, 0.12, 0.78, 0.045);
-  for (const x of [-2.43, -1.13]) {
-    for (const z of [-1.91, -1.37]) addBox(scene, wood, x, 0.42, z, 0.075, 0.78, 0.075);
+  // ---- Cama de pallet com cabeceira de ripas, sob a janela (lado direito, norte).
+  for (const y of [0.1, 0.27]) {
+    addBox(scene, pine, 1.32, y, -0.42, 3.3, 0.15, 2.72);
+    for (const x of [-0.3, 0.8, 1.9, 2.94]) addBox(scene, pineDark, x, y, -0.42, 0.14, 0.152, 2.74, false, false);
   }
-  addRoundedBox(scene, darkDetail, -1.78, 1.35, -2.13, 1.05, 0.67, 0.09, 0.045);
-  const screenMaterial = standardMaterial(0x0d1c29, { roughness: 0.32, metalness: 0.08 });
-  addRoundedBox(scene, screenMaterial, -1.78, 1.35, -2.075, 0.91, 0.53, 0.015, 0.025);
-  const screenGlow = standardMaterial(0x27566a, { roughness: 0.38, emissive: 0x1a7890, emissiveIntensity: 0.24 });
-  addRoundedBox(scene, screenGlow, -1.78, 1.38, -2.064, 0.79, 0.39, 0.008, 0.025);
-  emissive.push({ material: screenGlow, maxIntensity: 0.24 });
-  addRoundedBox(scene, darkDetail, -1.78, 0.99, -2.01, 0.075, 0.28, 0.055, 0.02);
-  addRoundedBox(scene, woodLight, -1.78, 0.855, -1.99, 0.43, 0.045, 0.22, 0.02);
+  addBox(scene, standardMaterial(0x1e2f6e, { roughness: 0.95 }), 1.34, 0.47, -0.42, 2.98, 0.26, 2.3);
+  addRoundedBox(scene, standardMaterial(0x23368a, { roughness: 0.96 }), 1.34, 0.61, -0.42, 2.96, 0.05, 2.28, 0.04);
+  addRoundedBox(scene, standardMaterial(0x203078, { roughness: 1 }), 2.5, 0.72, -1.0, 0.56, 0.16, 0.92, 0.1);
+  addRoundedBox(scene, standardMaterial(0x203078, { roughness: 1 }), 2.5, 0.72, 0.12, 0.56, 0.16, 0.92, 0.1);
+  addSphere(scene, standardMaterial(0x6f9fa3, { roughness: 1 }), 1.55, 0.74, -0.25, 0.62, 0.16, 0.42, 18);
+  const neckPillow = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.08, 10, 24, Math.PI * 1.6), standardMaterial(0x7a72c9, { roughness: 1 }));
+  neckPillow.position.set(0.25, 0.71, -1.1);
+  neckPillow.rotation.x = -Math.PI / 2;
+  neckPillow.castShadow = true;
+  scene.add(neckPillow);
+  addRoundedBox(scene, standardMaterial(0xa3243d, { roughness: 1 }), 0.25, 0.65, -0.72, 0.62, 0.06, 0.5, 0.05);
+  // Cabeceira: ripas horizontais de pallet na largura da cama.
+  for (let slat = 0; slat < 5; slat += 1) addBox(scene, pine, 2.92, 0.52 + slat * 0.24, -0.42, 0.1, 0.14, 3.02);
+  for (const z of [-1.88, -0.42, 1.04]) addBox(scene, pineDark, 2.86, 0.98, z, 0.06, 1.1, 0.1, false, false);
+  // Caixotes de criado-mudo dos dois lados, com tênis dentro.
+  for (const z of [-2.02, 1.18]) {
+    addBox(scene, pine, 2.62, 0.62, z, 0.5, 0.04, 0.5);
+    addBox(scene, pine, 2.62, 0.04, z, 0.5, 0.04, 0.5);
+    addBox(scene, pine, 2.62, 0.33, z - 0.235, 0.5, 0.58, 0.03);
+    addBox(scene, pine, 2.62, 0.33, z + 0.235, 0.5, 0.58, 0.03);
+    addBox(scene, pine, 2.86, 0.33, z, 0.03, 0.58, 0.5);
+    addRoundedBox(scene, standardMaterial(0xece8e0, { roughness: 0.8 }), 2.6, 0.13, z, 0.36, 0.12, 0.3, 0.05);
+  }
 
-  // A compact chair, air conditioner, and quiet plant detail.
-  addRoundedBox(scene, standardMaterial(0x233d54, { roughness: 0.92 }), -1.78, 0.52, -0.86, 0.62, 0.15, 0.58, 0.09);
-  addRoundedBox(scene, upholstery, -1.78, 0.91, -0.59, 0.58, 0.68, 0.14, 0.1);
-  for (const x of [-2.0, -1.56]) addBox(scene, wood, x, 0.27, -0.72, 0.055, 0.46, 0.055);
+  // ---- Guarda-roupa (encostado na parede da frente, que é cortada): em "raio-X", translúcido e só
+  // com o contorno, para mostrar o lugar e o tamanho real sem esconder a escrivaninha.
+  const ghost = new THREE.MeshBasicMaterial({ color: 0xd8d2c8, transparent: true, opacity: 0.1, depthWrite: false });
+  const outline = new THREE.LineBasicMaterial({ color: 0xe8e2d8, transparent: true, opacity: 0.55 });
+  const wardrobe = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.52, 0.78), ghost);
+  wardrobe.position.set(0.55, 1.26, 1.98);
+  scene.add(wardrobe);
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(wardrobe.geometry), outline);
+  edges.position.copy(wardrobe.position);
+  scene.add(edges);
+  // Divisões das quatro portas escuras e das laterais brancas, na face voltada para a cama.
+  const doorLines: number[] = [];
+  for (const x of [-0.45, -0.2, 0.3, 0.8, 1.3, 1.8]) doorLines.push(x, 0.08, 1.585, x, 2.44, 1.585);
+  const doors = new THREE.BufferGeometry();
+  doors.setAttribute("position", new THREE.Float32BufferAttribute(doorLines, 3));
+  scene.add(new THREE.LineSegments(doors, outline));
+  addRoundedBox(scene, black, 1.72, 1.02, 1.5, 0.3, 0.46, 0.16, 0.06);
+  // Violão encostado ao lado do guarda-roupa, perto da cabeceira.
+  addSphere(scene, standardMaterial(0x6d3a22, { roughness: 0.5 }), 2.28, 0.42, 2.12, 0.22, 0.26, 0.08, 18);
+  addSphere(scene, standardMaterial(0x6d3a22, { roughness: 0.5 }), 2.28, 0.74, 2.12, 0.17, 0.18, 0.08, 18);
+  addBox(scene, standardMaterial(0x2c1a12, { roughness: 0.6 }), 2.28, 1.12, 2.12, 0.06, 0.62, 0.04);
 
-  const ac = standardMaterial(0xd8e1e4, { roughness: 0.6 });
-  addRoundedBox(scene, ac, 1.9, 2.53, -2.16, 1.42, 0.38, 0.22, 0.11);
-  addBox(scene, standardMaterial(0x8ea1a8, { roughness: 0.52 }), 1.9, 2.415, -2.032, 1.15, 0.018, 0.022, false, false);
-  addPlant(scene, 2.43, -1.76, 0x8c6253, 0x58775c);
-
-  const stripMaterial = standardMaterial(0xffffff, {
-    roughness: 0.32,
-    emissive: DEFAULT_TINT,
-    emissiveIntensity: 0.75,
-  });
-  addRoundedBox(scene, stripMaterial, 1.02, 1.46, -1.0, 2.48, 0.035, 0.035, 0.015);
-  emissive.push({ material: stripMaterial, maxIntensity: 0.86 });
+  // Lâmpada do quarto (a luz controlada pelo painel).
+  addPendantBulb(scene, 0.4, -0.2, lights, emissive);
 }
 
-function addBathroomTiles(scene: THREE.Scene): void {
-  const backTiles = [0x3b5263, 0x435b6b, 0x354b5b].map((color) =>
-    standardMaterial(color, { roughness: 0.62 }),
-  );
-  const sideTiles = [0x33495a, 0x3b5263, 0x304556].map((color) =>
-    standardMaterial(color, { roughness: 0.66 }),
-  );
-
-  for (let row = 0; row < 5; row += 1) {
+function addBathroomWalls(scene: THREE.Scene, depth: number): void {
+  const half = depth / 2;
+  const tiles = [0xdfe3e2, 0xd7dcdb].map((color) => standardMaterial(color, { roughness: 0.3, metalness: 0.04 }));
+  const tileTop = 2.36;
+  const size = 0.59;
+  for (let row = 0; row * size < tileTop; row += 1) {
+    const h = Math.min(size, tileTop - row * size) - 0.02;
     for (let column = 0; column < 10; column += 1) {
-      addBox(
-        scene,
-        backTiles[(row + column) % backTiles.length],
-        -2.72 + column * 0.6,
-        0.43 + row * 0.58,
-        -2.292,
-        0.575,
-        0.555,
-        0.025,
-        false,
-        true,
-      );
+      addBox(scene, tiles[(row + column) % 2], -2.91 + column * size + size / 2, row * size + h / 2 + 0.02, -half + 0.105, size - 0.02, h, 0.02, false, true);
+    }
+    for (let column = 0; column * size < depth - 0.2; column += 1) {
+      const w = Math.min(size, depth - 0.2 - column * size) - 0.02;
+      addBox(scene, tiles[(row + column + 1) % 2], -2.895, row * size + h / 2 + 0.02, -half + 0.1 + column * size + w / 2, 0.02, h, w, false, true);
     }
   }
-  for (let row = 0; row < 5; row += 1) {
-    for (let column = 0; column < 8; column += 1) {
-      addBox(
-        scene,
-        sideTiles[(row + column * 2) % sideTiles.length],
-        -2.89,
-        0.43 + row * 0.58,
-        -2.1 + column * 0.59,
-        0.025,
-        0.555,
-        0.565,
-        false,
-        true,
-      );
-    }
-  }
+  // Faixa de concreto aparente entre o azulejo e o teto.
+  const concrete = new THREE.MeshStandardMaterial({ map: concreteTexture(), roughness: 0.95 });
+  const band = WALL_HEIGHT - tileTop;
+  addBox(scene, concrete, 0, tileTop + band / 2, -half + 0.1, 5.82, band, 0.02, false, true);
+  addBox(scene, concrete, -2.9, tileTop + band / 2, 0, 0.02, band, depth - 0.2, false, true);
 }
 
 function addBathroom(scene: THREE.Scene, lights: LightTarget[], emissive: EmissiveTarget[]): void {
-  addBathroomFloor(scene);
-  addBathroomTiles(scene);
+  const depth = 4.0;
+  const half = depth / 2;
+  addTileFloor(scene, depth, [0xd8d4cc, 0xd2cec6], 0xa9a59d, 0.98);
+  addBathroomWalls(scene, depth);
 
-  const walnut = standardMaterial(0x4b3935, { roughness: 0.72 });
-  const counter = standardMaterial(0x9caeb2, { roughness: 0.45, metalness: 0.08 });
-  const porcelain = standardMaterial(0xdce4e4, { roughness: 0.34 });
-  const chrome = standardMaterial(0x94aeb6, { roughness: 0.24, metalness: 0.7 });
-  const mirrorFrame = standardMaterial(0xb18b65, { roughness: 0.36, metalness: 0.44 });
+  const porcelain = standardMaterial(0xeef0f0, { roughness: 0.28 });
+  const chrome = standardMaterial(0xc3cbd0, { roughness: 0.2, metalness: 0.8 });
+  const granite = standardMaterial(0xcbbba4, { roughness: 0.42 });
+  const frame = standardMaterial(0xe6e8e8, { roughness: 0.4 });
 
-  // Floating vanity and round mirror.
-  addRoundedBox(scene, walnut, -1.83, 0.47, -1.64, 1.42, 0.76, 0.68, 0.08);
-  addRoundedBox(scene, counter, -1.83, 0.88, -1.64, 1.56, 0.12, 0.78, 0.055);
-  addRoundedBox(scene, standardMaterial(0x594540, { roughness: 0.68 }), -1.83, 0.56, -1.278, 1.14, 0.21, 0.035, 0.025);
-  addSphere(scene, mirrorFrame, -1.83, 1.92, -2.23, 0.55, 0.55, 0.055, 28);
-  addSphere(scene, standardMaterial(0x456477, { roughness: 0.2, metalness: 0.2 }), -1.83, 1.92, -2.164, 0.48, 0.48, 0.025, 28);
-  addSphere(scene, standardMaterial(0x6b8992, { roughness: 0.3, metalness: 0.08 }), -1.99, 2.03, -2.135, 0.11, 0.31, 0.012, 18);
+  // Box no fundo, de ponta a ponta: vidro fosco, perfis brancos e a toalha laranja no trilho.
+  const glass = new THREE.MeshStandardMaterial({ color: 0xc7dfdb, transparent: true, opacity: 0.38, roughness: 0.55, metalness: 0.02, depthWrite: false });
+  addBox(scene, glass, -1.35, 1.2, -0.48, 0.03, 2.3, 1.95, false, false);
+  addBox(scene, glass, -1.39, 1.2, 0.86, 0.03, 2.3, 1.3, false, false);
+  addBox(scene, frame, -1.36, 2.38, 0.0, 0.07, 0.07, depth - 0.2, false, false);
+  addBox(scene, frame, -1.36, 0.06, 0.0, 0.07, 0.06, depth - 0.2, false, false);
+  for (const z of [-half + 0.12, half - 0.12, 0.2]) addBox(scene, frame, -1.36, 1.2, z, 0.05, 2.36, 0.05, false, false);
+  addRoundedBox(scene, standardMaterial(0xf08a6a, { roughness: 1 }), -1.36, 2.02, -0.55, 0.12, 0.74, 0.78, 0.04);
+  addBox(scene, standardMaterial(0xe27a5a, { roughness: 1 }), -1.28, 1.86, -0.55, 0.05, 0.12, 0.78, false, false);
+  // Chuveiro elétrico branco na parede do fundo do box, com o fio subindo.
+  addRoundedBox(scene, porcelain, -2.76, 2.5, -0.65, 0.26, 0.12, 0.5, 0.05);
+  addSphere(scene, porcelain, -2.55, 2.42, -0.65, 0.2, 0.05, 0.2, 18);
+  addCylinder(scene, standardMaterial(0x1c1c20, { roughness: 0.8 }), -2.86, 2.75, -0.4, 0.008, 0.008, 0.6, 6);
+  addBox(scene, standardMaterial(0xcfd3d3, { roughness: 0.4 }), -2.87, 1.45, -0.42, 0.02, 0.4, 0.24, false, false);
 
-  // Vessel basin and a simple metal tap.
-  addSphere(scene, porcelain, -1.83, 0.98, -1.64, 0.42, 0.14, 0.27, 24);
-  addSphere(scene, standardMaterial(0x526976, { roughness: 0.42 }), -1.83, 1.035, -1.64, 0.31, 0.075, 0.19, 22);
-  addCylinder(scene, chrome, -1.83, 1.08, -1.88, 0.025, 0.035, 0.2, 16);
-  addCylinder(scene, chrome, -1.83, 1.17, -1.78, 0.025, 0.025, 0.19, 16).rotation.x = Math.PI / 2;
+  // Vaso encostado na parede do espelho, logo depois do box.
+  addRoundedBox(scene, porcelain, -0.78, 0.72, -half + 0.32, 0.62, 0.42, 0.26, 0.06);
+  addSphere(scene, porcelain, -0.78, 0.32, -half + 0.72, 0.28, 0.3, 0.4, 22);
+  addRoundedBox(scene, porcelain, -0.78, 0.52, -half + 0.78, 0.6, 0.06, 0.82, 0.18);
 
-  // Porcelain tub with a quiet glass shower screen.
-  addRoundedBox(scene, porcelain, 1.42, 0.38, -0.25, 1.64, 0.64, 2.4, 0.18);
-  addRoundedBox(scene, standardMaterial(0x455d68, { roughness: 0.26, metalness: 0.04 }), 1.42, 0.718, -0.25, 1.32, 0.045, 2.08, 0.16);
-  addRoundedBox(scene, standardMaterial(0x688791, { roughness: 0.24, metalness: 0.08 }), 1.42, 0.747, -0.25, 1.12, 0.025, 1.87, 0.13);
-  const glass = new THREE.MeshStandardMaterial({
-    color: 0x85bdcb,
-    transparent: true,
-    opacity: 0.2,
-    roughness: 0.16,
-    metalness: 0.08,
-    depthWrite: false,
-  });
-  addBox(scene, glass, 0.47, 1.52, -0.32, 0.035, 2.05, 1.45, false, false);
-  addBox(scene, chrome, 0.48, 2.55, -0.32, 0.055, 0.055, 1.55, false, false);
+  // Bancada de granito bege com cuba quadrada branca e torneira alta.
+  addRoundedBox(scene, granite, 1.28, 1.0, -half + 0.56, 3.2, 0.08, 0.92, 0.03);
+  addBox(scene, granite, 1.28, 0.9, -half + 1.0, 3.2, 0.16, 0.04);
+  addRoundedBox(scene, porcelain, 0.42, 1.04, -half + 0.92, 0.92, 0.26, 0.78, 0.07);
+  addRoundedBox(scene, standardMaterial(0xc8cdcd, { roughness: 0.3 }), 0.42, 1.12, -half + 0.92, 0.74, 0.04, 0.6, 0.06);
+  addCylinder(scene, chrome, 0.42, 1.36, -half + 0.42, 0.03, 0.04, 0.6, 14);
+  addCylinder(scene, chrome, 0.42, 1.64, -half + 0.56, 0.022, 0.022, 0.32, 12).rotation.x = Math.PI / 2;
+  // Espelho grande na parede, de ponta a ponta da bancada.
+  addBox(scene, standardMaterial(0xbfd0d6, { roughness: 0.12, metalness: 0.25 }), 1.28, 1.78, -half + 0.13, 3.18, 1.36, 0.03, false, false);
+  // Frascos sobre a bancada e cesto de roupa embaixo.
+  const bottles: Array<[number, number, number]> = [[1.3, 0x6f4bd6, 0.32], [1.48, 0x6f4bd6, 0.3], [1.8, 0x1d1d20, 0.24], [2.05, 0xd9d4cc, 0.28], [2.3, 0xe8b9b0, 0.34], [2.55, 0xf0efe9, 0.22]];
+  for (const [x, color, h] of bottles) addCylinder(scene, standardMaterial(color, { roughness: 0.5 }), x, 1.04 + h / 2, -half + 0.42, 0.06, 0.06, h, 12);
+  addCylinder(scene, standardMaterial(0x2f9e72, { roughness: 0.7 }), 2.0, 0.32, -half + 0.6, 0.34, 0.28, 0.6, 18);
 
-  // A compact toilet in the open foreground and a folded towel at the side.
-  addRoundedBox(scene, porcelain, -1.15, 0.65, 0.62, 0.48, 0.7, 0.18, 0.06);
-  addSphere(scene, porcelain, -1.15, 0.31, 0.95, 0.4, 0.28, 0.58, 24);
-  addSphere(scene, standardMaterial(0x50616a, { roughness: 0.4 }), -1.15, 0.48, 0.93, 0.29, 0.08, 0.43, 22);
-  addRoundedBox(scene, standardMaterial(0x93a9ae, { roughness: 0.92 }), -2.72, 1.49, 0.8, 0.13, 0.68, 0.56, 0.06);
-  addRoundedBox(scene, standardMaterial(0x758e97, { roughness: 0.94 }), -2.69, 1.42, 0.8, 0.12, 0.11, 0.49, 0.045);
+  // Tapete vermelho diante do box.
+  addRoundedBox(scene, standardMaterial(0xa3151d, { roughness: 1 }), -0.75, 0.07, 0.95, 0.75, 0.04, 1.2, 0.12);
 
-  const sconce = standardMaterial(0xe9e0d2, { roughness: 0.45, emissive: DEFAULT_TINT, emissiveIntensity: 0.65 });
-  addRoundedBox(scene, sconce, -1.83, 2.63, -2.17, 0.48, 0.13, 0.18, 0.06);
-  emissive.push({ material: sconce, maxIntensity: 0.85 });
-  addLightSource(scene, -1.83, 2.54, -2.05, 8, lights, emissive);
-  addPlant(scene, 2.51, -1.9, 0x829395, 0x52745e);
+  // Lâmpada do banheiro (a luz controlada pelo painel).
+  addPendantBulb(scene, 0.6, 0.0, lights, emissive);
 }
 
 function createRoomModel(room: RoomKind): RoomModel {
@@ -489,9 +559,9 @@ function createRoomModel(room: RoomKind): RoomModel {
   camera.position.set(8.2, 7.2, 9.2);
   camera.lookAt(0, 1.12, 0);
 
-  const hemisphere = new THREE.HemisphereLight(0xd6e8fa, 0x17202b, 1.55);
+  const hemisphere = new THREE.HemisphereLight(0xd6e8fa, 0x17202b, 1.35);
   scene.add(hemisphere);
-  const key = new THREE.DirectionalLight(0xffe4c5, 2.1);
+  const key = new THREE.DirectionalLight(0xffe4c5, 1.9);
   key.position.set(-4, 8, 5);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
@@ -508,10 +578,10 @@ function createRoomModel(room: RoomKind): RoomModel {
   const lights: LightTarget[] = [];
   const emissive: EmissiveTarget[] = [];
   if (room === "quarto") {
-    addShell(scene, 0x40536a, 0x34485c, 0x29211e);
+    addShell(scene, 4.8, 0x8a929b, 0x7d8690, 0x29211e);
     addBedroom(scene, lights, emissive);
   } else {
-    addShell(scene, 0x304657, 0x293d4e, 0x25333c);
+    addShell(scene, 4.0, 0x8a949a, 0x7e888e, 0x25333c);
     addBathroom(scene, lights, emissive);
   }
 
@@ -526,6 +596,7 @@ function disposeModel(model: RoomModel): void {
       geometries.add(object.geometry);
       const meshMaterials = Array.isArray(object.material) ? object.material : [object.material];
       meshMaterials.forEach((material) => materials.add(material));
+      meshMaterials.forEach((material) => (material as THREE.MeshStandardMaterial).map?.dispose());
     }
   });
   geometries.forEach((geometry) => geometry.dispose());

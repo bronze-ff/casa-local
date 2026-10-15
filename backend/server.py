@@ -18,10 +18,11 @@ from urllib.parse import unquote, urlsplit
 from .app import CasaApp
 from .cameras import LIVE_SECONDS, CameraBridge
 from .config import ROOT, private_ip
+from .location import LocationStore
 from .models import AppError, VERSION
 
 MAX_BODY = 16384
-CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'{ws}; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tile.openstreetmap.org; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'{ws}; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
 
 
 def local_hosts(extra=None):
@@ -54,9 +55,10 @@ class CasaServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
-    def __init__(self, address, app, dist_dir=None, allowed_hosts=None, cameras=None):
+    def __init__(self, address, app, dist_dir=None, allowed_hosts=None, cameras=None, location=None):
         self.app = app
         self.cameras = cameras or CameraBridge()
+        self.location = location or LocationStore(app.data_dir)
         self.dist_dir = Path(dist_dir or ROOT / "dist").resolve()
         self.allowed_hosts = local_hosts(allowed_hosts)
         self.slots = threading.BoundedSemaphore(16)
@@ -128,7 +130,7 @@ class CasaHandler(BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(encoded)
 
-    def guard(self, mutation=False):
+    def guard(self, mutation=False, phone=False):
         if not private_ip(self.client_address[0]):
             raise AppError("Acesso restrito à rede privada.", 403, "private_network_only")
         hosts = self.headers.get_all("Host", [])
@@ -142,6 +144,14 @@ class CasaHandler(BaseHTTPRequestHandler):
                 raise ValueError
         except ValueError:
             raise AppError("Host não permitido.", 403, "invalid_host") from None
+        # Pelo Tailscale Serve (.ts.net) o celular dela também chega aqui: com a localização
+        # preparada, só o dono da tailnet vê o painel; os demais só podem enviar a posição.
+        # O Serve preenche Tailscale-User-Login e descarta o valor que vier do cliente.
+        owner = self.server.location.owner
+        if owner and hostname.endswith(".ts.net") and not phone:
+            logins = self.headers.get_all("Tailscale-User-Login", [])
+            if len(logins) != 1 or logins[0].strip().lower() != owner:
+                raise AppError("Este acesso só envia a localização.", 403, "owner_only")
         origins = self.headers.get_all("Origin", [])
         if len(origins) > 1:
             raise AppError("Origem não permitida.", 403, "invalid_origin")
@@ -250,6 +260,9 @@ class CasaHandler(BaseHTTPRequestHandler):
 
     def dispatch(self, mutation):
         try:
+            if urlsplit(self.path).path == "/owntracks":
+                self.receive_owntracks()
+                return
             self.guard(mutation)
             target = urlsplit(self.path)
             path = target.path
@@ -263,7 +276,17 @@ class CasaHandler(BaseHTTPRequestHandler):
                 match = re.fullmatch(r"/api/devices/([a-z-]+)/commands", path)
                 scene = re.fullmatch(r"/api/scenes/([a-z-]+)/run", path)
                 learn = re.fullmatch(r"/api/devices/(tv-quarto|ar-quarto)/learn", path)
-                if match:
+                remove_place = re.fullmatch(r"/api/location/places/([a-z0-9-]{1,24})/remove", path)
+                location = self.server.location
+                if path == "/api/location/setup" and set(body) == {"name"}:
+                    result = {"phone": location.setup(body["name"]), "location": location.status()}
+                elif path == "/api/location/phone" and not body:
+                    result = {"phone": location.phone_config()}
+                elif path == "/api/location/places":
+                    result = location.save_place(body)
+                elif remove_place and not body:
+                    result = location.remove_place(remove_place[1])
+                elif match:
                     result = app.command(match[1], body)
                 elif learn:
                     result = app.learn(learn[1], body)
@@ -278,6 +301,8 @@ class CasaHandler(BaseHTTPRequestHandler):
                 self.json_response(200, app.snapshot(path.endswith("bootstrap")))
             elif path == "/api/status":
                 self.json_response(200, {"version": VERSION, "mode": app.mode, "configuredCount": len(app.config), "build": self.published_build()})
+            elif path == "/api/location":
+                self.json_response(200, self.server.location.status())
             elif path == "/api/cameras":
                 self.json_response(200, self.server.cameras.snapshot())
             elif camera := re.fullmatch(r"/api/cameras/(cam[0-9]{1,2})/frame\.jpg", path):
@@ -300,6 +325,17 @@ class CasaHandler(BaseHTTPRequestHandler):
             pass
         except Exception:
             self.json_response(500, {"error": "Não foi possível concluir a solicitação.", "code": "internal_error"})
+
+    def receive_owntracks(self):
+        """Posições do app OwnTracks (modo HTTP). Sem token do painel: autentica por HTTP Basic."""
+        self.guard(phone=True)
+        if self.command != "POST" or urlsplit(self.path).query:
+            raise AppError("Use POST.", 405, "method_not_allowed")
+        self.server.location.authorize(self.headers.get("Authorization"), self.client_address[0])
+        lengths = self.headers.get_all("Content-Length", [])
+        # O app manda corpo vazio quando um amigo é apagado: nada a guardar.
+        body = {} if lengths == ["0"] else self.read_json()
+        self.json_response(200, self.server.location.ingest(body))
 
     def relay_ws(self, camera_id):
         if self.headers.get("Upgrade", "").lower() != "websocket":

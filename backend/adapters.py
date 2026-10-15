@@ -5,9 +5,9 @@ import logging
 import multiprocessing
 import socket
 
-from . import tuya_light
+from . import ac_frames, tuya_light
 from .ir_codes import code_of
-from .models import AppError
+from .models import AC_STATE_FIELDS, AppError
 
 
 MODE_PT = {"cool": "resfriar", "heat": "aquecer", "dry": "desumidificar", "fan": "ventilar", "auto": "automático"}
@@ -23,7 +23,7 @@ def _requested_dps(config):
 
 
 def climate_code_key(state):
-    return json.dumps(state, sort_keys=True, separators=(",", ":"))
+    return json.dumps({k: state[k] for k in AC_STATE_FIELDS if k in state}, sort_keys=True, separators=(",", ":"))
 
 
 def encode_dp(field, value, spec):
@@ -226,6 +226,10 @@ def send(config, command, current):
                 key, estimated = command["key"], {}
             else:
                 estimated = {**current, **command["values"]}
+                if estimated.get("power") is False:
+                    estimated["turbo"] = False
+                if estimated.get("turbo") and "turbo" not in config.get("frameFix", {}):
+                    raise AppError("O turbo ainda não foi calibrado. Grave o mesmo estado com e sem turbo e rode a calibração.", 409, "ir_not_learned")
                 # Desligar costuma ser o mesmo sinal em qualquer estado: usa o código "off" quando aprendido.
                 key = "off" if estimated.get("power") is False and "off" in config["schema"] else climate_code_key(estimated)
             entry = config["schema"].get(key)
@@ -245,10 +249,14 @@ def send(config, command, current):
             # control_type avoids automatic detection, which itself emits study commands.
             device = CheckedIR(**common, control_type=config["controlType"])
             device.set_retry(False)
-            device.send_button(code_of(entry))
+            code = code_of(entry)
+            if key.startswith("{") and config.get("frameFix"):
+                # Quadros do perfil viram os do controle original; o turbo é um bit sobre o estado.
+                code = ac_frames.adjust(code, config["frameFix"], bool(estimated.get("turbo")))
+            device.send_button(code)
             if isinstance(device.send_result, dict) and ("Error" in device.send_result or "Err" in device.send_result):
                 raise AppError("A central não confirmou o envio. Confira antes de repetir.", 502, "device_unavailable")
-            return {"status": "sent", "confidence": "estimated" if estimated else "unknown", "state": estimated, "message": "IR enviado uma vez; o estado físico não é confirmado."}
+            return {"status": "sent", "confidence": "estimated" if estimated or "temperature" in current else "unknown", "state": estimated, "message": "IR enviado uma vez; o estado físico não é confirmado."}
         schema = config["schema"]
         values = command["values"]
         if config["adapter"] == "light":

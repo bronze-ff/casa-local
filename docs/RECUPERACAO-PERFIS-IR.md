@@ -72,3 +72,37 @@ Feita fora de casa, sem enviar comandos, entrar em Aprender, executar cenas ou v
 **Testes:** `tests/backend/test_climate_profile.py` (11 novos). Suíte completa: 80 testes, um ignorado, em três execuções seguidas; compilação e detector de design limpos. Instalado no PC de casa (servidor reiniciado; go2rtc e bandeja intactos; a bandeja recarrega o painel novo ao fechar o popup).
 
 **Não verificado:** a tela do automático com estado real (depende de um comando enviado para haver estado estimado). Pendências físicas: [ROTEIRO-TESTES-FISICOS.md](ROTEIRO-TESTES-FISICOS.md).
+
+## Validação física e diagnóstico da ventilação — 15/10/2026 (noite)
+
+**Comprovado pelo proprietário em casa:** o ar ligou e respondeu pelo painel (resfriar, mudança de temperatura e ventilação alta). Liga/desliga e ventilação **alta** e **baixa** fazem o ar apitar (sinal recebido).
+
+**Problema relatado:** ventilação **média** e **automática** às vezes não fazem o ar apitar nem mudar.
+
+**Análise offline dos sinais do perfil (sem envio):** quadro de 9,1/4,55 ms, 35 bits + pausa + 32 bits (formato do tipo Gree). Entre S0–S3 mudam só os bits 4–5 do primeiro byte (0 automática, 1 baixa, 2 média, 3 alta), igual em todos os modos e temperaturas; o verificador desse formato não usa esses bits. Estruturalmente, os quatro sinais são consistentes — a análise offline não aponta código corrompido.
+
+**Hipóteses e próximo teste:** (1) o modelo pode não ter média/automática no mesmo formato — conferir no controle original; (2) o controle original pode enviar esses estados com outro bit. Teste: Aprender › "24 °C · Resfriar · Média" pelo controle original; comparar bit a bit o sinal aprendido com o do perfil e, se a diferença for sistemática, corrigir todas as temperaturas de média/automática de uma vez. O sinal aprendido já tem precedência para o estado gravado.
+
+**Turbo:** o perfil recuperado não tem tecla de turbo (246 entradas: estados, `power_on`, `power_off`). Só é possível adicioná-lo aprendendo do controle original, o que exige suporte a uma tecla extra no painel.
+
+**Interface:** a animação do vento acompanha a ventilação (baixa 7 fios lentos, média 11, alta 14 rápidos e longos, automática "respirando") e a cor acompanha o modo.
+
+## Calibração dos quadros do ar com o controle original (15/10/2026)
+
+Gravações feitas com Aprender: 22 °C resfriar auto, 22 °C resfriar auto com turbo, 24 °C resfriar média.
+A comparação bit a bit com o perfil Geonav mostrou que:
+
+- o perfil difere do controle original em **3 bits fixos** em todos os estados (seg0[22]=1, seg1[1]=0, seg1[8]=1).
+  É a causa provável de a ventilação média e a automática não serem aceitas pelo ar;
+- o **turbo é um único bit** (seg0[20]) sobre o mesmo estado; o checksum não muda;
+- o "33º bit" do perfil era só a pausa final do quadro (1 ms no perfil, ~52 ms no controle), não um dado.
+
+Aplicando a correção aos quadros do perfil, as três gravações são reproduzidas bit a bit, e a correção
+vale para todos os 244 quadros do perfil. Ela fica no cadastro DPAPI como `frameFix` do `ar-quarto`
+e é aplicada no envio (`backend/ac_frames.py`). Para recalibrar depois de novas gravações:
+
+    .venv\Scripts\python.exe -m backend.calibrar_ar          (mostra)
+    .venv\Scripts\python.exe -m backend.calibrar_ar --apply  (salva; depois reinicie o servidor)
+
+No painel, o botão Turbo passa a ligar e desligar de verdade (estado estimado; desligar o ar zera o turbo).
+Falta o teste físico: média, automática e turbo ligado/desligado.
