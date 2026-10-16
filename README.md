@@ -64,7 +64,7 @@ O ar por IR precisa de códigos para cada combinação completa de potência, te
 
 ## Ícone na bandeja
 
-`tray/casa_tray.py` coloca a Casa na bandeja do Windows: clique abre o popup acima do relógio (fecha ao clicar fora), o ponto no ícone mostra o status (verde: painel e câmeras; âmbar: câmeras paradas; vermelho: central fora) e o botão direito oferece Câmeras, Abrir no navegador, Reiniciar serviços (só no PC de casa), Iniciar com o Windows e Sair. Instalado em `%LOCALAPPDATA%\CasaLocalBandeja` no PC de casa e no notebook:
+`tray/casa_tray.py` coloca a Casa na bandeja do Windows com **um ícone só**. O clique (ou **Ctrl+Alt+H**) abre o painel completo acima do relógio, com as abas Luzes, Clima, TV, Câmeras, Local e Central, na última aba usada; fecha ao clicar fora ou com Esc. O botão direito tem ações rápidas sem abrir o painel: cenas, ligar/desligar o ar e timer, luzes, cada câmera direto ao vivo, Localização e Central, além de Reiniciar serviços (só no PC de casa), Iniciar com o Windows e Sair. A bolinha do ícone fica verde com tudo ok, laranja com aviso novo (movimento nas câmeras marcadas, saída/chegada na localização, algo na saúde do sistema) e vermelha se o painel cair; os avisos também aparecem como notificação do Windows. Instalado em `%LOCALAPPDATA%\CasaLocalBandeja` no PC de casa e no notebook:
 
 ```powershell
 # PC de casa
@@ -72,6 +72,10 @@ O ar por IR precisa de códigos para cada combinação completa de potência, te
 # Notebook (pelo Tailscale)
 .\tray\instalar-bandeja.ps1 -Url https://<PC-DE-CASA>.<TAILNET>.ts.net
 ```
+
+## Central: saúde, rotinas, movimento, TVs e gasto do ar
+
+Detalhes em [docs/CENTRAL.md](docs/CENTRAL.md): rotinas por horário e "desligar o ar em…", saúde do sistema com vigia e backup diário, eventos de movimento do DVR com foto, TVs Samsung pela rede (pareamento na própria TV) e gasto estimado do ar.
 
 ## Instalação atual no PC de casa
 

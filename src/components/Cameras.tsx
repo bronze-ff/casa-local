@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera as CameraIcon, CameraOff, Cctv, ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, ShieldCheck, X } from 'lucide-react';
+import { Bell, BellOff, Camera as CameraIcon, CameraOff, Cctv, ChevronLeft, ChevronRight, History, LoaderCircle, Pause, Play, Radio, RefreshCw, RotateCcw, RotateCw, ShieldCheck, SkipForward, X } from 'lucide-react';
+import type { useCasa } from '../useCasa';
 
 type Camera = {id: string; name: string; group: 'externa' | 'interna'};
 type Frame = {url?: string; at?: number; failed?: boolean};
-type Filter = 'todas' | 'externa' | 'interna';
+type Filter = 'todas' | 'externa' | 'interna' | 'movimento';
+type MotionEvent = {id: string; camera: string; start: number; end: number | null; count: number; photo: boolean; hits?: [number, number | null][]};
+// Horários no relógio do DVR (o impresso no vídeo); `offset` = DVR − este aparelho, em segundos.
+type ReplayTarget = {camera: Camera; start: number; from: number; to: number; offset: number};
+type Motion = {connected: boolean; error: string | null; events: MotionEvent[]; notify: string[]; unseen: number; dvrOffset?: number};
+type Casa = ReturnType<typeof useCasa>;
 
 const REFRESH_MS = 4000;
 const PARALLEL = 5;
@@ -19,10 +25,13 @@ function ago(at: number | undefined, now: number) {
 }
 
 /** H264 direto do DVR via go2rtc (MSE por WebSocket): primeiro quadro em ~1 s, sem conversão no PC. */
-function playMse(video: HTMLVideoElement, cameraId: string, onLive: () => void, onFail: () => void) {
+type PlayOptions = {replay?: boolean; held?: () => boolean; onEnd?: () => void};
+/** No ao vivo segue a ponta do stream; no replay (`replay`) toca no ritmo da gravação, respeita a
+ * pausa do usuário (`held`) e avisa quando o trecho acaba (`onEnd`). */
+function playMse(video: HTMLVideoElement, path: string, onLive: () => void, onFail: () => void, options: PlayOptions = {}) {
   const source = new MSE!();
   const managed = MSE !== window.MediaSource;
-  const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/cameras/${cameraId}/ws`);
+  const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${path}`);
   socket.binaryType = 'arraybuffer';
   let buffer: SourceBuffer | null = null;
   let queue: ArrayBuffer[] = [];
@@ -44,9 +53,14 @@ function playMse(video: HTMLVideoElement, cameraId: string, onLive: () => void, 
     if (buffer.buffered.length) {
       const end = buffer.buffered.end(buffer.buffered.length - 1);
       const start = buffer.buffered.start(0);
-      // Stay at the live edge and keep only a few seconds in memory.
-      if (end - video.currentTime > 1.2) video.currentTime = end - 0.2;
-      if (end - start > 10) { try { buffer.remove(start, end - 6); } catch { /* ignore */ } }
+      if (options.replay) {
+        // Gravação: sem pular para a ponta (pausar segura a imagem); descarta só o que já passou.
+        if (video.currentTime - start > 10) { try { buffer.remove(start, video.currentTime - 5); } catch { /* ignore */ } }
+      } else {
+        // Stay at the live edge and keep only a few seconds in memory.
+        if (end - video.currentTime > 1.2) video.currentTime = end - 0.2;
+        if (end - start > 10) { try { buffer.remove(start, end - 6); } catch { /* ignore */ } }
+      }
     }
   };
   source.addEventListener('sourceopen', request, {once: true});
@@ -64,9 +78,9 @@ function playMse(video: HTMLVideoElement, cameraId: string, onLive: () => void, 
     }
     queue.push(event.data as ArrayBuffer);
     pump();
-    if (video.paused) void video.play().catch(() => {});
+    if (video.paused && !options.held?.()) void video.play().catch(() => {});
   };
-  socket.onclose = () => { if (!closed && !live) onFail(); };
+  socket.onclose = () => { if (closed) return; if (!live) onFail(); else options.onEnd?.(); };
   const onPlaying = () => { if (!live) { live = true; onLive(); } };
   video.addEventListener('playing', onPlaying);
   return () => {
@@ -80,7 +94,7 @@ function playMse(video: HTMLVideoElement, cameraId: string, onLive: () => void, 
   };
 }
 
-function LiveView({cameras, index, poster, move, close}: {cameras: Camera[]; index: number; poster?: string; move: (step: number) => void; close: () => void}) {
+function LiveView({cameras, index, poster, move, close, rewind}: {cameras: Camera[]; index: number; poster?: string; move: (step: number) => void; close: () => void; rewind: (camera: Camera) => void}) {
   const dialog = useRef<HTMLDialogElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const image = useRef<HTMLImageElement>(null);
@@ -91,7 +105,7 @@ function LiveView({cameras, index, poster, move, close}: {cameras: Camera[]; ind
   useEffect(() => { setState('loading'); setMjpeg(!MSE); }, [camera.id]);
   useEffect(() => {
     if (mjpeg || !video.current) return;
-    return playMse(video.current, camera.id, () => setState('live'), () => setMjpeg(true));
+    return playMse(video.current, `/api/cameras/${camera.id}/ws`, () => setState('live'), () => setMjpeg(true));
   }, [camera.id, mjpeg]);
   useEffect(() => {
     const node = image.current;
@@ -120,6 +134,7 @@ function LiveView({cameras, index, poster, move, close}: {cameras: Camera[]; ind
     <div className="camera-live__bar">
       <button className="round ghost back" aria-label="Voltar para a grade" onClick={close}><ChevronLeft size={20} /><span>Voltar</span></button>
       <div><strong>Canal {camera.id.replace('cam', '')}</strong><small>{camera.name}</small></div>
+      <button className="pill rewind" onClick={() => rewind(camera)} title="Ver a gravação do último minuto"><History size={15} />Rever 1 min</button>
       <span className={`live-badge ${state}`}><i />{state === 'live' ? 'Ao vivo' : state === 'failed' ? 'Sem sinal' : 'Conectando'}</span>
       <button className="round ghost close" aria-label="Fechar câmera" onClick={close}><X size={18} /></button>
     </div>
@@ -136,7 +151,197 @@ function LiveView({cameras, index, poster, move, close}: {cameras: Camera[]; ind
   </dialog>;
 }
 
-export default function Cameras() {
+const stamp = (tst: number) => new Date(tst * 1000).toLocaleString('pt-BR', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'});
+
+/** Gravação do próprio DVR a partir de um horário: voltar/avançar 30 s, pausar e ir ao ao vivo. */
+/** Janela da linha do tempo para um evento: 30 s antes até 1 min depois do fim, com pelo menos 3 min. */
+function eventWindow(camera: Camera, event: MotionEvent, offset: number): ReplayTarget {
+  const realNow = Date.now() / 1000 + offset;
+  const from = event.start - 30;
+  const to = Math.min(realNow - 5, Math.max((event.end ?? realNow) + 60, from + 180));
+  return {camera, start: event.start - 10, from, to, offset};
+}
+
+/** Barra como a do YouTube: marcações laranja onde o DVR viu movimento, traço da posição atual,
+ * tocar/arrastar para pular e "próximo movimento". */
+function Timeline({from, to, now, hits, seek}: {from: number; to: number; now: number; hits: [number, number][]; seek: (t: number) => void}) {
+  const track = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<number | null>(null);
+  // Ref além do estado: um toque rápido solta o dedo antes da tela redesenhar.
+  const dragging = useRef(false);
+  const span = Math.max(1, to - from);
+  const pct = (t: number) => `${Math.min(100, Math.max(0, ((t - from) / span) * 100))}%`;
+  const at = (clientX: number) => { const box = track.current!.getBoundingClientRect(); return from + Math.min(1, Math.max(0, (clientX - box.left) / box.width)) * span; };
+  const next = hits.map(([a]) => a).find(a => a > now + 2);
+  const time = (t: number) => new Date(t * 1000).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+  return <div className="replay-timeline">
+    <div className="replay-track" ref={track} role="slider" aria-label="Linha do tempo da gravação" aria-valuemin={Math.round(from)} aria-valuemax={Math.round(to)} aria-valuenow={Math.round(now)} aria-valuetext={time(now)} tabIndex={0}
+      onKeyDown={event => { if (event.key === 'ArrowLeft') seek(now - 10); if (event.key === 'ArrowRight') seek(now + 10); }}
+      onPointerDown={event => { try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* sem captura */ } dragging.current = true; setDrag(at(event.clientX)); }}
+      onPointerMove={event => { if (dragging.current) setDrag(at(event.clientX)); }}
+      onPointerUp={event => { if (dragging.current) { dragging.current = false; seek(at(event.clientX)); setDrag(null); } }}
+      onPointerCancel={() => { dragging.current = false; setDrag(null); }}>
+      <span className="replay-track__rail" />
+      {hits.map(([a, b], index) => <i key={index} className="replay-hit" style={{left: pct(a), width: `max(4px, calc(${pct(b)} - ${pct(a)}))`}} />)}
+      <b className="replay-head" style={{left: pct(drag ?? now)}}>{drag !== null ? <em>{time(drag)}</em> : null}</b>
+    </div>
+    <div className="replay-scale"><span>{time(from)}</span>
+      <button className="link" disabled={next === undefined} onClick={() => next !== undefined && seek(next - 3)}><SkipForward size={14} />{next === undefined ? 'Sem outro movimento' : `Próximo movimento ${time(next)}`}</button>
+      <span>{time(to)}</span></div>
+  </div>;
+}
+
+function ReplayView({camera, start, from, to, offset: clockOffset, casa, close, goLive}: ReplayTarget & {casa: Casa; close: () => void; goLive: () => void}) {
+  const dvrNow = () => Date.now() / 1000 + clockOffset;
+  type State = 'loading' | 'live' | 'failed' | 'ended' | 'unsupported';
+  const dialog = useRef<HTMLDialogElement>(null);
+  const video = useRef<HTMLVideoElement>(null);
+  const [base, setBase] = useState(Math.floor(start));
+  const [replay, setReplay] = useState<string | null>(null);
+  const [state, setState] = useState<State>(MSE ? 'loading' : 'unsupported');
+  const [failure, setFailure] = useState('');
+  const [offset, setOffset] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const held = useRef(false);
+  const first = useRef<number | null>(null);
+  const current = useRef<string | null>(null);
+  const opening = useRef<Promise<void>>(Promise.resolve());
+  const shut = (id: string) => { void casa.call(`/api/replays/${id}/close`, {}).catch(() => {}); };
+  useEffect(() => { const node = dialog.current; node?.showModal(); return () => node?.close(); }, []);
+  // Cada horário pedido abre um replay novo no servidor, que já descarta o anterior.
+  useEffect(() => {
+    if (!MSE) return;
+    let cancelled = false;
+    setState('loading'); setReplay(null); setOffset(0); setPaused(false); held.current = false; first.current = null;
+    // Aberturas em fila: cada uma espera a anterior e troca o replay aberto; um pulo que já foi
+    // substituído antes da vez dele nem abre. Chamada própria, fora da fila de "ocupado" do painel.
+    opening.current = opening.current.then(async () => {
+      if (cancelled) return;
+      const previous = current.current;
+      current.current = null;
+      try {
+        const value = await casa.call(`/api/cameras/${camera.id}/replay`, {start: base, ...(previous ? {replace: previous} : {})});
+        if (cancelled) { shut(value.id); return; }  // fechado ou trocado enquanto o DVR respondia
+        current.current = value.id;
+        setReplay(value.id);
+      } catch (error) {
+        if (!cancelled) { setFailure((error as Error).message); setState('failed'); }
+      }
+    });
+    return () => { cancelled = true; };
+  }, [camera.id, base]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // Fechar ou recarregar a página com o replay aberto também o fecha no servidor.
+    const leave = () => { if (current.current) void casa.call(`/api/replays/${current.current}/close`, {}, true).catch(() => {}); };
+    window.addEventListener('pagehide', leave);
+    return () => { window.removeEventListener('pagehide', leave); if (current.current) shut(current.current); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!replay || !video.current) return;
+    return playMse(video.current, `/api/replays/${replay}/ws`, () => setState('live'), () => setState('failed'),
+      {replay: true, held: () => held.current, onEnd: () => setState('ended')});
+  }, [replay]);
+  const now = base + offset;
+  const seekTo = (t: number) => setBase(Math.min(Math.floor(dvrNow()) - 10, Math.floor(t)));
+  const jump = (seconds: number) => seekTo(now + seconds);
+  // Disparos de movimento desta câmera dentro da janela (eventos antigos sem disparos: início-fim).
+  const [hits, setHits] = useState<[number, number][]>([]);
+  useEffect(() => {
+    void fetch(`/api/motion/${camera.id}`, {cache: 'no-store'}).then(r => r.ok ? r.json() : null).then(value => {
+      if (!value) return;
+      const all: [number, number][] = [];
+      for (const event of value.events as MotionEvent[]) {
+        for (const [a, b] of event.hits ?? [[event.start, event.end]]) all.push([a, b ?? Math.max(a + 5, dvrNow())]);
+      }
+      setHits(all.sort((x, y) => x[0] - y[0]));
+    }).catch(() => {});
+  }, [camera.id]);
+  // A janela acompanha se o vídeo passar do fim dela (até o agora).
+  const windowEnd = Math.min(dvrNow() - 5, Math.max(to, now + 30));
+  const windowHits = hits.filter(([a, b]) => b >= from && a <= windowEnd);
+  const toggle = () => {
+    const node = video.current;
+    if (!node) return;
+    held.current = !node.paused;
+    if (node.paused) void node.play(); else node.pause();
+    setPaused(held.current);
+  };
+  return <dialog ref={dialog} className="camera-live replay" onCancel={close} aria-label={`Gravação: ${camera.name}`}>
+    <div className="camera-live__bar">
+      <button className="round ghost back" aria-label="Voltar" onClick={close}><ChevronLeft size={20} /><span>Voltar</span></button>
+      <div><strong>{camera.name}</strong><small>Gravação do DVR · {stamp(now)}</small></div>
+      <button className="pill live-jump" onClick={goLive}><Radio size={15} />Ao vivo</button>
+      <button className="round ghost close" aria-label="Fechar" onClick={close}><X size={18} /></button>
+    </div>
+    <div className="camera-live__stage">
+      <video ref={video} muted autoPlay playsInline aria-label={`Gravação de ${camera.name}`}
+        onTimeUpdate={event => { const t = event.currentTarget.currentTime; if (first.current === null) first.current = t; setOffset(Math.max(0, t - first.current)); }} />
+      {state === 'loading' ? <div className="camera-live__overlay"><LoaderCircle className="spin" size={26} /><p>Buscando a gravação no DVR…</p></div> : null}
+      {state === 'failed' ? <div className="camera-live__overlay"><CameraOff size={26} /><p>{failure || 'O DVR não entregou a gravação desse horário (pode não ter sido gravado).'}</p></div> : null}
+      {state === 'ended' ? <div className="camera-live__overlay"><History size={26} /><p>Fim deste trecho da gravação. Avance ou volte para continuar.</p></div> : null}
+      {state === 'unsupported' ? <div className="camera-live__overlay"><CameraOff size={26} /><p>Este navegador não toca a gravação. Use o Chrome, o Edge ou o Safari atualizado.</p></div> : null}
+      <Timeline from={from} to={windowEnd} now={now} hits={windowHits} seek={seekTo} />
+      <div className="replay-controls" role="group" aria-label="Controle da gravação">
+        <button aria-label="Voltar 30 segundos" onClick={() => jump(-30)}><RotateCcw size={18} /><span>30 s</span></button>
+        <button aria-label={paused ? 'Continuar' : 'Pausar'} className="main" disabled={state !== 'live'} onClick={toggle}>{paused ? <Play size={20} /> : <Pause size={20} />}</button>
+        <button aria-label="Avançar 30 segundos" onClick={() => jump(30)}><RotateCw size={18} /><span>30 s</span></button>
+      </div>
+    </div>
+  </dialog>;
+}
+
+const clock = (tst: number) => new Date(tst * 1000).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+const day = (tst: number) => { const d = new Date(tst * 1000), today = new Date(); return d.toDateString() === today.toDateString() ? 'Hoje' : new Date(today.getTime() - 86400000).toDateString() === d.toDateString() ? 'Ontem' : d.toLocaleDateString('pt-BR'); };
+
+/** Linha do tempo de movimento (eventos do próprio DVR) e escolha de quais câmeras avisam. */
+function MotionView({cameras, motion, casa, open, reload}: {cameras: Camera[]; motion: Motion | null; casa: Casa; open: (event: MotionEvent) => void; reload: () => void}) {
+  const [cam, setCam] = useState<string>('todas');
+  // Uma câmera escolhida busca os eventos dela no servidor (a lista geral traz só os mais recentes de todas).
+  const [only, setOnly] = useState<{camera: string; events: MotionEvent[]} | null>(null);
+  useEffect(() => {
+    if (cam === 'todas') { setOnly(null); return; }
+    let stop = false;
+    const load = async () => {
+      try { const response = await fetch(`/api/motion/${cam}`, {cache: 'no-store'}); if (response.ok && !stop) setOnly({camera: cam, events: (await response.json()).events}); } catch { /* tenta de novo */ }
+    };
+    void load();
+    const timer = setInterval(() => { if (!document.hidden) void load(); }, 15000);
+    return () => { stop = true; clearInterval(timer); };
+  }, [cam]);
+  const names = Object.fromEntries(cameras.map(c => [c.id, c.name]));
+  if (!motion) return <div className="empty"><LoaderCircle className="spin" size={22} /><p>Lendo eventos do DVR</p></div>;
+  const loadingCam = cam !== 'todas' && only?.camera !== cam;
+  const events = cam === 'todas' ? motion.events : only?.camera === cam ? only.events : [];
+  const watching = motion.notify.includes(cam);
+  const toggle = async (id: string) => { await casa.post('motion', '/api/motion/notify', {camera: id, on: !motion.notify.includes(id)}); reload(); };
+  let lastDay = '';
+  return <div className="motion">
+    <div className={`motion-status ${motion.connected ? 'ok' : 'warn'}`}><i />{motion.connected ? 'Recebendo eventos do DVR' : motion.error ?? 'Conectando ao DVR…'}<span>últimas 24 h</span></div>
+    <div className="motion-cams" role="group" aria-label="Filtrar por câmera">
+      <button className={cam === 'todas' ? 'selected' : ''} onClick={() => setCam('todas')}>Todas</button>
+      {cameras.map(c => <button key={c.id} className={cam === c.id ? 'selected' : ''} onClick={() => setCam(c.id)}>{motion.notify.includes(c.id) ? <Bell size={12} /> : null}{c.name}</button>)}
+    </div>
+    {cam !== 'todas' ? <button className={`motion-bell ${watching ? 'on' : ''}`} aria-pressed={watching} disabled={!!casa.busy} onClick={() => void toggle(cam)}>
+      {watching ? <Bell size={15} /> : <BellOff size={15} />}{watching ? `Avisando quando houver movimento em ${names[cam]}` : `Avisar quando houver movimento em ${names[cam]}`}
+    </button> : <p className="loc-hint">Escolha uma câmera acima para ligar os avisos dela (na bandeja do Windows).</p>}
+    {events.length ? <ol className="motion-list">{events.map(event => {
+      const label = day(event.start);
+      const header = label !== lastDay ? (lastDay = label) : null;
+      const duration = event.end ? Math.max(1, Math.round((event.end - event.start) / 60)) : null;
+      return <li key={event.id}>
+        {header ? <h4>{header}</h4> : null}
+        <button onClick={() => open(event)} aria-label={`Ver a gravação de ${names[event.camera]} às ${clock(event.start)}`}>
+          {event.photo ? <img src={`/api/motion/${event.id}.jpg`} alt="" loading="lazy" /> : <span className="motion-nophoto"><CameraIcon size={16} /></span>}
+          <span className="motion-text"><strong>{names[event.camera] ?? event.camera}</strong><small>{clock(event.start)}{event.end ? ` · ${duration} min` : ' · agora'}{event.count > 1 ? ` · ${event.count} disparos` : ''}</small></span>
+          {motion.notify.includes(event.camera) ? <Bell size={14} className="motion-flag" /> : null}
+        </button>
+      </li>;
+    })}</ol> : loadingCam ? <div className="empty small"><LoaderCircle className="spin" size={20} /></div>
+      : <p className="loc-hint">Nenhum movimento {cam === 'todas' ? 'nas câmeras' : 'nesta câmera'} nas últimas 24 h.</p>}
+  </div>;
+}
+
+export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: string | null}) {
   const [cameras, setCameras] = useState<Camera[] | null>(null);
   const [available, setAvailable] = useState(true);
   const [error, setError] = useState(false);
@@ -146,6 +351,26 @@ export default function Cameras() {
   const [now, setNow] = useState(Date.now());
   const [nonce, setNonce] = useState(0);
   const urls = useRef<Record<string, string>>({});
+  const [motion, setMotion] = useState<Motion | null>(null);
+  const [replay, setReplay] = useState<ReplayTarget | null>(null);
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
+  const loadMotion = useCallback(async () => {
+    try {
+      const response = await fetch('/api/motion', {cache: 'no-store'});
+      if (!response.ok) return;
+      const value: Motion = await response.json();
+      setMotion(value);
+      // Com o filtro Movimento aberto, cada leitura reenvia o "visto" enquanto houver não vistos:
+      // uma falha passageira não deixa o aviso da bandeja preso.
+      if (filterRef.current === 'movimento' && value.unseen) void casa.call('/api/motion/seen', {}).catch(() => {});
+    } catch { /* tenta de novo */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void loadMotion(); const timer = setInterval(() => { if (!document.hidden) void loadMotion(); }, 15000); return () => clearInterval(timer); }, [loadMotion]);
+  // Abrir a aba de movimento conta como "visto" para o aviso da bandeja.
+  // Chamada própria (fora da fila de ocupado): não se perde se outra ação, como parear a TV, estiver em andamento.
+  useEffect(() => { if (filter === 'movimento' && motion?.unseen) void casa.call('/api/motion/seen', {}).then(() => loadMotion()).catch(() => {}); }, [filter, motion?.unseen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const active = new Set((motion?.events ?? []).filter(event => event.end === null).map(event => event.camera));
 
   const load = useCallback(async () => {
     try {
@@ -158,9 +383,11 @@ export default function Cameras() {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const visible = (cameras ?? []).filter(camera => filter === 'todas' || camera.group === filter);
+  const visible = (cameras ?? []).filter(camera => filter === 'todas' || filter === 'movimento' || camera.group === filter);
   const visibleIds = visible.map(camera => camera.id).join(',');
-  const paused = live !== null || !available;
+  const paused = live !== null || !available || filter === 'movimento';
+  // A bandeja pode abrir uma câmera direto ao vivo (#cameras:cam4).
+  useEffect(() => { if (!cameras || !openCamera) return; const index = cameras.findIndex(c => c.id === openCamera); if (index >= 0) { setFilter('todas'); setLive(index); } }, [cameras, openCamera]);
 
   useEffect(() => {
     if (!visibleIds || paused) return;
@@ -206,9 +433,9 @@ export default function Cameras() {
       <div className="title"><Cctv size={17} /><strong id="cameras-heading">Câmeras</strong><span>{visible.length} de {cameras.length}</span></div>
       <button className="round accent" aria-label="Atualizar imagens agora" disabled={paused} onClick={() => setNonce(value => value + 1)}><RefreshCw size={17} /></button>
     </div>
-    <div className="segmented wide" role="group" aria-label="Filtrar câmeras">{([['todas', 'Todas'], ['externa', 'Externas'], ['interna', 'Internas']] as const).map(([value, label]) => <button key={value} className={filter === value ? 'selected' : ''} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>)}</div>
+    <div className="segmented wide" role="group" aria-label="Filtrar câmeras">{([['todas', 'Todas'], ['externa', 'Externas'], ['interna', 'Internas'], ['movimento', 'Movimento']] as const).map(([value, label]) => <button key={value} className={filter === value ? 'selected' : ''} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}{value === 'movimento' && motion?.unseen ? <b className="count">{motion.unseen}</b> : null}</button>)}</div>
     {!available ? <div className="alert" role="alert"><p>O serviço de câmeras (go2rtc) não está rodando no PC de casa.</p><button onClick={() => void load()}><RefreshCw size={15} />Verificar</button></div> : null}
-    <div className="cam-grid">
+    {filter === 'movimento' ? <MotionView cameras={cameras} motion={motion} casa={casa} reload={() => void loadMotion()} open={event => { const camera = cameras.find(c => c.id === event.camera); if (camera) setReplay(eventWindow(camera, event, motion?.dvrOffset ?? 0)); }} /> : <div className="cam-grid">
       {visible.map((camera, index) => {
         const frame = frames[camera.id];
         return <button key={camera.id} className="cam" onClick={() => setLive(index)} aria-label={`Abrir ${camera.name} ao vivo`}>
@@ -216,10 +443,14 @@ export default function Cameras() {
           <span className="cam-ch">{camera.id.replace('cam', '')}</span>
           <span className="cam-snap" aria-hidden="true"><CameraIcon size={13} /></span>
           <span className="cam-name">{camera.name}</span>
+          {active.has(camera.id) ? <span className="cam-motion" title="Movimento agora"><i />Movimento</span> : null}
         </button>;
       })}
-    </div>
+    </div>}
     <p className={`card-foot ${available ? 'tone-online' : 'tone-offline'}`}><ShieldCheck size={14} />{available ? 'Conectado ao DVR' : 'Sem conexão'}<span>{latest ? `Automático · ${ago(latest, now)}` : 'Atualização automática'}</span></p>
-    {live !== null && visible[live] ? <LiveView cameras={visible} index={live} poster={frames[visible[live].id]?.url} move={move} close={() => setLive(null)} /> : null}
+    {live !== null && visible[live] ? <LiveView cameras={visible} index={live} poster={frames[visible[live].id]?.url} move={move} close={() => setLive(null)}
+      rewind={camera => { const offset = motion?.dvrOffset ?? 0, realNow = Date.now() / 1000 + offset; setLive(null); setReplay({camera, start: realNow - 60, from: realNow - 300, to: realNow - 5, offset}); }} /> : null}
+    {replay ? <ReplayView key={`${replay.camera.id}-${replay.start}`} {...replay} casa={casa} close={() => setReplay(null)}
+      goLive={() => { const camera = replay.camera; setReplay(null); setFilter('todas'); setLive(cameras.findIndex(c => c.id === camera.id)); }} /> : null}
   </section>;
 }

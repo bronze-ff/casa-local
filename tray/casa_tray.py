@@ -1,5 +1,11 @@
-"""Casa Local na bandeja do Windows: quatro ícones fixos (Ar, Lâmpadas e dispositivos, Câmeras, Localização),
-cada um abre o seu painel acima do relógio, como os painéis do Windows 11.
+"""Casa Local na bandeja do Windows: um ícone só ("Casa") que abre o painel completo acima do
+relógio, com as mesmas abas do celular (Luzes, Clima, TV, Câmeras, Local, Central).
+
+- Clique: abre/fecha o painel na última aba usada. Ctrl+Alt+H faz o mesmo de qualquer lugar.
+- Botão direito: ações rápidas (cenas, ar, luzes, câmeras ao vivo) sem abrir o painel.
+- Bolinha do ícone: verde ok, laranja com aviso novo (movimento, localização, saúde), vermelha se
+  o painel caiu. Avisos do Windows para movimento nas câmeras marcadas, saída/chegada dela e
+  serviços que pararam.
 
 Uso: pythonw casa_tray.py --url https://pc.tailnet.ts.net [--servicos C:\\caminho\\CasaLocal]
 --servicos habilita "Reiniciar serviços" (apenas no PC que roda o painel e o go2rtc).
@@ -12,6 +18,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.error
 import urllib.request
 import webbrowser
 import winreg
@@ -25,80 +32,32 @@ from PIL import Image, ImageDraw
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 RUN_NAME = "CasaLocalBandeja"
 MARGIN = 12
+SIZE = (440, 760)
 POLL_SECONDS = 20
+HEALTH_EVERY = 60
+TABS = ("luzes", "clima", "tv", "cameras", "local", "central")
 DOT = {"ok": (58, 211, 122), "aviso": (255, 181, 71), "fora": (255, 97, 89), "?": (157, 157, 166)}
 WHITE = (255, 255, 255)
+HOTKEY_ID, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, WM_HOTKEY = 1, 0x1, 0x2, 0x4000, 0x0312
 
 
-def tile(color):
+def glyph_house():
     image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
     pen = ImageDraw.Draw(image)
-    pen.rounded_rectangle((2, 2, 62, 62), radius=16, fill=color)
-    return image, pen
-
-
-def glyph_ac():
-    image, pen = tile((47, 124, 255))
-    pen.rounded_rectangle((9, 13, 55, 31), radius=6, fill=WHITE)
-    pen.rounded_rectangle((15, 25, 49, 28), radius=2, fill=(47, 124, 255))
-    for x, lean in ((20, -3), (32, 0), (44, 3)):
-        pen.line((x, 36, x + lean, 50), fill=WHITE, width=4)
+    pen.rounded_rectangle((2, 2, 62, 62), radius=16, fill=(47, 107, 255))
+    pen.polygon([(32, 11), (54, 30), (49, 30), (49, 52), (15, 52), (15, 30), (10, 30)], fill=WHITE)
+    pen.rounded_rectangle((27, 36, 37, 52), radius=2, fill=(47, 107, 255))
     return image
 
 
-def glyph_bulb():
-    image, pen = tile((240, 160, 32))
-    pen.ellipse((17, 8, 47, 38), fill=WHITE)
-    pen.polygon([(22, 31), (42, 31), (38, 42), (26, 42)], fill=WHITE)
-    pen.rounded_rectangle((25, 44, 39, 48), radius=2, fill=WHITE)
-    pen.rounded_rectangle((27, 51, 37, 55), radius=2, fill=WHITE)
-    return image
-
-
-def glyph_camera():
-    image, pen = tile((143, 123, 255))
-    pen.rounded_rectangle((8, 19, 44, 45), radius=7, fill=WHITE)
-    pen.ellipse((18, 24, 34, 40), fill=(143, 123, 255))
-    pen.ellipse((22, 28, 30, 36), fill=WHITE)
-    pen.polygon([(46, 26), (57, 19), (57, 45), (46, 38)], fill=WHITE)
-    return image
-
-
-def glyph_pin():
-    image, pen = tile((236, 92, 140))
-    pen.ellipse((18, 9, 46, 37), fill=WHITE)
-    pen.polygon([(20, 29), (44, 29), (32, 55)], fill=WHITE)
-    pen.ellipse((26, 17, 38, 29), fill=(236, 92, 140))
-    return image
-
-
-PANELS = {
-    "clima": {"title": "Ar-condicionado", "size": (380, 560), "glyph": glyph_ac, "hash": "clima"},
-    "dispositivos": {"title": "Lâmpadas e dispositivos", "size": (400, 700), "glyph": glyph_bulb, "hash": "luzes"},
-    "cameras": {"title": "Câmeras", "size": (600, 620), "glyph": glyph_camera, "hash": "cameras"},
-    "local": {"title": "Localização", "size": (420, 680), "glyph": glyph_pin, "hash": "local"},
-}
-
-
-def ago(seconds):
-    return "agora" if seconds < 60 else f"há {round(seconds / 60)} min" if seconds < 3600 else f"há {seconds // 3600} h"
-
-
-def describe(status):
-    """Texto curto para a dica do ícone: onde ela está e quando chegou a última posição."""
-    last = status.get("last")
-    if not last:
-        return "aguardando o primeiro envio"
-    names = {p["id"]: p["name"] for p in status.get("places", [])}
-    where = f"em {names[status['place']]}" if status.get("place") in names else "a caminho" if (last.get("vel") or 0) >= 3 else "fora dos lugares"
-    return f"{where} · {ago(max(0, status['now'] - last['tst']))}"
-
-
-def with_status(base, state):
+def with_status(base, state, count=0):
     image = base.copy()
     pen = ImageDraw.Draw(image)
-    pen.ellipse((41, 41, 63, 63), fill=(22, 22, 24))
-    pen.ellipse((44, 44, 60, 60), fill=DOT[state])
+    pen.ellipse((38, 38, 64, 64), fill=(22, 22, 24))
+    pen.ellipse((41, 41, 61, 61), fill=DOT[state])
+    if count:
+        text = str(min(count, 9))
+        pen.text((51 - pen.textlength(text) / 2, 43), text, fill=(22, 22, 24))
     return image
 
 
@@ -133,7 +92,7 @@ def set_autostart(enabled):
 
 
 def pin_icons():
-    """Windows 11 esconde ícones novos na setinha ^; marca os da Casa como sempre visíveis."""
+    """Windows 11 esconde ícones novos na setinha ^; marca o da Casa como sempre visível."""
     path = r"Control Panel\NotifyIconSettings"
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path) as root:
@@ -145,7 +104,7 @@ def pin_icons():
                         tip = str(winreg.QueryValueEx(entry, "InitialTooltip")[0]) if "pythonw" in exe else ""
                     except OSError:
                         continue
-                    if exe.endswith("pythonw.exe") and tip.startswith("Casa ·"):
+                    if exe.endswith("pythonw.exe") and tip.startswith("Casa"):
                         winreg.SetValueEx(entry, "IsPromoted", 0, winreg.REG_DWORD, 1)
     except OSError:
         pass
@@ -165,64 +124,143 @@ class Tray:
     def __init__(self, url, services):
         self.url = url.rstrip("/")
         self.services = Path(services) if services else None
-        self.server_state = "?"
-        self.camera_state = "?"
-        self.location_state, self.location_text, self.location_seen = "?", "Verificando…", None
-        self.current = None
         self.visible = False
         self.hidden_at = 0.0
-        self.device_tab = "luzes"
+        self.tab = "luzes"
         self.stop = threading.Event()
         self.window = None
-        self.icons = {key: pystray.Icon(f"casa-{key}", with_status(panel["glyph"](), "?"), f"Casa · {panel['title']}", menu=self.menu(key)) for key, panel in PANELS.items()}
+        self.token = None
+        self.cameras = []
+        self.state = {"server": "?", "cameras": "?", "location": "Verificando…", "health": None, "alerts": 0}
+        self.seen = {"location": None, "motion": None, "health": {}}
+        self.last_health = 0.0
+        self.base = glyph_house()
+        self.icon = pystray.Icon("casa", with_status(self.base, "?"), "Casa", menu=self.menu())
 
-    def label(self, key):
-        if self.server_state == "fora":
-            return "Central indisponível"
-        if key == "local":
-            return self.location_text
-        if key == "cameras":
-            return "Câmeras funcionando" if self.camera_state == "ok" else "Câmeras paradas" if self.camera_state == "aviso" else "Verificando…"
-        return "Central funcionando" if self.server_state == "ok" else "Verificando…"
+    # ---- servidor ----
+    def fetch(self, path, timeout=5):
+        request = urllib.request.Request(self.url + path, headers={"Cache-Control": "no-store"})
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read(1 << 20))
 
-    def menu(self, key):
+    def post(self, path, body):
+        """Ação pelo menu: usa o token do painel; renova uma vez se o servidor reiniciou."""
+        for attempt in range(2):
+            if not self.token:
+                self.token = self.fetch("/api/bootstrap").get("csrfToken")
+            request = urllib.request.Request(self.url + path, data=json.dumps(body).encode(), method="POST",
+                                             headers={"Content-Type": "application/json", "X-Casa-Token": self.token or ""})
+            try:
+                with urllib.request.urlopen(request, timeout=25) as response:
+                    return json.loads(response.read(1 << 20))
+            except urllib.error.HTTPError as error:
+                detail = json.loads(error.read(65536) or b"{}")
+                if error.code == 403 and detail.get("code") == "invalid_token" and attempt == 0:
+                    self.token = None
+                    continue
+                raise RuntimeError(detail.get("error") or "Não foi possível concluir.") from None
+        raise RuntimeError("Não foi possível concluir.")
+
+    def act(self, label, path, body):
+        def run():
+            try:
+                result = self.post(path, body)
+                message = (result.get("command") or {}).get("message") or ("Cena com falhas" if result.get("status") == "partial" else "Feito")
+                self.icon.notify(message, f"Casa · {label}")
+            except (OSError, ValueError, RuntimeError) as error:
+                self.icon.notify(str(error) or "Central indisponível", f"Casa · {label}")
+        threading.Thread(target=run, daemon=True).start()
+
+    # ---- menu ----
+    def menu(self):
+        def device(label, device_id, values):
+            return lambda: self.act(label, f"/api/devices/{device_id}/commands", {"action": "set", "values": values})
+
+        def timer(minutes):
+            return lambda: self.act("Ar", "/api/routines/timer", {"device": "ar-quarto", "minutes": minutes})
+
+        def scene(label, scene_id):
+            return lambda: self.act(label, f"/api/scenes/{scene_id}/run", {})
+
+        def camera(camera_id):
+            return lambda: self.show(f"cameras:{camera_id}")
+
+        cameras = [pystray.MenuItem(item["name"], camera(item["id"])) for item in self.cameras]
         items = [
-            pystray.MenuItem(f"Abrir {PANELS[key]['title'].lower()}", lambda: self.show(key), default=True),
-            pystray.MenuItem("Abrir no navegador", lambda: webbrowser.open(f"{self.url}/#{PANELS[key]['hash']}")),
+            pystray.MenuItem("Abrir a Casa", lambda: self.toggle(), default=True),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem(lambda _: self.label(key), None, enabled=False),
+            pystray.MenuItem("Cenas", pystray.Menu(
+                pystray.MenuItem("Cinema", scene("Cinema", "cinema")),
+                pystray.MenuItem("Boa noite", scene("Boa noite", "boa-noite")),
+                pystray.MenuItem("Cheguei", scene("Cheguei", "cheguei")),
+            )),
+            pystray.MenuItem("Ar-condicionado", pystray.Menu(
+                pystray.MenuItem("Ligar · 24 °C resfriar", device("Ar", "ar-quarto", {"power": True, "temperature": 24, "mode": "cool", "fan": "auto"})),
+                pystray.MenuItem("Desligar", device("Ar", "ar-quarto", {"power": False})),
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("Desligar em 1 h", timer(60)),
+                pystray.MenuItem("Desligar em 2 h", timer(120)),
+                pystray.MenuItem("Cancelar timer", timer(0)),
+            )),
+            pystray.MenuItem("Luzes", pystray.Menu(
+                pystray.MenuItem("Acender quarto", device("Luz do quarto", "quarto-luz", {"power": True})),
+                pystray.MenuItem("Apagar quarto", device("Luz do quarto", "quarto-luz", {"power": False})),
+                pystray.MenuItem("Acender banheiro", device("Luz do banheiro", "banheiro-luz", {"power": True})),
+                pystray.MenuItem("Apagar banheiro", device("Luz do banheiro", "banheiro-luz", {"power": False})),
+            )),
+            pystray.MenuItem("Câmeras ao vivo", pystray.Menu(*cameras) if cameras else pystray.Menu(pystray.MenuItem("Carregando…", None, enabled=False))),
+            pystray.MenuItem("Localização", lambda: self.show("local")),
+            pystray.MenuItem("Central (saúde e rotinas)", lambda: self.show("central")),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(lambda _: self.label(), None, enabled=False),
+            pystray.MenuItem(lambda _: self.state["location"], None, enabled=False),
         ]
         if self.services:
             items.append(pystray.MenuItem("Reiniciar serviços", lambda: threading.Thread(target=self.restart, daemon=True).start()))
         items += [
+            pystray.MenuItem("Testar aviso", lambda: self.icon.notify("Se você está lendo isto, os avisos do Windows funcionam.", "Casa · Teste de aviso")),
+            pystray.MenuItem("Abrir no navegador", lambda: webbrowser.open(f"{self.url}/#{self.tab}")),
             pystray.MenuItem("Iniciar com o Windows", lambda: set_autostart(not autostart_enabled()), checked=lambda _: autostart_enabled()),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Sair da Casa", self.quit),
         ]
         return pystray.Menu(*items)
 
-    def show(self, key):
+    def label(self):
+        if self.state["server"] == "fora":
+            return "Central indisponível"
+        if self.state["server"] != "ok":
+            return "Verificando…"
+        parts = ["Central funcionando", "câmeras ok" if self.state["cameras"] == "ok" else "câmeras paradas"]
+        if self.state["health"] and self.state["health"] != "ok":
+            parts.append("ver Central")
+        return " · ".join(parts)
+
+    # ---- painel ----
+    def toggle(self):
+        if self.visible or time.monotonic() - self.hidden_at < 0.6:
+            self.hide()
+        else:
+            self.show()
+
+    def show(self, target=None):
         try:
-            self._show(key)
+            self._show(target)
         except webview.errors.WebViewException:
             pass  # janela ainda iniciando; o próximo clique abre normalmente
 
-    def _show(self, key):
+    def _show(self, target):
         if not self.window:
             return
-        # Clicar no ícone com o popup aberto tira o foco antes do clique chegar: trate como "fechar".
-        recently_hidden = time.monotonic() - self.hidden_at < 0.6
-        if self.current == key and (self.visible or recently_hidden):
-            self.hide()
-            return
-        width, height = PANELS[key]["size"]
+        width, height = SIZE
         scale = ctypes.windll.user32.GetDpiForSystem() / 96  # pywebview usa pixels lógicos
         _, _, right, bottom = work_area()
+        height = min(height, round(bottom / scale) - 2 * MARGIN)
         self.window.resize(width, height)
         self.window.move(round(right / scale) - width - MARGIN, round(bottom / scale) - height - MARGIN)
-        target = self.device_tab if key == "dispositivos" else PANELS[key]["hash"]
-        self.window.evaluate_js(f"location.hash = {json.dumps(target)}")
-        self.current = key
+        if target:
+            self.tab = target.split(":")[0]
+        self.window.evaluate_js(f"location.hash = {json.dumps(target or self.tab)}")
         self.shown_at = time.monotonic()
         self.had_focus = False
         self.visible = True
@@ -237,9 +275,8 @@ class Tray:
             self.visible = False
             self.hidden_at = time.monotonic()
             try:
-                if self.current == "dispositivos":
-                    tab = self.window.evaluate_js("location.hash.slice(1)")
-                    self.device_tab = tab if tab in ("luzes", "tv") else "luzes"
+                tab = str(self.window.evaluate_js("location.hash.slice(1)") or "").split(":")[0]
+                self.tab = tab if tab in TABS else self.tab
                 # Página "dorme": câmeras, vídeo ao vivo e cena 3D são desmontados enquanto o popup está fechado.
                 self.window.evaluate_js("location.hash = 'oculto'")
             except webview.errors.WebViewException:
@@ -247,65 +284,118 @@ class Tray:
 
     def restart(self):
         script = self.services / "scripts" / "reiniciar-inicio.ps1"
-        self.icons["dispositivos"].notify("Reiniciando painel e câmeras…", "Casa Local")
+        self.icon.notify("Reiniciando painel e câmeras…", "Casa Local")
         subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script)], creationflags=subprocess.CREATE_NO_WINDOW, timeout=90, check=False)
         self.poll_once()
-        self.icons["dispositivos"].notify(self.label("dispositivos") + " · " + self.label("cameras"), "Casa Local")
+        self.icon.notify(self.label(), "Casa Local")
 
-    def fetch(self, path):
-        request = urllib.request.Request(self.url + path, headers={"Cache-Control": "no-store"})
-        with urllib.request.urlopen(request, timeout=5) as response:
-            return json.loads(response.read(65536))
+    # ---- avisos ----
+    def poll_location(self):
+        try:
+            status = self.fetch("/api/location")
+        except (OSError, ValueError):
+            return "Localização indisponível", 0
+        if not status.get("configured"):
+            return "Localização não configurada", 0
+        names = {p["id"]: p["name"] for p in status.get("places", [])}
+        last = status.get("last")
+        if not last:
+            text = f"{status['name']}: aguardando o primeiro envio"
+        else:
+            where = f"em {names[status['place']]}" if status.get("place") in names else "a caminho" if (last.get("vel") or 0) >= 3 else "fora dos lugares"
+            age = max(0, status["now"] - last["tst"])
+            text = f"{status['name']} {where} · " + ("agora" if age < 60 else f"há {round(age / 60)} min" if age < 3600 else f"há {age // 3600} h")
+        events = status.get("events", [])
+        newest = max((e["tst"] for e in events), default=0)
+        fresh = 0
+        if self.seen["location"] is not None:
+            for event in events:
+                if event["tst"] > self.seen["location"]:
+                    fresh += 1
+                    verb = "saiu de" if event["kind"] == "saiu" else "chegou em"
+                    when = time.strftime("%H:%M", time.localtime(event["tst"]))
+                    self.icon.notify(f"{status['name']} {verb} {names.get(event['place'], 'um lugar')} às {when}", "Casa · Localização")
+        self.seen["location"] = max(newest, self.seen["location"] or 0)
+        return text, fresh
+
+    def poll_motion(self):
+        try:
+            motion = self.fetch("/api/motion")
+        except (OSError, ValueError):
+            return 0
+        names = {c["id"]: c["name"] for c in self.cameras}
+        watched = [e for e in motion.get("events", []) if e["camera"] in motion.get("notify", [])]
+        newest = max((e["start"] for e in watched), default=0)
+        if self.seen["motion"] is not None:
+            fresh = [e for e in watched if e["start"] > self.seen["motion"]]
+            if fresh:
+                cams = sorted({names.get(e["camera"], e["camera"]) for e in fresh})
+                self.icon.notify(f"Movimento em {', '.join(cams)}", "Casa · Câmeras")
+        self.seen["motion"] = max(newest, self.seen["motion"] or 0)
+        return motion.get("unseen", 0)
+
+    def poll_health(self):
+        if time.monotonic() - self.last_health < HEALTH_EVERY:
+            return
+        self.last_health = time.monotonic()
+        try:
+            health = self.fetch("/api/health", timeout=10)
+        except (OSError, ValueError):
+            return
+        self.state["health"] = health.get("state")
+        for check in health.get("checks", []):
+            before = self.seen["health"].get(check["id"])
+            if before and before != "fail" and check["state"] == "fail":
+                self.icon.notify(f"{check['label']}: {check['detail']}", "Casa · Saúde")
+            self.seen["health"][check["id"]] = check["state"]
 
     def poll_once(self):
         try:
             self.fetch("/api/status")
             server = "ok"
             try:
-                cameras = "ok" if self.fetch("/api/cameras").get("available") else "aviso"
+                cameras = self.fetch("/api/cameras")
+                camera_state = "ok" if cameras.get("available") else "aviso"
+                if not self.cameras and cameras.get("cameras"):
+                    self.cameras = cameras["cameras"]
+                    self.icon.menu = self.menu()
             except (OSError, ValueError):
-                cameras = "aviso"
+                camera_state = "aviso"
         except (OSError, ValueError):
-            server, cameras = "fora", "fora"
-        location, text = self.poll_location() if server == "ok" else ("fora", "Central indisponível")
-        if (server, cameras, location, text) != (self.server_state, self.camera_state, self.location_state, self.location_text):
-            self.server_state, self.camera_state, self.location_state, self.location_text = server, cameras, location, text
-            for key, icon in self.icons.items():
-                state = cameras if key == "cameras" else location if key == "local" else server
-                icon.icon = with_status(PANELS[key]["glyph"](), state)
-                icon.title = f"Casa · {PANELS[key]['title']} · {self.label(key)}"
-                icon.update_menu()
-
-    def poll_location(self):
-        try:
-            status = self.fetch("/api/location")
-        except (OSError, ValueError):
-            return "aviso", "Localização indisponível"
-        if not status.get("configured"):
-            return "?", "Localização não configurada"
-        text = f"{status['name']} {describe(status)}"
-        # Aviso do Windows quando ela sai ou chega de um lugar (não repete o que já existia ao abrir).
-        events = status.get("events", [])
-        newest = max((e["tst"] for e in events), default=0)
-        if self.location_seen is not None:
-            names = {p["id"]: p["name"] for p in status.get("places", [])}
-            for event in events:
-                if event["tst"] > self.location_seen:
-                    verb = "saiu de" if event["kind"] == "saiu" else "chegou em"
-                    when = time.strftime("%H:%M", time.localtime(event["tst"]))
-                    self.icons["local"].notify(f"{status['name']} {verb} {names.get(event['place'], 'um lugar')} às {when}", "Casa · Localização")
-        self.location_seen = max(newest, self.location_seen or 0)
-        return ("aviso" if status.get("stale") or not status.get("last") else "ok"), text
+            server, camera_state = "fora", "fora"
+        location, alerts = ("Central indisponível", 0) if server != "ok" else self.poll_location()
+        if server == "ok":
+            alerts += self.poll_motion()
+            self.poll_health()
+        self.state.update(server=server, cameras=camera_state, location=location, alerts=alerts)
+        dot = "fora" if server == "fora" else "aviso" if alerts or camera_state != "ok" or self.state["health"] in ("warn", "fail") else "ok" if server == "ok" else "?"
+        self.icon.icon = with_status(self.base, dot, alerts)
+        self.icon.title = f"Casa · {self.label()}"[:120]
+        self.icon.update_menu()
 
     def poll(self):
         while not self.stop.is_set():
-            self.poll_once()
+            try:
+                self.poll_once()
+            except Exception:
+                pass
             self.stop.wait(POLL_SECONDS)
+
+    # ---- atalho global ----
+    def hotkey(self):
+        """Ctrl+Alt+H abre/fecha o painel (registrado nesta thread, que recebe a mensagem)."""
+        user32 = ctypes.windll.user32
+        if not user32.RegisterHotKey(None, HOTKEY_ID, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, ord("H")):
+            return  # outro programa já usa o atalho
+        message = wintypes.MSG()
+        while not self.stop.is_set() and user32.GetMessageW(ctypes.byref(message), None, 0, 0) > 0:
+            if message.message == WM_HOTKEY and message.wParam == HOTKEY_ID:
+                self.toggle()
+        user32.UnregisterHotKey(None, HOTKEY_ID)
 
     def quit(self):
         self.stop.set()
-        for icon in self.icons.values():
-            icon.stop()
+        self.icon.stop()
         if self.window:
             self.window.destroy()
 
@@ -328,10 +418,9 @@ class Tray:
             self.ready = True
             if not self.visible:
                 self.window.hide()
-        elif self.visible and self.current:
-            # A página recarregou (painel novo publicado) com o popup aberto: volta ao painel certo.
-            target = self.device_tab if self.current == "dispositivos" else PANELS[self.current]["hash"]
-            self.window.evaluate_js(f"location.hash = {json.dumps(target)}")
+        elif self.visible:
+            # A página recarregou (painel novo publicado) com o popup aberto: volta à aba certa.
+            self.window.evaluate_js(f"location.hash = {json.dumps(self.tab)}")
 
     def watch_focus(self):
         """Fecha o popup quando outra janela recebe o foco (não depende da página ter carregado)."""
@@ -348,22 +437,21 @@ class Tray:
                 self.hide()
 
     def run(self):
-        width, height = PANELS["dispositivos"]["size"]
+        width, height = SIZE
         self.ready, self.hwnd, self.shown_at, self.had_focus = False, None, 0.0, False
         # Criada visível fora da tela: o WebView2 só pinta janelas que já foram mostradas uma vez.
         self.window = webview.create_window(
             "Casa Local", f"{self.url}/?tray=1#oculto", js_api=Api(self), width=width, height=height, x=-32000, y=-32000,
-            frameless=True, easy_drag=False, on_top=True, resizable=False, background_color="#1f1f22",
+            frameless=True, easy_drag=False, on_top=True, resizable=False, background_color="#161618",
         )
         self.window.events.shown += self.on_shown
         self.window.events.loaded += self.on_loaded
         self.window.events.closing += lambda: (self.hide(), False)[1]
+        self.icon.run_detached()
         threading.Thread(target=self.poll, daemon=True).start()
         threading.Thread(target=self.watch_focus, daemon=True).start()
-        # Ordem da direita para a esquerda ao lado do relógio: localização, câmeras, dispositivos, ar.
-        for key in ("clima", "dispositivos", "cameras", "local"):
-            self.icons[key].run_detached()
-        # O Windows registra os ícones em NotifyIconSettings com atraso; tenta fixá-los nos primeiros minutos.
+        threading.Thread(target=self.hotkey, daemon=True).start()
+        # O Windows registra o ícone em NotifyIconSettings com atraso; tenta fixá-lo nos primeiros minutos.
         def keep_pinning():
             for _ in range(12):
                 pin_icons()

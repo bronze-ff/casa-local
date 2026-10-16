@@ -1,14 +1,17 @@
 import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from 'react';
-import { AirVent, Leaf, MoveVertical, SunDim, Zap, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Cctv, Check, Copy, Droplets, Fan, Film, Flame, Home, House, Lightbulb, LoaderCircle, MapPin, Minus, Monitor, Moon, Plus, Power, Radio, RefreshCw, Settings2, ShieldCheck, Snowflake, Sparkles, Thermometer, Tv, Undo2, Volume2, VolumeX, Wind, X } from 'lucide-react';
+import { Activity, AirVent, Leaf, MoveVertical, SunDim, Zap, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Cctv, Check, Copy, Droplets, Fan, Film, Flame, Home, House, Lightbulb, LoaderCircle, MapPin, Minus, Monitor, Moon, Plus, Power, Radio, RefreshCw, Settings2, ShieldCheck, Snowflake, Sparkles, Thermometer, Tv, Undo2, Volume2, VolumeX, Wind, X } from 'lucide-react';
 import Cameras from './components/Cameras';
 import type { Device } from './types';
 import { useCasa } from './useCasa';
 
 const RoomScene = lazy(() => import('./components/RoomScene'));
 const Location = lazy(() => import('./components/Location'));
+const Central = lazy(() => import('./components/Central'));
+const AcTimer = lazy(() => import('./components/Central').then(module => ({default: module.AcTimer})));
+const NetworkTvs = lazy(() => import('./components/NetworkTvs'));
 type Casa = ReturnType<typeof useCasa>;
-type Tab = 'luzes' | 'clima' | 'tv' | 'cameras' | 'local';
-const TABS: [Tab, string, typeof Lightbulb][] = [['luzes', 'Luzes', Lightbulb], ['clima', 'Clima', AirVent], ['tv', 'TV', Tv], ['cameras', 'Câmeras', Cctv], ['local', 'Local', MapPin]];
+type Tab = 'luzes' | 'clima' | 'tv' | 'cameras' | 'local' | 'central';
+const TABS: [Tab, string, typeof Lightbulb][] = [['luzes', 'Luzes', Lightbulb], ['clima', 'Clima', AirVent], ['tv', 'TV', Tv], ['cameras', 'Câmeras', Cctv], ['local', 'Local', MapPin], ['central', 'Central', Activity]];
 
 const PALETTE: [string, string][] = [
   ['#FF3B30', 'Vermelho'], ['#FF6A2B', 'Laranja'], ['#FFA51F', 'Âmbar'], ['#FFD84D', 'Amarelo'], ['#9BE15D', 'Lima'], ['#34C759', 'Verde'], ['#2ED3B7', 'Turquesa'], ['#FFFFFF', 'Branco frio'],
@@ -19,8 +22,12 @@ const MODES: [string, string, typeof Snowflake][] = [['cool', 'Resfriar', Snowfl
 const AC_EXTRAS: [string, string, typeof Zap][] = [['turbo', 'Turbo', Zap], ['eco', 'Eco', Leaf], ['brisa', 'Brisa', MoveVertical], ['display', 'Display', SunDim]];
 const FANS: [string, string][] = [['auto', 'Auto'], ['low', 'Baixa'], ['medium', 'Média'], ['high', 'Alta']];
 
+// O endereço pode trazer um detalhe depois de ":" (ex.: #cameras:cam4 abre a câmera 4 ao vivo).
+function hashTarget(): string | null {
+  return window.location.hash.slice(1).split(':')[1] ?? null;
+}
 function initialTab(): Tab {
-  const hash = window.location.hash.slice(1);
+  const hash = window.location.hash.slice(1).split(':')[0];
   return (TABS.some(([id]) => id === hash) ? hash : 'luzes') as Tab;
 }
 function locked(device: Device | undefined, casa: Casa) {
@@ -214,6 +221,7 @@ function Climate({casa}: {casa: Casa}) {
       <button className="primary" disabled={!canLearn} onClick={learnState}>{casa.busy === ac?.id ? <LoaderCircle className="spin" size={16} /> : <Radio size={16} />}Gravar ligar neste estado</button>
       <button className="pill" disabled={!canLearn} onClick={() => { if (ac) void casa.learn(ac.id, {key: 'off'}, 'desligar'); }}><Power size={16} />{learnedOff ? 'Regravar desligar' : 'Gravar desligar'}</button>
     </div> : null}
+    {learning || !ac ? null : <Suspense fallback={null}><AcTimer casa={casa} on={on} /></Suspense>}
     <Footer device={ac} casa={casa} extra={summary ? `Perfil Geonav: ${profileStates} estados${learnedOff ? ' + desligar' : ''}${learnedStates ? ` · ${learnedStates} aprendidos` : ''} · ainda não confirmado olhando o ar` : undefined} />
   </section>;
 }
@@ -293,6 +301,7 @@ export default function App() {
   const casa = useCasa();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [sheet, setSheet] = useState(false);
+  const [target, setTarget] = useState<string | null>(hashTarget);
   const tray = new URLSearchParams(window.location.search).has('tray');
   // A bandeja marca #oculto ao fechar o popup: desmonta câmeras e cena 3D para não gastar CPU escondida.
   const [asleep, setAsleep] = useState(() => window.location.hash === '#oculto');
@@ -326,29 +335,15 @@ export default function App() {
   }, [asleep]);
   useEffect(() => { document.body.classList.toggle('in-tray', tray); }, [tray]);
   useEffect(() => {
-    const onHash = () => { setAsleep(window.location.hash === '#oculto'); setTab(initialTab()); };
+    const onHash = () => { setAsleep(window.location.hash === '#oculto'); setTab(initialTab()); setTarget(hashTarget()); };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-  const choose = (next: Tab) => { setTab(next); history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${next}`); };
+  // Trocar de aba consome o atalho da bandeja (#cameras:cam4): voltar a Câmeras não reabre a câmera.
+  const choose = (next: Tab) => { setTab(next); setTarget(null); history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${next}`); };
   const preview = casa.data?.mode === 'preview';
+  // Bandeja única: o mesmo painel do celular, com as abas embaixo; dormindo enquanto escondido.
   if (tray && asleep) return <div className="tray-panel" />;
-  if (tray) {
-    // Bandeja: cada ícone abre um painel próprio (Ar, Lâmpadas e dispositivos, Câmeras), sem moldura nem abas.
-    const panel = tab === 'cameras' ? 'cameras' : tab === 'clima' ? 'clima' : tab === 'local' ? 'local' : 'dispositivos';
-    return <div className={`tray-panel tray-${panel}`}>
-      {casa.error && panel !== 'cameras' && panel !== 'local' ? <div className="alert" role="alert"><p>{casa.error}</p><button onClick={() => void casa.connect()}><RefreshCw size={15} />Tentar de novo</button></div> : null}
-      {panel === 'cameras' ? <Cameras /> : panel === 'local' ? <Suspense fallback={null}><Location casa={casa} /></Suspense> : !casa.data ? <div className="empty"><LoaderCircle className={casa.error ? '' : 'spin'} size={24} /><p>{casa.error ? 'Aguardando a central' : 'Abrindo sua casa'}</p></div>
-        : panel === 'clima' ? <Climate casa={casa} />
-        : <>
-          <div className="segmented device-switch" role="tablist" aria-label="Dispositivos">
-            {([['luzes', 'Lâmpadas', Lightbulb], ['tv', 'TV', Tv]] as const).map(([id, label, Icon]) => <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'selected' : ''} onClick={() => choose(id)}><Icon size={16} />{label}</button>)}
-          </div>
-          {tab === 'tv' ? <Television casa={casa} /> : <Lights casa={casa} />}
-        </>}
-      <div className={`toast ${casa.notice ? 'visible' : ''}`} role="status" aria-live="polite">{casa.notice}</div>
-    </div>;
-  }
   const pill = casa.error ? ['offline', 'Sem conexão'] : !casa.data ? ['loading', 'Conectando'] : preview ? ['preview', 'Prévia'] : ['local', 'Rede local'];
   return <div className="stage">
     <div className="pop">
@@ -358,8 +353,13 @@ export default function App() {
         <button className="round ghost" aria-label="Central e últimas ações" onClick={() => setSheet(true)}><Settings2 size={18} /></button>
       </header>
       <main className="body">
-        {casa.error && tab !== 'cameras' && tab !== 'local' ? <div className="alert" role="alert"><p>{casa.error}</p><button onClick={() => void casa.connect()}><RefreshCw size={15} />Tentar de novo</button></div> : null}
-        {tab === 'cameras' ? <Cameras /> : tab === 'local' ? <Suspense fallback={null}><Location casa={casa} /></Suspense> : !casa.data ? <div className="empty"><LoaderCircle className={casa.error ? '' : 'spin'} size={24} /><p>{casa.error ? 'Aguardando a central' : 'Abrindo sua casa'}</p></div> : tab === 'luzes' ? <Lights casa={casa} /> : tab === 'clima' ? <Climate casa={casa} /> : <Television casa={casa} />}
+        {casa.error && !['cameras', 'local', 'central'].includes(tab) ? <div className="alert" role="alert"><p>{casa.error}</p><button onClick={() => void casa.connect()}><RefreshCw size={15} />Tentar de novo</button></div> : null}
+        {tab === 'cameras' ? <Cameras casa={casa} openCamera={target} />
+          : tab === 'local' ? <Suspense fallback={null}><Location casa={casa} /></Suspense>
+          : tab === 'central' ? <Suspense fallback={null}><Central casa={casa} /></Suspense>
+          : !casa.data ? <div className="empty"><LoaderCircle className={casa.error ? '' : 'spin'} size={24} /><p>{casa.error ? 'Aguardando a central' : 'Abrindo sua casa'}</p></div>
+          : tab === 'luzes' ? <Lights casa={casa} /> : tab === 'clima' ? <Climate casa={casa} />
+          : <><Television casa={casa} /><Suspense fallback={null}><NetworkTvs casa={casa} /></Suspense></>}
       </main>
       <nav className="tabs" aria-label="Seções">
         {TABS.map(([id, label, Icon]) => <button key={id} className={tab === id ? 'active' : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => choose(id)}><Icon size={20} /><span>{label}</span></button>)}
