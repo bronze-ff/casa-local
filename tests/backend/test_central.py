@@ -236,6 +236,38 @@ class TvTests(Temp):
             self.tvs.pair(self.key)
 
 
+class PreviewSafetyTests(Temp):
+    """Na prévia nada físico acontece nem altera dados reais (revisão do PR #1)."""
+
+    def setUp(self):
+        super().setUp()
+        from backend.server import CasaServer
+        self.dist = self.dir / "dist"
+        self.dist.mkdir()
+        (self.dist / "index.html").write_text("<html></html>", encoding="utf-8")
+        self.server = CasaServer(("127.0.0.1", 0), CasaApp(data_dir=self.dir / "data"), self.dist)
+
+    def tearDown(self):
+        self.server.server_close()
+        super().tearDown()
+
+    def test_tv_commands_pairing_and_scan_are_refused(self):
+        self.server.tvs.tvs = {"aabbcc001122": {"label": "TV", "ip": "192.0.2.5", "mac": "AA:BB:CC:00:11:22", "token": "x"}}
+        for call in (lambda: self.server.tvs.command("aabbcc001122", {"key": "power"}), lambda: self.server.tvs.pair("aabbcc001122"),
+                     lambda: self.server.tvs.refresh(force=True)):
+            with self.assertRaises(AppError) as error:
+                call()
+            self.assertEqual(error.exception.code, "preview_mode")
+
+    def test_routines_use_separate_file_and_ac_usage_is_not_recorded(self):
+        self.server.routines.set_timer({"device": "ar-quarto", "minutes": 60})
+        self.assertTrue((self.dir / "data" / "rotinas-previa.json").exists())
+        self.assertFalse((self.dir / "data" / "rotinas.json").exists())
+        self.server.app.command("ar-quarto", {"action": "set", "values": {"power": True}})
+        self.assertFalse(self.server.energy.summary()["on"])
+        self.assertIsNone(self.server.routines.thread)
+
+
 class BackupTests(Temp):
     def test_daily_zip_without_motion_photos_keeps_seven(self):
         data, target = self.dir / "data", self.dir / "backups"

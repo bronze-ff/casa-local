@@ -48,9 +48,9 @@ def validate_routine(body):
 
 
 class Routines:
-    def __init__(self, app, data_dir, clock=time.time):
+    def __init__(self, app, data_dir, clock=time.time, filename="rotinas.json"):
         self.app, self.clock = app, clock
-        self.path = Path(data_dir) / "rotinas.json"
+        self.path = Path(data_dir) / filename
         self.lock = threading.Lock()
         self.stop_event = threading.Event()
         self.thread = None

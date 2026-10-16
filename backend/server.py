@@ -65,11 +65,15 @@ class CasaServer(ThreadingHTTPServer):
         self.cameras = cameras or CameraBridge()
         self.location = location or LocationStore(app.data_dir)
         self.started = time.time()
-        self.routines = Routines(app, app.data_dir)
+        # Na prévia nada físico acontece: rotinas em arquivo separado (e sem executar), gasto do ar
+        # sem contar o ar simulado e TVs sem comandos, pareamento ou varredura da rede.
+        local = app.mode == "local"
+        self.routines = Routines(app, app.data_dir, filename="rotinas.json" if local else "rotinas-previa.json")
         self.energy = AcUsage(app.data_dir)
-        app.listeners.append(lambda device_id, state: self.energy.observe(state.get("power")) if device_id == "ar-quarto" else None)
+        if local:
+            app.listeners.append(lambda device_id, state: self.energy.observe(state.get("power")) if device_id == "ar-quarto" else None)
         self.motion = MotionWatcher(self.cameras, app.data_dir)
-        self.tvs = SamsungTVs(app.data_dir)
+        self.tvs = SamsungTVs(app.data_dir, preview=not local)
         self.backups = Backups(app.data_dir)
         self.background = threading.Event()
         self.dist_dir = Path(dist_dir or ROOT / "dist").resolve()
@@ -82,8 +86,8 @@ class CasaServer(ThreadingHTTPServer):
 
     def start_background(self):
         """Serviços de fundo do PC de casa (não sobem nos testes): rotinas, DVR, TVs, backup."""
-        self.routines.start()
         if self.app.mode == "local":
+            self.routines.start()
             self.motion.start()
             self.tvs.start(self.background)
             self.backups.start(self.background)

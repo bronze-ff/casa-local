@@ -155,7 +155,8 @@ class TizenSocket:
 
 
 class SamsungTVs:
-    def __init__(self, data_dir, scanner=scan, connector=TizenSocket, clock=time.time):
+    def __init__(self, data_dir, scanner=scan, connector=TizenSocket, clock=time.time, preview=False):
+        self.preview = preview
         self.path = Path(data_dir) / "tvs.dpapi"
         self.scanner, self.connector, self.clock = scanner, connector, clock
         self.lock = threading.Lock()
@@ -173,7 +174,12 @@ class SamsungTVs:
         temporary.write_bytes(dpapi(json.dumps({"tvs": self.tvs}).encode("utf-8")))
         temporary.replace(self.path)
 
+    def _real_only(self):
+        if self.preview:
+            raise AppError("Prévia: nada é enviado às TVs.", 409, "preview_mode")
+
     def refresh(self, force=False):
+        self._real_only()
         if not force and self.clock() - self.last_scan < SCAN_EVERY:
             return
         self.last_scan = self.clock()
@@ -214,6 +220,7 @@ class SamsungTVs:
 
     def pair(self, key):
         """Abre o canal sem token: a TV mostra "Permitir Casa Local?". Espera até 30 s pelo aceite."""
+        self._real_only()
         tv = self._tv(key)
         if self.live.get(key, {}).get("power") != "on":
             raise AppError("Ligue a TV antes de parear.", 409, "tv_off")
@@ -275,6 +282,7 @@ class SamsungTVs:
             channel.close()
 
     def command(self, key, body):
+        self._real_only()
         if not isinstance(body, dict) or len(body) != 1:
             raise AppError("Comando inválido.")
         if "key" in body and body["key"] in KEYS:
