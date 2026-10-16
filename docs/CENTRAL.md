@@ -1,13 +1,29 @@
-# Central: saúde, rotinas, movimento, TVs e gasto do ar
+# Central: saúde, modos, rotinas, movimento, TVs e gasto do ar
 
 Tudo roda no PC de casa, na rede local, sem nuvem. Os dados ficam em `.data` (fora do Git).
 
+## Modos (aba Central; botões na aba Luzes e no menu da bandeja)
+
+- Um modo diz o que fazer em cada aparelho: **não mexer**, **desligar/apagar** ou **ligar** com um
+  ajuste (cor e brilho das luzes; temperatura, modo e ventilação do ar). Ex.: Cheguei, Leitura,
+  Filme, Sair de casa.
+- O ar pode **manter se já estiver ligado** (ligado pelo celular antes de chegar). O painel sabe o
+  estado pelo último comando dele; se alguém usou o controle original, ele não sabe.
+- As luzes vão primeiro, o ar por último. Até 12 modos. Arquivo: `.data/modos.json`; na primeira vez
+  nasce das três cenas antigas (Cinema, Boa noite, Cheguei), com os nomes de `scenes.json`.
+- Um modo usado por uma rotina não pode ser apagado (troque a ação da rotina antes).
+
 ## Rotinas (aba Central)
 
-- Horário fixo por dia da semana: "desligar o ar às 6h30 nos dias úteis", "cena Boa noite às 23h".
-- Ações disponíveis: ligar ou desligar o ar, acender ou apagar luzes, rodar uma cena. Usam o mesmo
+- **Num horário**, por dia da semana: "desligar o ar às 6h30 nos dias úteis", "modo Boa noite às 23h".
+- **Num lugar** (localização do celular, lugares da aba Local): ao **sair** ou **chegar**, com faixa
+  de horário opcional. Ex.: sair da academia entre 17h e 21h → modo Cheguei. Só reage a transições
+  recentes (até 10 min; a fila antiga do celular não liga nada fora de hora) e não repete em menos
+  de 30 min (o GPS às vezes oscila na borda do lugar).
+- Ações: rodar um modo, ou ações avulsas (ligar/desligar o ar, acender/apagar luzes). Usam o mesmo
   caminho e a mesma validação dos botões do painel.
-- Se o servidor estava parado na hora marcada, a rotina ainda roda se ele voltar em até 5 minutos.
+- Se o servidor estava parado na hora marcada, a rotina de horário ainda roda se ele voltar em até
+  5 minutos.
 - Nenhuma rotina vem pronta. Arquivo: `.data/rotinas.json`.
 - **Desligar em…** (aba Clima ou menu da bandeja): timer de uma vez para desligar o ar em 30 min,
   1, 2 ou 4 h.
@@ -31,6 +47,12 @@ Sem tomada medidora: conta as horas em que o painel deixou o ar ligado × potên
   acima do relógio com a foto, a câmera e o horário (**Ver gravação** abre o replay no ponto;
   **Ao vivo**), além da notificação do Windows. O alerta some sozinho em 25 s e não rouba o foco.
   Menu da bandeja › **Testar aviso** mostra os dois.
+- **Onde avisar** (em Movimento › Todas): cada computador com a bandeja tem sua regra:
+  **Monitoradas** (segue o sino de cada câmera), **Só estas** (câmeras escolhidas para aquele
+  computador) ou **Nenhuma**. Com **Segurar com jogo ou vídeo em tela cheia**, o alerta espera e
+  chega num resumo quando a tela cheia acaba. Dá para pausar por 1 h, 4 h ou até reativar, aqui ou
+  no menu da bandeja › **Avisos neste computador**. A bandeja se apresenta sozinha (id aleatório em
+  `%LOCALAPPDATA%\CasaLocalBandeja\aparelho.json`); a regra fica em `.data/avisos-dispositivos.json`.
 - A contagem fica por câmera: cada botão de câmera mostra quantos movimentos novos teve, os eventos
   ganham a marca **Novo**, e abrir a câmera zera só a contagem dela (em Todas há "Marcar tudo como
   visto").

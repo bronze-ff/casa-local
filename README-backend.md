@@ -73,7 +73,7 @@ O adaptador IR retorna `sent` após enviar o código. O estado físico permanece
 | `POST /api/scenes/{id}/run` | `state`, `results` por etapa e `status` (`preview`, `completed`, `partial`) |
 | `POST /api/discovery` | `mode`, `devices: [{id, ip, protocol}]`, `message` |
 
-IDs de aparelho: `quarto-luz`, `banheiro-luz`, `ar-quarto`, `tv-quarto`. Cenas: `cinema`, `boa-noite`, `cheguei`. Todos os POST exigem `Content-Type: application/json`, corpo de até 16 KiB e `X-Casa-Token` recebido no bootstrap. O token muda ao reiniciar o servidor. Exemplo local PowerShell:
+IDs de aparelho: `quarto-luz`, `banheiro-luz`, `ar-quarto`, `tv-quarto`. Modos (`scenes` no estado): editáveis em `POST /api/modes`, `/api/modes/{id}/remove` e `/api/modes/order`; os iniciais são `cinema`, `boa-noite` e `cheguei`. Todos os POST exigem `Content-Type: application/json`, corpo de até 16 KiB e `X-Casa-Token` recebido no bootstrap. O token muda ao reiniciar o servidor. Exemplo local PowerShell:
 
 ```powershell
 $baseUrl = 'http://localhost:8787'

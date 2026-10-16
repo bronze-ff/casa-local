@@ -67,6 +67,8 @@ class LocationStore:
         history = self._read(self.history_path, {"points": [], "events": []})
         self.points, self.events = history.get("points", []), history.get("events", [])
         self.failures = []
+        # Quem reage a chegadas/saídas novas (rotinas de lugar): f({"tst", "kind", "place"}).
+        self.listeners = []
 
     # ---- armazenamento ----
     def _read(self, path, default):
@@ -257,6 +259,11 @@ class LocationStore:
                 return
         self.events.append({"tst": tst, "kind": kind, "place": place_id, "exact": exact})
         self.events.sort(key=lambda e: e["tst"])
+        for listener in self.listeners:
+            try:
+                listener({"tst": tst, "kind": kind, "place": place_id})
+            except Exception:
+                pass
 
     # ---- leitura para o painel ----
     def status(self):

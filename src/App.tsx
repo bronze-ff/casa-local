@@ -1,7 +1,9 @@
 import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from 'react';
-import { Activity, AirVent, Leaf, MoveVertical, SunDim, Zap, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Cctv, Check, Copy, Droplets, Fan, Film, Flame, Home, House, Lightbulb, LoaderCircle, MapPin, Minus, Monitor, Moon, Plus, Power, Radio, RefreshCw, Settings2, ShieldCheck, Snowflake, Sparkles, Thermometer, Tv, Undo2, Volume2, VolumeX, Wind, X } from 'lucide-react';
+import { Activity, AirVent, Leaf, MoveVertical, SunDim, Zap, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Cctv, Check, Copy, Fan, House, Lightbulb, LoaderCircle, MapPin, Minus, Monitor, Plus, Power, Radio, RefreshCw, Settings2, ShieldCheck, Snowflake, Thermometer, Tv, Undo2, Volume2, VolumeX, X } from 'lucide-react';
 import Cameras from './components/Cameras';
 import type { Device } from './types';
+import { FANS, MODES, PALETTE } from './constants';
+import { MODE_ICONS } from './components/Modes';
 import { useCasa } from './useCasa';
 
 const RoomScene = lazy(() => import('./components/RoomScene'));
@@ -13,14 +15,8 @@ type Casa = ReturnType<typeof useCasa>;
 type Tab = 'luzes' | 'clima' | 'tv' | 'cameras' | 'local' | 'central';
 const TABS: [Tab, string, typeof Lightbulb][] = [['luzes', 'Luzes', Lightbulb], ['clima', 'Clima', AirVent], ['tv', 'TV', Tv], ['cameras', 'Câmeras', Cctv], ['local', 'Local', MapPin], ['central', 'Central', Activity]];
 
-const PALETTE: [string, string][] = [
-  ['#FF3B30', 'Vermelho'], ['#FF6A2B', 'Laranja'], ['#FFA51F', 'Âmbar'], ['#FFD84D', 'Amarelo'], ['#9BE15D', 'Lima'], ['#34C759', 'Verde'], ['#2ED3B7', 'Turquesa'], ['#FFFFFF', 'Branco frio'],
-  ['#34C8FF', 'Ciano'], ['#64A8FF', 'Céu'], ['#2F6BFF', 'Azul'], ['#5E5CE6', 'Índigo'], ['#9B5CF6', 'Violeta'], ['#F25FD0', 'Magenta'], ['#FF7EA6', 'Rosa'], ['#FFD6A0', 'Branco quente'],
-];
-const MODES: [string, string, typeof Snowflake][] = [['cool', 'Resfriar', Snowflake], ['heat', 'Aquecer', Flame], ['dry', 'Desumidificar', Droplets], ['fan', 'Ventilar', Wind], ['auto', 'Automático', Sparkles]];
 // Botões do controle original que não existem no perfil Geonav: funcionam depois de gravados com Aprender.
 const AC_EXTRAS: [string, string, typeof Zap][] = [['turbo', 'Turbo', Zap], ['eco', 'Eco', Leaf], ['brisa', 'Brisa', MoveVertical], ['display', 'Display', SunDim]];
-const FANS: [string, string][] = [['auto', 'Auto'], ['low', 'Baixa'], ['medium', 'Média'], ['high', 'Alta']];
 
 // O endereço pode trazer um detalhe depois de ":" (ex.: #cameras:cam4 abre a câmera 4 ao vivo).
 function hashTarget(): string | null {
@@ -87,11 +83,11 @@ function Lights({casa}: {casa: Casa}) {
       <button className="round" aria-label="Aumentar brilho" disabled={disabled || level >= 100} onClick={() => setLevel(level + 10)}><Plus size={16} /></button>
       <output>{lamp?.state.brightness == null ? '—' : `${level}%`}</output>
     </div>
-    <div className="scenes" role="group" aria-label="Cenas">
+    <div className="scenes" role="group" aria-label="Modos">
       {scenes.map(scene => {
-        const Icon = scene.id === 'cinema' ? Film : scene.id === 'boa-noite' ? Moon : Home;
-        const blocked = !preview && (casa.data?.devices ?? []).some(device => (scene.id === 'cheguei' ? device.id === 'quarto-luz' : device.kind === 'light' || (scene.id === 'boa-noite' && device.kind === 'climate')) && !device.configured);
-        return <button key={scene.id} title={scene.description} disabled={!!casa.busy || !!casa.error || blocked} onClick={() => void casa.scene(scene.id, scene.name)}>{casa.busy === scene.id ? <LoaderCircle className="spin" size={15} /> : <Icon size={15} />}{scene.name}</button>;
+        const Icon = MODE_ICONS[scene.icon] ?? House;
+        const blocked = !preview && (casa.data?.devices ?? []).some(device => scene.devices.includes(device.id) && !device.configured);
+        return <button key={scene.id} title={scene.description} disabled={!!casa.busy || !!casa.error || blocked} onClick={() => void casa.scene(scene.id, scene.name)}>{casa.busy === scene.id ? <LoaderCircle className="spin" size={15} /> : <Icon size={15} />}<span>{scene.name}</span></button>;
       })}
     </div>
     <Footer device={lamp} casa={casa} />
