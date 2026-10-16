@@ -125,6 +125,12 @@ class CameraBridge:
         if camera_id not in IDS:
             raise AppError("Câmera não encontrada.", 404, "not_found")
 
+    def recent(self, camera_id):
+        """Última imagem em cache e a idade em segundos, sem contar como alguém assistindo."""
+        with self.cache_lock:
+            data, stamp = self.cache.get(camera_id, (b"", -1e9))
+        return data, time.monotonic() - stamp
+
     def frame(self, camera_id):
         """Return (jpeg, age_seconds); served from the background cache when fresh enough."""
         self._check(camera_id)

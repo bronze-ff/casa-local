@@ -18,7 +18,12 @@ from urllib.parse import unquote, urlsplit
 from .app import CasaApp
 from .cameras import LIVE_SECONDS, CameraBridge
 from .config import ROOT, private_ip
+from .energy import AcUsage
+from .health import Backups, report as health_report
 from .location import LocationStore
+from .motion import MotionWatcher
+from .routines import Routines
+from .samsung_tv import SamsungTVs
 from .models import AppError, VERSION
 
 MAX_BODY = 16384
@@ -59,6 +64,14 @@ class CasaServer(ThreadingHTTPServer):
         self.app = app
         self.cameras = cameras or CameraBridge()
         self.location = location or LocationStore(app.data_dir)
+        self.started = time.time()
+        self.routines = Routines(app, app.data_dir)
+        self.energy = AcUsage(app.data_dir)
+        app.listeners.append(lambda device_id, state: self.energy.observe(state.get("power")) if device_id == "ar-quarto" else None)
+        self.motion = MotionWatcher(self.cameras, app.data_dir)
+        self.tvs = SamsungTVs(app.data_dir)
+        self.backups = Backups(app.data_dir)
+        self.background = threading.Event()
         self.dist_dir = Path(dist_dir or ROOT / "dist").resolve()
         self.allowed_hosts = local_hosts(allowed_hosts)
         self.slots = threading.BoundedSemaphore(16)
@@ -67,7 +80,18 @@ class CasaServer(ThreadingHTTPServer):
         super().__init__(address, CasaHandler)
         self.app.start_polling()
 
+    def start_background(self):
+        """Serviços de fundo do PC de casa (não sobem nos testes): rotinas, DVR, TVs, backup."""
+        self.routines.start()
+        if self.app.mode == "local":
+            self.motion.start()
+            self.tvs.start(self.background)
+            self.backups.start(self.background)
+
     def server_close(self):
+        self.background.set()
+        self.routines.close()
+        self.motion.close()
         self.app.close()
         self.cameras.close()
         super().server_close()
@@ -277,8 +301,34 @@ class CasaHandler(BaseHTTPRequestHandler):
                 scene = re.fullmatch(r"/api/scenes/([a-z-]+)/run", path)
                 learn = re.fullmatch(r"/api/devices/(tv-quarto|ar-quarto)/learn", path)
                 remove_place = re.fullmatch(r"/api/location/places/([a-z0-9-]{1,24})/remove", path)
+                remove_routine = re.fullmatch(r"/api/routines/([0-9a-f]{8})/remove", path)
+                tv = re.fullmatch(r"/api/tvs/([0-9a-f]{12})/(pair|command|label)", path)
                 location = self.server.location
-                if path == "/api/location/setup" and set(body) == {"name"}:
+                if path == "/api/routines":
+                    result = self.server.routines.save(body)
+                elif remove_routine and not body:
+                    result = self.server.routines.remove(remove_routine[1])
+                elif path == "/api/routines/timer":
+                    result = self.server.routines.set_timer(body)
+                elif path == "/api/energy":
+                    try:
+                        result = self.server.energy.configure(body)
+                    except ValueError as error:
+                        raise AppError(str(error)) from None
+                elif path == "/api/motion/notify":
+                    result = self.server.motion.set_notify(body)
+                elif path == "/api/motion/seen" and not body:
+                    result = self.server.motion.mark_seen()
+                elif path == "/api/tvs/scan" and not body:
+                    self.server.tvs.refresh(force=True)
+                    result = self.server.tvs.status()
+                elif tv and tv[2] == "pair" and not body:
+                    result = self.server.tvs.pair(tv[1])
+                elif tv and tv[2] == "command":
+                    result = {**self.server.tvs.command(tv[1], body), **self.server.tvs.status()}
+                elif tv and tv[2] == "label" and set(body) == {"label"}:
+                    result = self.server.tvs.rename(tv[1], body["label"])
+                elif path == "/api/location/setup" and set(body) == {"name"}:
                     result = {"phone": location.setup(body["name"]), "location": location.status()}
                 elif path == "/api/location/phone" and not body:
                     result = {"phone": location.phone_config()}
@@ -303,6 +353,19 @@ class CasaHandler(BaseHTTPRequestHandler):
                 self.json_response(200, {"version": VERSION, "mode": app.mode, "configuredCount": len(app.config), "build": self.published_build()})
             elif path == "/api/location":
                 self.json_response(200, self.server.location.status())
+            elif path == "/api/routines":
+                self.json_response(200, self.server.routines.status())
+            elif path == "/api/energy":
+                self.json_response(200, self.server.energy.summary())
+            elif path == "/api/motion":
+                self.json_response(200, self.server.motion.status())
+            elif photo := re.fullmatch(r"/api/motion/(\d{9,11}-[0-9a-f]{6})\.jpg", path):
+                self.binary_response(self.server.motion.photo(photo[1]), "image/jpeg")
+            elif path == "/api/tvs":
+                self.json_response(200, self.server.tvs.status())
+            elif path == "/api/health":
+                server = self.server
+                self.json_response(200, health_report(app, server.cameras, server.motion, server.tvs, server.backups, server.started))
             elif path == "/api/cameras":
                 self.json_response(200, self.server.cameras.snapshot())
             elif camera := re.fullmatch(r"/api/cameras/(cam[0-9]{1,2})/frame\.jpg", path):
@@ -433,6 +496,7 @@ def main():
         print(f"Casa Local · {args.mode} · http://localhost:{args.port}")
         print("Acesso privado à LAN habilitado." if args.lan else "Acesso apenas neste computador. Use --lan para iPhone na mesma rede.")
         server.cameras.start()
+        server.start_background()
         server.serve_forever(poll_interval=0.5)
     except KeyboardInterrupt:
         pass

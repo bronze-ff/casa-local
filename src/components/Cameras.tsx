@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera as CameraIcon, CameraOff, Cctv, ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, ShieldCheck, X } from 'lucide-react';
+import { Bell, BellOff, Camera as CameraIcon, CameraOff, Cctv, ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, ShieldCheck, X } from 'lucide-react';
+import type { useCasa } from '../useCasa';
 
 type Camera = {id: string; name: string; group: 'externa' | 'interna'};
 type Frame = {url?: string; at?: number; failed?: boolean};
-type Filter = 'todas' | 'externa' | 'interna';
+type Filter = 'todas' | 'externa' | 'interna' | 'movimento';
+type MotionEvent = {id: string; camera: string; start: number; end: number | null; count: number; photo: boolean};
+type Motion = {connected: boolean; error: string | null; events: MotionEvent[]; notify: string[]; unseen: number};
+type Casa = ReturnType<typeof useCasa>;
 
 const REFRESH_MS = 4000;
 const PARALLEL = 5;
@@ -136,7 +140,44 @@ function LiveView({cameras, index, poster, move, close}: {cameras: Camera[]; ind
   </dialog>;
 }
 
-export default function Cameras() {
+const clock = (tst: number) => new Date(tst * 1000).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+const day = (tst: number) => { const d = new Date(tst * 1000), today = new Date(); return d.toDateString() === today.toDateString() ? 'Hoje' : new Date(today.getTime() - 86400000).toDateString() === d.toDateString() ? 'Ontem' : d.toLocaleDateString('pt-BR'); };
+
+/** Linha do tempo de movimento (eventos do próprio DVR) e escolha de quais câmeras avisam. */
+function MotionView({cameras, motion, casa, open, reload}: {cameras: Camera[]; motion: Motion | null; casa: Casa; open: (id: string) => void; reload: () => void}) {
+  const [cam, setCam] = useState<string>('todas');
+  const names = Object.fromEntries(cameras.map(c => [c.id, c.name]));
+  if (!motion) return <div className="empty"><LoaderCircle className="spin" size={22} /><p>Lendo eventos do DVR</p></div>;
+  const events = motion.events.filter(event => cam === 'todas' || event.camera === cam);
+  const watching = motion.notify.includes(cam);
+  const toggle = async (id: string) => { await casa.post('motion', '/api/motion/notify', {camera: id, on: !motion.notify.includes(id)}); reload(); };
+  let lastDay = '';
+  return <div className="motion">
+    <div className={`motion-status ${motion.connected ? 'ok' : 'warn'}`}><i />{motion.connected ? 'Recebendo eventos do DVR' : motion.error ?? 'Conectando ao DVR…'}<span>últimas 24 h</span></div>
+    <div className="motion-cams" role="group" aria-label="Filtrar por câmera">
+      <button className={cam === 'todas' ? 'selected' : ''} onClick={() => setCam('todas')}>Todas</button>
+      {cameras.map(c => <button key={c.id} className={cam === c.id ? 'selected' : ''} onClick={() => setCam(c.id)}>{motion.notify.includes(c.id) ? <Bell size={12} /> : null}{c.name}</button>)}
+    </div>
+    {cam !== 'todas' ? <button className={`motion-bell ${watching ? 'on' : ''}`} aria-pressed={watching} disabled={!!casa.busy} onClick={() => void toggle(cam)}>
+      {watching ? <Bell size={15} /> : <BellOff size={15} />}{watching ? `Avisando quando houver movimento em ${names[cam]}` : `Avisar quando houver movimento em ${names[cam]}`}
+    </button> : <p className="loc-hint">Escolha uma câmera acima para ligar os avisos dela (na bandeja do Windows).</p>}
+    {events.length ? <ol className="motion-list">{events.map(event => {
+      const label = day(event.start);
+      const header = label !== lastDay ? (lastDay = label) : null;
+      const duration = event.end ? Math.max(1, Math.round((event.end - event.start) / 60)) : null;
+      return <li key={event.id}>
+        {header ? <h4>{header}</h4> : null}
+        <button onClick={() => open(event.camera)} aria-label={`Ver ${names[event.camera]} ao vivo`}>
+          {event.photo ? <img src={`/api/motion/${event.id}.jpg`} alt="" loading="lazy" /> : <span className="motion-nophoto"><CameraIcon size={16} /></span>}
+          <span className="motion-text"><strong>{names[event.camera] ?? event.camera}</strong><small>{clock(event.start)}{event.end ? ` · ${duration} min` : ' · agora'}{event.count > 1 ? ` · ${event.count} disparos` : ''}</small></span>
+          {motion.notify.includes(event.camera) ? <Bell size={14} className="motion-flag" /> : null}
+        </button>
+      </li>;
+    })}</ol> : <p className="loc-hint">Nenhum movimento {cam === 'todas' ? 'nas câmeras' : 'nesta câmera'} nas últimas 24 h.</p>}
+  </div>;
+}
+
+export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: string | null}) {
   const [cameras, setCameras] = useState<Camera[] | null>(null);
   const [available, setAvailable] = useState(true);
   const [error, setError] = useState(false);
@@ -146,6 +187,14 @@ export default function Cameras() {
   const [now, setNow] = useState(Date.now());
   const [nonce, setNonce] = useState(0);
   const urls = useRef<Record<string, string>>({});
+  const [motion, setMotion] = useState<Motion | null>(null);
+  const loadMotion = useCallback(async () => {
+    try { const response = await fetch('/api/motion', {cache: 'no-store'}); if (response.ok) setMotion(await response.json()); } catch { /* tenta de novo */ }
+  }, []);
+  useEffect(() => { void loadMotion(); const timer = setInterval(() => { if (!document.hidden) void loadMotion(); }, 15000); return () => clearInterval(timer); }, [loadMotion]);
+  // Abrir a aba de movimento conta como "visto" para o aviso da bandeja.
+  useEffect(() => { if (filter === 'movimento' && motion?.unseen) void casa.post('motion', '/api/motion/seen', {}).then(() => loadMotion()); }, [filter, motion?.unseen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const active = new Set((motion?.events ?? []).filter(event => event.end === null).map(event => event.camera));
 
   const load = useCallback(async () => {
     try {
@@ -158,9 +207,11 @@ export default function Cameras() {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const visible = (cameras ?? []).filter(camera => filter === 'todas' || camera.group === filter);
+  const visible = (cameras ?? []).filter(camera => filter === 'todas' || filter === 'movimento' || camera.group === filter);
   const visibleIds = visible.map(camera => camera.id).join(',');
-  const paused = live !== null || !available;
+  const paused = live !== null || !available || filter === 'movimento';
+  // A bandeja pode abrir uma câmera direto ao vivo (#cameras:cam4).
+  useEffect(() => { if (!cameras || !openCamera) return; const index = cameras.findIndex(c => c.id === openCamera); if (index >= 0) { setFilter('todas'); setLive(index); } }, [cameras, openCamera]);
 
   useEffect(() => {
     if (!visibleIds || paused) return;
@@ -206,9 +257,9 @@ export default function Cameras() {
       <div className="title"><Cctv size={17} /><strong id="cameras-heading">Câmeras</strong><span>{visible.length} de {cameras.length}</span></div>
       <button className="round accent" aria-label="Atualizar imagens agora" disabled={paused} onClick={() => setNonce(value => value + 1)}><RefreshCw size={17} /></button>
     </div>
-    <div className="segmented wide" role="group" aria-label="Filtrar câmeras">{([['todas', 'Todas'], ['externa', 'Externas'], ['interna', 'Internas']] as const).map(([value, label]) => <button key={value} className={filter === value ? 'selected' : ''} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>)}</div>
+    <div className="segmented wide" role="group" aria-label="Filtrar câmeras">{([['todas', 'Todas'], ['externa', 'Externas'], ['interna', 'Internas'], ['movimento', 'Movimento']] as const).map(([value, label]) => <button key={value} className={filter === value ? 'selected' : ''} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}{value === 'movimento' && motion?.unseen ? <b className="count">{motion.unseen}</b> : null}</button>)}</div>
     {!available ? <div className="alert" role="alert"><p>O serviço de câmeras (go2rtc) não está rodando no PC de casa.</p><button onClick={() => void load()}><RefreshCw size={15} />Verificar</button></div> : null}
-    <div className="cam-grid">
+    {filter === 'movimento' ? <MotionView cameras={cameras} motion={motion} casa={casa} reload={() => void loadMotion()} open={id => { setFilter('todas'); setLive(cameras.findIndex(c => c.id === id)); }} /> : <div className="cam-grid">
       {visible.map((camera, index) => {
         const frame = frames[camera.id];
         return <button key={camera.id} className="cam" onClick={() => setLive(index)} aria-label={`Abrir ${camera.name} ao vivo`}>
@@ -216,9 +267,10 @@ export default function Cameras() {
           <span className="cam-ch">{camera.id.replace('cam', '')}</span>
           <span className="cam-snap" aria-hidden="true"><CameraIcon size={13} /></span>
           <span className="cam-name">{camera.name}</span>
+          {active.has(camera.id) ? <span className="cam-motion" title="Movimento agora"><i />Movimento</span> : null}
         </button>;
       })}
-    </div>
+    </div>}
     <p className={`card-foot ${available ? 'tone-online' : 'tone-offline'}`}><ShieldCheck size={14} />{available ? 'Conectado ao DVR' : 'Sem conexão'}<span>{latest ? `Automático · ${ago(latest, now)}` : 'Atualização automática'}</span></p>
     {live !== null && visible[live] ? <LiveView cameras={visible} index={live} poster={frames[visible[live].id]?.url} move={move} close={() => setLive(null)} /> : null}
   </section>;

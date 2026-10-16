@@ -26,6 +26,8 @@ class CasaApp:
         self.discovery_lock = threading.Lock()
         self.last_discovery = -100.0
         self.recent = deque(maxlen=12)
+        # Quem precisa saber de comandos aceitos (ex.: gasto do ar): f(device_id, estado estimado).
+        self.listeners = []
         self.stop_event = threading.Event()
         self.poll_thread = None
         self.devices = deepcopy(INVENTORY)
@@ -135,7 +137,7 @@ class CasaApp:
                 result["csrfToken"] = self.csrf_token
             return result
 
-    def command(self, device_id, body):
+    def command(self, device_id, body, origin=None):
         with self.lock:
             device = next((d for d in self.devices if d["id"] == device_id), None)
             if device is None:
@@ -164,12 +166,19 @@ class CasaApp:
                 with self.lock:
                     device["state"].update(result["state"])
                     device.update(connection="preview" if self.mode == "preview" else "online", confidence=result["confidence"], updatedAt=now())
-                    self.recent.appendleft({"id": secrets.token_hex(6), "deviceId": device_id, "name": device["name"], "message": result["message"], "status": result["status"], "createdAt": now()})
+                    message = f"{origin}: {result['message']}" if origin else result["message"]
+                    self.recent.appendleft({"id": secrets.token_hex(6), "deviceId": device_id, "name": device["name"], "message": message, "status": result["status"], "createdAt": now()})
+                    state = deepcopy(device["state"])
                     if self.mode == "preview":
                         self.data_dir.mkdir(parents=True, exist_ok=True)
                         temporary = self.data_dir / "preview-state.json.tmp"
                         temporary.write_text(json.dumps({d["id"]: d["state"] for d in self.devices}), encoding="utf-8")
                         temporary.replace(self.data_dir / "preview-state.json")
+                for listener in self.listeners:
+                    try:
+                        listener(device_id, state)
+                    except Exception:
+                        pass
                 return {"state": self.snapshot(), "device": deepcopy(device), "command": {k: v for k, v in result.items() if k != "state"}}
             except AppError as error:
                 with self.lock:

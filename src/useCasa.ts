@@ -95,6 +95,6 @@ export function useCasa() {
   // navegador espera mais que isso antes de desistir.
   const learn = (id: string, body: Record<string, unknown>, label: string) => send(id, `/api/devices/${encodeURIComponent(id)}/learn`, body, `Aprendido: ${label}`, 40000);
   // Ações fora dos aparelhos (localização): mesmo token, mesma fila de ocupado e mesmos avisos.
-  const post = (id: string, path: string, body: Record<string, unknown>, success?: string) => send(id, path, body, success);
+  const post = (id: string, path: string, body: Record<string, unknown>, success?: string, timeout?: number) => send(id, path, body, success, timeout);
   return {data, error, busy, notice, connect, command, key, scene, discover, learn, post};
 }
