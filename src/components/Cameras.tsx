@@ -8,7 +8,10 @@ type Filter = 'todas' | 'externa' | 'interna' | 'movimento';
 type MotionEvent = {id: string; camera: string; start: number; end: number | null; count: number; photo: boolean; hits?: [number, number | null][]};
 // Horários no relógio do DVR (o impresso no vídeo); `offset` = DVR − este aparelho, em segundos.
 type ReplayTarget = {camera: Camera; start: number; from: number; to: number; offset: number};
-type Motion = {connected: boolean; error: string | null; events: MotionEvent[]; notify: string[]; unseen: number; dvrOffset?: number};
+type Motion = {connected: boolean; error: string | null; events: MotionEvent[]; notify: string[]; unseen: number; unseenBy?: Record<string, number>; seenBy?: Record<string, number>; dvrOffset?: number};
+
+/** Câmeras com aviso ligado vêm primeiro (na ordem de sempre); as demais seguem depois. */
+const watchedFirst = (list: Camera[], notify: string[] = []) => [...list].sort((a, b) => Number(notify.includes(b.id)) - Number(notify.includes(a.id)));
 type Casa = ReturnType<typeof useCasa>;
 
 const REFRESH_MS = 4000;
@@ -245,17 +248,23 @@ function ReplayView({camera, start, from, to, offset: clockOffset, casa, close, 
   const seekTo = (t: number) => setBase(Math.min(Math.floor(dvrNow()) - 10, Math.floor(t)));
   const jump = (seconds: number) => seekTo(now + seconds);
   // Disparos de movimento desta câmera dentro da janela (eventos antigos sem disparos: início-fim).
+  // Atualiza a cada 10 s: aberto logo depois do alerta, o movimento pode continuar acontecendo.
   const [hits, setHits] = useState<[number, number][]>([]);
+  const [ongoing, setOngoing] = useState(false);
   useEffect(() => {
-    void fetch(`/api/motion/${camera.id}`, {cache: 'no-store'}).then(r => r.ok ? r.json() : null).then(value => {
+    const load = () => fetch(`/api/motion/${camera.id}`, {cache: 'no-store'}).then(r => r.ok ? r.json() : null).then(value => {
       if (!value) return;
       const all: [number, number][] = [];
       for (const event of value.events as MotionEvent[]) {
         for (const [a, b] of event.hits ?? [[event.start, event.end]]) all.push([a, b ?? Math.max(a + 5, dvrNow())]);
       }
       setHits(all.sort((x, y) => x[0] - y[0]));
+      setOngoing((value.events as MotionEvent[]).some(event => event.end === null && event.start <= to + 60));
     }).catch(() => {});
-  }, [camera.id]);
+    void load();
+    const timer = setInterval(() => { if (!document.hidden) void load(); }, 10000);
+    return () => clearInterval(timer);
+  }, [camera.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // A janela acompanha se o vídeo passar do fim dela (até o agora).
   const windowEnd = Math.min(dvrNow() - 5, Math.max(to, now + 30));
   const windowHits = hits.filter(([a, b]) => b >= from && a <= windowEnd);
@@ -278,7 +287,9 @@ function ReplayView({camera, start, from, to, offset: clockOffset, casa, close, 
         onTimeUpdate={event => { const t = event.currentTarget.currentTime; if (first.current === null) first.current = t; setOffset(Math.max(0, t - first.current)); }} />
       {state === 'loading' ? <div className="camera-live__overlay"><LoaderCircle className="spin" size={26} /><p>Buscando a gravação no DVR…</p></div> : null}
       {state === 'failed' ? <div className="camera-live__overlay"><CameraOff size={26} /><p>{failure || 'O DVR não entregou a gravação desse horário (pode não ter sido gravado).'}</p></div> : null}
-      {state === 'ended' ? <div className="camera-live__overlay"><History size={26} /><p>Fim deste trecho da gravação. Avance ou volte para continuar.</p></div> : null}
+      {state === 'ended' ? <div className="camera-live__overlay"><History size={26} /><p>{dvrNow() - (base + offset) < 90 ? 'Você chegou ao momento atual da gravação.' : 'Fim deste trecho da gravação. Avance ou volte para continuar.'}</p>
+        {dvrNow() - (base + offset) < 90 ? <button className="pill accent" onClick={goLive}><Radio size={15} />Ver ao vivo</button> : null}</div> : null}
+      {ongoing && state !== 'ended' ? <button className="replay-ongoing" onClick={goLive}><i />Movimento ainda acontecendo · ver ao vivo</button> : null}
       {state === 'unsupported' ? <div className="camera-live__overlay"><CameraOff size={26} /><p>Este navegador não toca a gravação. Use o Chrome, o Edge ou o Safari atualizado.</p></div> : null}
       <Timeline from={from} to={windowEnd} now={now} hits={windowHits} seek={seekTo} />
       <div className="replay-controls" role="group" aria-label="Controle da gravação">
@@ -308,6 +319,13 @@ function MotionView({cameras, motion, casa, open, reload}: {cameras: Camera[]; m
     const timer = setInterval(() => { if (!document.hidden) void load(); }, 15000);
     return () => { stop = true; clearInterval(timer); };
   }, [cam]);
+  // "Novo" usa o visto de quando a tela abriu: continua marcado mesmo depois de a câmera ser vista.
+  const [since, setSince] = useState<Record<string, number> | null>(null);
+  useEffect(() => { if (motion?.seenBy && !since) setSince(motion.seenBy); }, [motion?.seenBy, since]);
+  // Abrir uma câmera zera só os avisos dela (os outros continuam contando). Reenvia a cada leitura
+  // (15 s) enquanto ainda houver avisos dela: uma falha passageira não deixa a contagem presa.
+  const unseenHere = cam !== 'todas' ? motion?.unseenBy?.[cam] ?? 0 : 0;
+  useEffect(() => { if (unseenHere) void casa.call('/api/motion/seen', {camera: cam}).then(reload).catch(() => {}); }, [cam, unseenHere, motion]); // eslint-disable-line react-hooks/exhaustive-deps
   const names = Object.fromEntries(cameras.map(c => [c.id, c.name]));
   if (!motion) return <div className="empty"><LoaderCircle className="spin" size={22} /><p>Lendo eventos do DVR</p></div>;
   const loadingCam = cam !== 'todas' && only?.camera !== cam;
@@ -319,8 +337,14 @@ function MotionView({cameras, motion, casa, open, reload}: {cameras: Camera[]; m
     <div className={`motion-status ${motion.connected ? 'ok' : 'warn'}`}><i />{motion.connected ? 'Recebendo eventos do DVR' : motion.error ?? 'Conectando ao DVR…'}<span>últimas 24 h</span></div>
     <div className="motion-cams" role="group" aria-label="Filtrar por câmera">
       <button className={cam === 'todas' ? 'selected' : ''} onClick={() => setCam('todas')}>Todas</button>
-      {cameras.map(c => <button key={c.id} className={cam === c.id ? 'selected' : ''} onClick={() => setCam(c.id)}>{motion.notify.includes(c.id) ? <Bell size={12} /> : null}{c.name}</button>)}
+      {watchedFirst(cameras, motion.notify).map(c => <button key={c.id} className={cam === c.id ? 'selected' : ''} onClick={() => setCam(c.id)}>
+        {motion.notify.includes(c.id) ? <Bell size={12} /> : null}{c.name}{motion.unseenBy?.[c.id] ? <b className="count">{motion.unseenBy[c.id]}</b> : null}
+      </button>)}
     </div>
+    {cam === 'todas' && motion.unseen ? <div className="motion-unseen">
+      <span><Bell size={14} />{motion.unseen} {motion.unseen === 1 ? 'movimento novo' : 'movimentos novos'} em {Object.keys(motion.unseenBy ?? {}).map(id => names[id]).join(', ')}</span>
+      <button className="link" onClick={() => void casa.call('/api/motion/seen', {}).then(reload).catch(() => {})}>Marcar tudo como visto</button>
+    </div> : null}
     {cam !== 'todas' ? <button className={`motion-bell ${watching ? 'on' : ''}`} aria-pressed={watching} disabled={!!casa.busy} onClick={() => void toggle(cam)}>
       {watching ? <Bell size={15} /> : <BellOff size={15} />}{watching ? `Avisando quando houver movimento em ${names[cam]}` : `Avisar quando houver movimento em ${names[cam]}`}
     </button> : <p className="loc-hint">Escolha uma câmera acima para ligar os avisos dela (na bandeja do Windows).</p>}
@@ -328,12 +352,13 @@ function MotionView({cameras, motion, casa, open, reload}: {cameras: Camera[]; m
       const label = day(event.start);
       const header = label !== lastDay ? (lastDay = label) : null;
       const duration = event.end ? Math.max(1, Math.round((event.end - event.start) / 60)) : null;
-      return <li key={event.id}>
+      const fresh = motion.notify.includes(event.camera) && event.start > (since?.[event.camera] ?? Infinity);
+      return <li key={event.id} className={fresh ? 'fresh' : ''}>
         {header ? <h4>{header}</h4> : null}
         <button onClick={() => open(event)} aria-label={`Ver a gravação de ${names[event.camera]} às ${clock(event.start)}`}>
           {event.photo ? <img src={`/api/motion/${event.id}.jpg`} alt="" loading="lazy" /> : <span className="motion-nophoto"><CameraIcon size={16} /></span>}
           <span className="motion-text"><strong>{names[event.camera] ?? event.camera}</strong><small>{clock(event.start)}{event.end ? ` · ${duration} min` : ' · agora'}{event.count > 1 ? ` · ${event.count} disparos` : ''}</small></span>
-          {motion.notify.includes(event.camera) ? <Bell size={14} className="motion-flag" /> : null}
+          {fresh ? <em className="motion-new">Novo</em> : motion.notify.includes(event.camera) ? <Bell size={14} className="motion-flag" /> : null}
         </button>
       </li>;
     })}</ol> : loadingCam ? <div className="empty small"><LoaderCircle className="spin" size={20} /></div>
@@ -347,29 +372,23 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState<Filter>('todas');
   const [frames, setFrames] = useState<Record<string, Frame>>({});
-  const [live, setLive] = useState<number | null>(null);
+  // Câmera ao vivo guardada pelo id: se a grade se reordena (avisos chegam depois), ela não troca.
+  const [liveId, setLiveId] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [nonce, setNonce] = useState(0);
   const urls = useRef<Record<string, string>>({});
   const [motion, setMotion] = useState<Motion | null>(null);
   const [replay, setReplay] = useState<ReplayTarget | null>(null);
-  const filterRef = useRef(filter);
-  filterRef.current = filter;
   const loadMotion = useCallback(async () => {
     try {
       const response = await fetch('/api/motion', {cache: 'no-store'});
       if (!response.ok) return;
       const value: Motion = await response.json();
       setMotion(value);
-      // Com o filtro Movimento aberto, cada leitura reenvia o "visto" enquanto houver não vistos:
-      // uma falha passageira não deixa o aviso da bandeja preso.
-      if (filterRef.current === 'movimento' && value.unseen) void casa.call('/api/motion/seen', {}).catch(() => {});
     } catch { /* tenta de novo */ }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { void loadMotion(); const timer = setInterval(() => { if (!document.hidden) void loadMotion(); }, 15000); return () => clearInterval(timer); }, [loadMotion]);
   // Abrir a aba de movimento conta como "visto" para o aviso da bandeja.
-  // Chamada própria (fora da fila de ocupado): não se perde se outra ação, como parear a TV, estiver em andamento.
-  useEffect(() => { if (filter === 'movimento' && motion?.unseen) void casa.call('/api/motion/seen', {}).then(() => loadMotion()).catch(() => {}); }, [filter, motion?.unseen]); // eslint-disable-line react-hooks/exhaustive-deps
   const active = new Set((motion?.events ?? []).filter(event => event.end === null).map(event => event.camera));
 
   const load = useCallback(async () => {
@@ -383,11 +402,25 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const visible = (cameras ?? []).filter(camera => filter === 'todas' || filter === 'movimento' || camera.group === filter);
+  const visible = watchedFirst((cameras ?? []).filter(camera => filter === 'todas' || filter === 'movimento' || camera.group === filter), motion?.notify);
   const visibleIds = visible.map(camera => camera.id).join(',');
-  const paused = live !== null || !available || filter === 'movimento';
+  const live = liveId === null ? null : visible.findIndex(camera => camera.id === liveId);
+  const paused = liveId !== null || !available || filter === 'movimento';
   // A bandeja pode abrir uma câmera direto ao vivo (#cameras:cam4).
-  useEffect(() => { if (!cameras || !openCamera) return; const index = cameras.findIndex(c => c.id === openCamera); if (index >= 0) { setFilter('todas'); setLive(index); } }, [cameras, openCamera]);
+  // Atalhos da bandeja: #cameras:cam4 abre ao vivo; #cameras:replay:cam4:<início> abre a gravação (alerta).
+  // Espera câmeras e movimento (ordem da grade e diferença de relógio) e abre uma vez por atalho.
+  const handled = useRef<string | null>(null);
+  useEffect(() => {
+    if (!cameras || !openCamera || !motion || handled.current === openCamera) return;
+    handled.current = openCamera;
+    const [kind, id, at] = openCamera.split(':');
+    if (kind === 'replay') {
+      const camera = cameras.find(c => c.id === id);
+      if (camera && Number(at)) { setLiveId(null); setReplay(eventWindow(camera, {id: '', camera: id, start: Number(at), end: null, count: 1, photo: false}, motion?.dvrOffset ?? 0)); }
+      return;
+    }
+    if (cameras.some(c => c.id === kind)) { setFilter('todas'); setLiveId(kind); }
+  }, [cameras, openCamera, motion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!visibleIds || paused) return;
@@ -422,7 +455,10 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
   useEffect(() => { const tick = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(tick); }, []);
   useEffect(() => () => Object.values(urls.current).forEach(url => URL.revokeObjectURL(url)), []);
 
-  const move = useCallback((step: number) => setLive(current => current === null ? null : (current + step + visible.length) % visible.length), [visible.length]);
+  const move = useCallback((step: number) => setLiveId(current => {
+    const index = visible.findIndex(camera => camera.id === current);
+    return index < 0 ? current : visible[(index + step + visible.length) % visible.length].id;
+  }), [visible]);
 
   if (error || !cameras) {
     return <div className="empty">{error ? <CameraOff size={24} /> : <LoaderCircle className="spin" size={24} />}<p>{error ? 'Câmeras indisponíveis' : 'Abrindo câmeras'}</p>{error ? <button className="pill" onClick={() => void load()}><RefreshCw size={15} />Tentar de novo</button> : null}</div>;
@@ -438,7 +474,7 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
     {filter === 'movimento' ? <MotionView cameras={cameras} motion={motion} casa={casa} reload={() => void loadMotion()} open={event => { const camera = cameras.find(c => c.id === event.camera); if (camera) setReplay(eventWindow(camera, event, motion?.dvrOffset ?? 0)); }} /> : <div className="cam-grid">
       {visible.map((camera, index) => {
         const frame = frames[camera.id];
-        return <button key={camera.id} className="cam" onClick={() => setLive(index)} aria-label={`Abrir ${camera.name} ao vivo`}>
+        return <button key={camera.id} className="cam" onClick={() => setLiveId(camera.id)} aria-label={`Abrir ${camera.name} ao vivo`}>
           {frame?.url ? <img src={frame.url} alt="" /> : <span className="cam-empty">{frame?.failed ? <CameraOff size={20} /> : <LoaderCircle className="spin" size={18} />}</span>}
           <span className="cam-ch">{camera.id.replace('cam', '')}</span>
           <span className="cam-snap" aria-hidden="true"><CameraIcon size={13} /></span>
@@ -448,9 +484,9 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
       })}
     </div>}
     <p className={`card-foot ${available ? 'tone-online' : 'tone-offline'}`}><ShieldCheck size={14} />{available ? 'Conectado ao DVR' : 'Sem conexão'}<span>{latest ? `Automático · ${ago(latest, now)}` : 'Atualização automática'}</span></p>
-    {live !== null && visible[live] ? <LiveView cameras={visible} index={live} poster={frames[visible[live].id]?.url} move={move} close={() => setLive(null)}
-      rewind={camera => { const offset = motion?.dvrOffset ?? 0, realNow = Date.now() / 1000 + offset; setLive(null); setReplay({camera, start: realNow - 60, from: realNow - 300, to: realNow - 5, offset}); }} /> : null}
+    {live !== null && live >= 0 ? <LiveView cameras={visible} index={live} poster={frames[visible[live].id]?.url} move={move} close={() => setLiveId(null)}
+      rewind={camera => { const offset = motion?.dvrOffset ?? 0, realNow = Date.now() / 1000 + offset; setLiveId(null); setReplay({camera, start: realNow - 60, from: realNow - 300, to: realNow - 5, offset}); }} /> : null}
     {replay ? <ReplayView key={`${replay.camera.id}-${replay.start}`} {...replay} casa={casa} close={() => setReplay(null)}
-      goLive={() => { const camera = replay.camera; setReplay(null); setFilter('todas'); setLive(cameras.findIndex(c => c.id === camera.id)); }} /> : null}
+      goLive={() => { const camera = replay.camera; setReplay(null); setFilter('todas'); setLiveId(camera.id); }} /> : null}
   </section>;
 }

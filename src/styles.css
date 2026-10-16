@@ -553,10 +553,10 @@ button:active:not(:disabled) { transform: scale(.95); }
 .routine strong { font-size: 13.5px; font-weight: 650; color: var(--text); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .routine span { font-size: 12px; color: var(--muted); }
 .routine.off strong, .routine.off span { color: #6f6f78; }
-.switch { position: relative; width: 38px; height: 22px; border-radius: 99px; background: var(--raised-2); transition: background-color .18s; }
-.switch i { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #d4d4da; transition: transform .2s cubic-bezier(.16, 1, .3, 1); }
-.switch.on { background: var(--blue); }
-.switch.on i { transform: translateX(16px); background: #fff; }
+.routine .switch { position: relative; width: 38px; height: 22px; border-radius: 99px; background: var(--raised-2); transition: background-color .18s; }
+.routine .switch i { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #d4d4da; transition: transform .2s cubic-bezier(.16, 1, .3, 1); }
+.routine .switch.on { background: var(--blue); }
+.routine .switch.on i { transform: translateX(16px); background: #fff; }
 .routine-form { display: grid; gap: 10px; padding: 12px; border-radius: 14px; background: #18181b; border: 1px solid rgba(61, 139, 255, .35); }
 .routine-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
 .routine-row .loc-field { flex: 1 1 120px; }
@@ -668,3 +668,29 @@ button:active:not(:disabled) { transform: scale(.95); }
 .replay-scale { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .replay-scale .link { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 8px; border-radius: 8px; color: var(--amber); font-size: 12px; font-weight: 650; }
 .replay-scale .link:disabled { color: var(--muted); }
+
+/* Movimento: contagem por câmera, faixa de novos e marca "Novo" nos eventos ainda não vistos. */
+.motion-cams .count { margin-left: 2px; min-width: 17px; height: 17px; padding: 0 5px; border-radius: 99px; background: var(--red); color: #fff; font-size: 10.5px; font-weight: 700; line-height: 17px; }
+.motion-unseen { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 8px 12px; border-radius: 12px; background: rgba(255, 97, 89, .1); border: 1px solid rgba(255, 97, 89, .35); color: #ffb3ae; font-size: 12.5px; font-weight: 600; }
+.motion-unseen span { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.motion-unseen .link { flex-shrink: 0; color: var(--text); }
+.motion-list li.fresh > button { border-color: rgba(255, 97, 89, .45); background: rgba(255, 97, 89, .06); }
+.motion-new { padding: 3px 8px; border-radius: 99px; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; font-style: normal; }
+
+/* ---- Janela de alerta da bandeja (movimento numa câmera com aviso) ---- */
+body.in-alert, body.in-alert #root { background: var(--pop); overflow: hidden; }
+.alert-window { position: fixed; inset: 0; display: grid; grid-template-columns: 148px 1fr; gap: 12px; padding: 12px; background: var(--pop); border: 1px solid rgba(255, 97, 89, .45); border-radius: 14px; animation: alert-in .35s cubic-bezier(.16, 1, .3, 1) both; }
+@keyframes alert-in { from { opacity: 0; transform: translateY(10px); } }
+.alert-photo { align-self: stretch; overflow: hidden; border-radius: 10px; background: #0b0b0d; }
+.alert-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.alert-photo span { display: grid; place-items: center; height: 100%; color: var(--muted); }
+.alert-body { display: grid; align-content: start; gap: 3px; min-width: 0; padding-right: 26px; }
+.alert-tag { display: inline-flex; align-items: center; gap: 6px; width: max-content; padding: 3px 8px; border-radius: 99px; background: rgba(255, 97, 89, .16); color: #ffb3ae; font-size: 11px; font-weight: 700; }
+.alert-tag i { width: 7px; height: 7px; border-radius: 50%; background: var(--red); animation: loc-ping-dot 1.4s ease-in-out infinite; }
+.alert-body strong { margin-top: 4px; font-size: 15px; font-weight: 650; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alert-body small { font-size: 12.5px; color: var(--soft); font-variant-numeric: tabular-nums; }
+.alert-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.alert-actions .pill { min-height: 34px; padding: 0 10px; font-size: 12px; }
+.alert-close { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; }
+.replay-ongoing { position: absolute; top: max(12px, env(safe-area-inset-top)); left: 50%; z-index: 3; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border-radius: 99px; background: rgba(255, 97, 89, .92); color: #fff; font-size: 12.5px; font-weight: 650; white-space: nowrap; box-shadow: 0 4px 14px rgba(0, 0, 0, .45); }
+.replay-ongoing i { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: loc-ping-dot 1.4s ease-in-out infinite; }

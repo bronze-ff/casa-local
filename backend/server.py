@@ -300,7 +300,7 @@ class CasaHandler(BaseHTTPRequestHandler):
             target = urlsplit(self.path)
             path = target.path
             # The page itself may carry ?tray=1 (tray popup); API routes never take a query string.
-            page_query = path in {"/", "/index.html"} and target.query == "tray=1" and not mutation
+            page_query = path in {"/", "/index.html"} and target.query in {"tray=1", "tray=1&alerta=1"} and not mutation
             if target.scheme or target.netloc or target.fragment or (target.query and not page_query):
                 raise AppError("Caminho inválido.", 404, "not_found")
             app = self.server.app
@@ -332,8 +332,8 @@ class CasaHandler(BaseHTTPRequestHandler):
                         raise AppError(str(error)) from None
                 elif path == "/api/motion/notify":
                     result = self.server.motion.set_notify(body)
-                elif path == "/api/motion/seen" and not body:
-                    result = self.server.motion.mark_seen()
+                elif path == "/api/motion/seen":
+                    result = self.server.motion.mark_seen(body)
                 elif path == "/api/tvs/scan" and not body:
                     self.server.tvs.refresh(force=True)
                     result = self.server.tvs.status()
