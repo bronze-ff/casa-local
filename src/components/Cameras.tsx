@@ -274,7 +274,8 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
   }, []);
   useEffect(() => { void loadMotion(); const timer = setInterval(() => { if (!document.hidden) void loadMotion(); }, 15000); return () => clearInterval(timer); }, [loadMotion]);
   // Abrir a aba de movimento conta como "visto" para o aviso da bandeja.
-  useEffect(() => { if (filter === 'movimento' && motion?.unseen) void casa.post('motion', '/api/motion/seen', {}).then(() => loadMotion()); }, [filter, motion?.unseen]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Chamada própria (fora da fila de ocupado): não se perde se outra ação, como parear a TV, estiver em andamento.
+  useEffect(() => { if (filter === 'movimento' && motion?.unseen) void casa.call('/api/motion/seen', {}).then(() => loadMotion()).catch(() => {}); }, [filter, motion?.unseen]); // eslint-disable-line react-hooks/exhaustive-deps
   const active = new Set((motion?.events ?? []).filter(event => event.end === null).map(event => event.camera));
 
   const load = useCallback(async () => {
