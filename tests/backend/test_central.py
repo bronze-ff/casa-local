@@ -189,6 +189,19 @@ class MotionTests(Temp):
         self.assertEqual([e["id"] for e in events], [later["id"], first["id"]])
         self.assertIsNotNone(events[1]["end"])
 
+    def test_count_cap_also_deletes_photos(self):
+        import backend.motion as motion_module
+        original, motion_module.MAX_EVENTS = motion_module.MAX_EVENTS, 2
+        try:
+            first = self.motion.handle("Code=VideoMotion;action=Start;index=0")
+            self.motion._snapshot(first)
+            for index in (1, 3):
+                self.clock.now += 1
+                self.motion.handle(f"Code=VideoMotion;action=Start;index={index}")
+            self.assertFalse((self.dir / "movimento" / f"{first['id']}.jpg").exists())
+        finally:
+            motion_module.MAX_EVENTS = original
+
     def test_disconnect_closes_open_events(self):
         self.motion.handle("Code=VideoMotion;action=Start;index=4")
         self.motion.close_open()
@@ -293,8 +306,13 @@ class PreviewSafetyTests(Temp):
 
     def test_routines_use_separate_file_and_ac_usage_is_not_recorded(self):
         self.server.routines.set_timer({"device": "ar-quarto", "minutes": 60})
-        self.assertTrue((self.dir / "data" / "rotinas-previa.json").exists())
-        self.assertFalse((self.dir / "data" / "rotinas.json").exists())
+        self.server.energy.configure({"watts": 1500})
+        self.server.motion.mark_seen()
+        self.server.tvs.tvs = {"aabbcc001122": {"label": "TV", "ip": "192.0.2.5", "mac": "AA:BB:CC:00:11:22", "token": None}}
+        self.server.tvs.rename("aabbcc001122", "Sala")
+        data = self.dir / "data"
+        self.assertEqual(sorted(p.name for p in data.iterdir()), ["previa"])  # nada real foi tocado
+        self.assertTrue((data / "previa" / "rotinas.json").exists())
         self.server.app.command("ar-quarto", {"action": "set", "values": {"power": True}})
         self.assertFalse(self.server.energy.summary()["on"])
         self.assertIsNone(self.server.routines.thread)

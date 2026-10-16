@@ -63,17 +63,19 @@ class CasaServer(ThreadingHTTPServer):
     def __init__(self, address, app, dist_dir=None, allowed_hosts=None, cameras=None, location=None):
         self.app = app
         self.cameras = cameras or CameraBridge()
-        self.location = location or LocationStore(app.data_dir)
-        self.started = time.time()
-        # Na prévia nada físico acontece: rotinas em arquivo separado (e sem executar), gasto do ar
-        # sem contar o ar simulado e TVs sem comandos, pareamento ou varredura da rede.
+        # Na prévia nada físico acontece e nada real muda: os serviços da Central e a localização
+        # usam .data/previa (rotinas, gasto, movimento, TVs, lugares), as rotinas não executam, o ar
+        # simulado não conta no gasto e as TVs recusam comandos, pareamento e varredura.
         local = app.mode == "local"
-        self.routines = Routines(app, app.data_dir, filename="rotinas.json" if local else "rotinas-previa.json")
-        self.energy = AcUsage(app.data_dir)
+        store = app.data_dir if local else app.data_dir / "previa"
+        self.location = location or LocationStore(store)
+        self.started = time.time()
+        self.routines = Routines(app, store)
+        self.energy = AcUsage(store)
         if local:
             app.listeners.append(lambda device_id, state: self.energy.observe(state.get("power")) if device_id == "ar-quarto" else None)
-        self.motion = MotionWatcher(self.cameras, app.data_dir)
-        self.tvs = SamsungTVs(app.data_dir, preview=not local)
+        self.motion = MotionWatcher(self.cameras, store)
+        self.tvs = SamsungTVs(store, preview=not local)
         self.backups = Backups(app.data_dir)
         self.background = threading.Event()
         self.dist_dir = Path(dist_dir or ROOT / "dist").resolve()

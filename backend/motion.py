@@ -65,11 +65,12 @@ class MotionWatcher:
     # ---- armazenamento ----
     def _save(self):
         cutoff = self.clock() - RETENTION
-        expired = [e for e in self.events if (e.get("end") or e["start"]) < cutoff]
-        self.events = [e for e in self.events if (e.get("end") or e["start"]) >= cutoff][-MAX_EVENTS:]
+        before = self.events
+        self.events = [e for e in before if (e.get("end") or e["start"]) >= cutoff][-MAX_EVENTS:]
         keep = {e["id"] for e in self.events}
-        for event in expired:
-            if event["id"] not in keep:
+        # Apaga a foto de todo evento que saiu, seja pela idade (48 h) ou pelo limite de eventos.
+        for event in before:
+            if event["id"] not in keep and event.get("photo"):
                 try:
                     (self.dir / f"{event['id']}.jpg").unlink()
                 except OSError:
