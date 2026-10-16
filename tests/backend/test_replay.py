@@ -59,9 +59,13 @@ class ReplayTests(unittest.TestCase):
         self.assertNotIn(ids[0], self.replays.active)  # o mais antigo saiu
         self.replays.close(ids[-1])
         self.assertNotIn(ids[-1], self.replays.active)
-        self.clock.now += 16 * 60
+        self.clock.now += 16 * 60  # ainda na folga da conexão (janela + 60 s): nada some
+        recent = self.replays.open("cam4", {"start": self.clock.now - 60})["id"]
+        self.assertIn(ids[1], self.replays.active)
+        self.clock.now += 2 * 60  # passou da janela + folga: o antigo expira, o recente fica
         self.replays.open("cam4", {"start": self.clock.now - 60})
-        self.assertEqual(len(self.replays.active), 1)  # os esquecidos expiraram
+        self.assertNotIn(ids[1], self.replays.active)
+        self.assertIn(recent, self.replays.active)
 
 
 if __name__ == "__main__":

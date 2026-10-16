@@ -19,7 +19,7 @@ from .models import AppError
 from .motion import dvr_source
 
 WINDOW = 15 * 60       # quanto da gravação cada replay pede a partir do início
-LIFETIME = 15 * 60     # replay esquecido aberto é apagado depois disto
+LIFETIME = WINDOW + 120  # depois da conexão do painel (janela + 60 s): só some quem já terminou
 MAX_ACTIVE = 2
 MAX_AGE_DAYS = 30
 
