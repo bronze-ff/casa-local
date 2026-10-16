@@ -20,7 +20,7 @@ export default function Alert() {
     void fetch('/api/cameras', {cache: 'no-store'}).then(r => r.json()).then(value => setNames(Object.fromEntries((value.cameras ?? []).map((c: {id: string; name: string}) => [c.id, c.name])))).catch(() => {});
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-  // A foto do evento chega alguns segundos depois do aviso: confere algumas vezes.
+  // A foto do evento pode chegar bem depois do aviso (fila de fotos): confere durante todo o alerta (25 s).
   useEffect(() => {
     if (!target?.id) return;
     let tries = 0;
@@ -29,7 +29,7 @@ export default function Alert() {
         const value = await (await fetch(`/api/motion/${target.camera}`, {cache: 'no-store'})).json();
         if ((value.events ?? []).some((e: {id: string; photo: boolean}) => e.id === target.id && e.photo)) { setPhoto(true); return; }
       } catch { /* tenta de novo */ }
-      if (++tries < 6) timer = setTimeout(check, 2000);
+      if (++tries < 13) timer = setTimeout(check, 2000);
     };
     let timer = setTimeout(check, 300);
     return () => clearTimeout(timer);
