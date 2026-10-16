@@ -372,7 +372,8 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState<Filter>('todas');
   const [frames, setFrames] = useState<Record<string, Frame>>({});
-  const [live, setLive] = useState<number | null>(null);
+  // Câmera ao vivo guardada pelo id: se a grade se reordena (avisos chegam depois), ela não troca.
+  const [liveId, setLiveId] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [nonce, setNonce] = useState(0);
   const urls = useRef<Record<string, string>>({});
@@ -403,10 +404,9 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
 
   const visible = watchedFirst((cameras ?? []).filter(camera => filter === 'todas' || filter === 'movimento' || camera.group === filter), motion?.notify);
   const visibleIds = visible.map(camera => camera.id).join(',');
-  const paused = live !== null || !available || filter === 'movimento';
+  const live = liveId === null ? null : visible.findIndex(camera => camera.id === liveId);
+  const paused = liveId !== null || !available || filter === 'movimento';
   // A bandeja pode abrir uma câmera direto ao vivo (#cameras:cam4).
-  // Posição de uma câmera na grade "Todas" (que põe as com aviso primeiro).
-  const indexInAll = (id: string) => watchedFirst(cameras ?? [], motion?.notify).findIndex(c => c.id === id);
   // Atalhos da bandeja: #cameras:cam4 abre ao vivo; #cameras:replay:cam4:<início> abre a gravação (alerta).
   // Espera câmeras e movimento (ordem da grade e diferença de relógio) e abre uma vez por atalho.
   const handled = useRef<string | null>(null);
@@ -416,11 +416,10 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
     const [kind, id, at] = openCamera.split(':');
     if (kind === 'replay') {
       const camera = cameras.find(c => c.id === id);
-      if (camera && Number(at)) { setLive(null); setReplay(eventWindow(camera, {id: '', camera: id, start: Number(at), end: null, count: 1, photo: false}, motion?.dvrOffset ?? 0)); }
+      if (camera && Number(at)) { setLiveId(null); setReplay(eventWindow(camera, {id: '', camera: id, start: Number(at), end: null, count: 1, photo: false}, motion?.dvrOffset ?? 0)); }
       return;
     }
-    const index = indexInAll(kind);
-    if (index >= 0) { setFilter('todas'); setLive(index); }
+    if (cameras.some(c => c.id === kind)) { setFilter('todas'); setLiveId(kind); }
   }, [cameras, openCamera, motion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -456,7 +455,10 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
   useEffect(() => { const tick = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(tick); }, []);
   useEffect(() => () => Object.values(urls.current).forEach(url => URL.revokeObjectURL(url)), []);
 
-  const move = useCallback((step: number) => setLive(current => current === null ? null : (current + step + visible.length) % visible.length), [visible.length]);
+  const move = useCallback((step: number) => setLiveId(current => {
+    const index = visible.findIndex(camera => camera.id === current);
+    return index < 0 ? current : visible[(index + step + visible.length) % visible.length].id;
+  }), [visible]);
 
   if (error || !cameras) {
     return <div className="empty">{error ? <CameraOff size={24} /> : <LoaderCircle className="spin" size={24} />}<p>{error ? 'Câmeras indisponíveis' : 'Abrindo câmeras'}</p>{error ? <button className="pill" onClick={() => void load()}><RefreshCw size={15} />Tentar de novo</button> : null}</div>;
@@ -472,7 +474,7 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
     {filter === 'movimento' ? <MotionView cameras={cameras} motion={motion} casa={casa} reload={() => void loadMotion()} open={event => { const camera = cameras.find(c => c.id === event.camera); if (camera) setReplay(eventWindow(camera, event, motion?.dvrOffset ?? 0)); }} /> : <div className="cam-grid">
       {visible.map((camera, index) => {
         const frame = frames[camera.id];
-        return <button key={camera.id} className="cam" onClick={() => setLive(index)} aria-label={`Abrir ${camera.name} ao vivo`}>
+        return <button key={camera.id} className="cam" onClick={() => setLiveId(camera.id)} aria-label={`Abrir ${camera.name} ao vivo`}>
           {frame?.url ? <img src={frame.url} alt="" /> : <span className="cam-empty">{frame?.failed ? <CameraOff size={20} /> : <LoaderCircle className="spin" size={18} />}</span>}
           <span className="cam-ch">{camera.id.replace('cam', '')}</span>
           <span className="cam-snap" aria-hidden="true"><CameraIcon size={13} /></span>
@@ -482,9 +484,9 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
       })}
     </div>}
     <p className={`card-foot ${available ? 'tone-online' : 'tone-offline'}`}><ShieldCheck size={14} />{available ? 'Conectado ao DVR' : 'Sem conexão'}<span>{latest ? `Automático · ${ago(latest, now)}` : 'Atualização automática'}</span></p>
-    {live !== null && visible[live] ? <LiveView cameras={visible} index={live} poster={frames[visible[live].id]?.url} move={move} close={() => setLive(null)}
-      rewind={camera => { const offset = motion?.dvrOffset ?? 0, realNow = Date.now() / 1000 + offset; setLive(null); setReplay({camera, start: realNow - 60, from: realNow - 300, to: realNow - 5, offset}); }} /> : null}
+    {live !== null && live >= 0 ? <LiveView cameras={visible} index={live} poster={frames[visible[live].id]?.url} move={move} close={() => setLiveId(null)}
+      rewind={camera => { const offset = motion?.dvrOffset ?? 0, realNow = Date.now() / 1000 + offset; setLiveId(null); setReplay({camera, start: realNow - 60, from: realNow - 300, to: realNow - 5, offset}); }} /> : null}
     {replay ? <ReplayView key={`${replay.camera.id}-${replay.start}`} {...replay} casa={casa} close={() => setReplay(null)}
-      goLive={() => { const camera = replay.camera; setReplay(null); setFilter('todas'); setLive(indexInAll(camera.id)); }} /> : null}
+      goLive={() => { const camera = replay.camera; setReplay(null); setFilter('todas'); setLiveId(camera.id); }} /> : null}
   </section>;
 }
