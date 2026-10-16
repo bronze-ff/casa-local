@@ -69,7 +69,11 @@ class MotionWatcher:
             saved = {}
         self.events = saved.get("events", []) if isinstance(saved.get("events"), list) else []
         self.notify = {c for c in saved.get("notify", []) if c in IDS}
-        self.seen_at = saved.get("seenAt", 0) if isinstance(saved.get("seenAt"), (int, float)) else 0
+        # "Visto" por câmera: abrir uma câmera no painel zera só os avisos dela (os outros continuam
+        # contando, para saber onde houve movimento). Arquivos antigos tinham um "seenAt" único.
+        legacy = saved.get("seenAt", 0) if isinstance(saved.get("seenAt"), (int, float)) else 0
+        stored = saved.get("seenBy") if isinstance(saved.get("seenBy"), dict) else {}
+        self.seen = {camera: stored.get(camera, legacy) for camera in IDS if isinstance(stored.get(camera, legacy), (int, float))}
         # Horários dos eventos ficam no relógio do DVR (o mesmo impresso no vídeo e usado no replay).
         # O DVR pode não bater com o PC (aqui estava 92 s adiantado): mede-se a diferença e soma-se.
         self.offset = saved.get("dvrOffset", 0) if isinstance(saved.get("dvrOffset"), (int, float)) else 0
@@ -91,7 +95,7 @@ class MotionWatcher:
                     pass
         self.dir.mkdir(parents=True, exist_ok=True)
         temporary = self.dir / "eventos.tmp"
-        temporary.write_text(json.dumps({"events": self.events, "notify": sorted(self.notify), "seenAt": self.seen_at,
+        temporary.write_text(json.dumps({"events": self.events, "notify": sorted(self.notify), "seenBy": self.seen,
                                          "dvrOffset": self.offset, "dvrClock": self.dvr_clock}), encoding="utf-8")
         temporary.replace(self.dir / "eventos.json")
 
@@ -150,8 +154,7 @@ class MotionWatcher:
                         hit[0] += offset
                         if hit[1] is not None:
                             hit[1] += offset
-                if self.seen_at:
-                    self.seen_at += offset
+                self.seen = {camera: (moment + offset if moment else 0) for camera, moment in self.seen.items()}
                 self.dvr_clock = True
             self.offset = offset
             self._save()
@@ -281,9 +284,12 @@ class MotionWatcher:
         with self.lock:
             since = self.now() - hours * 3600
             events = [dict(e) for e in self.events if e["start"] >= since and (camera is None or e["camera"] == camera)][-LIST_LIMIT:][::-1]
-            unseen = sum(1 for e in self.events if e["start"] > self.seen_at and e["camera"] in self.notify)
+            unseen_by = {}
+            for event in self.events:
+                if event["camera"] in self.notify and event["start"] > self.seen.get(event["camera"], 0):
+                    unseen_by[event["camera"]] = unseen_by.get(event["camera"], 0) + 1
             return {"connected": self.connected, "error": self.last_error, "events": events, "notify": sorted(self.notify), "dvrOffset": self.offset,
-                    "unseen": unseen, "seenAt": self.seen_at}
+                    "unseen": sum(unseen_by.values()), "unseenBy": unseen_by, "seenBy": dict(self.seen)}
 
     def set_notify(self, body):
         if not isinstance(body, dict) or set(body) != {"camera", "on"} or body["camera"] not in IDS or type(body["on"]) is not bool:
@@ -293,9 +299,15 @@ class MotionWatcher:
             self._save()
         return self.status()
 
-    def mark_seen(self):
+    def mark_seen(self, body=None):
+        """Marca como visto: todas as câmeras ({}) ou uma só ({"camera": "camN"})."""
+        body = body or {}
+        if not isinstance(body, dict) or not set(body) <= {"camera"} or ("camera" in body and body["camera"] not in IDS):
+            raise AppError("Pedido inválido.")
         with self.lock:
-            self.seen_at = self.now()
+            moment = self.now()
+            for camera in ([body["camera"]] if "camera" in body else IDS):
+                self.seen[camera] = moment
             self._save()
         return self.status()
 

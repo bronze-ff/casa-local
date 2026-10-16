@@ -33,6 +33,7 @@ RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 RUN_NAME = "CasaLocalBandeja"
 MARGIN = 12
 SIZE = (440, 760)
+ALERT_SIZE, ALERT_SECONDS = (390, 176), 25  # alerta de movimento acima do relógio; some sozinho
 POLL_SECONDS = 20
 HEALTH_EVERY = 60
 TABS = ("luzes", "clima", "tv", "cameras", "local", "central")
@@ -120,6 +121,21 @@ class Api:
         self._tray.hide()
 
 
+class AlertApi:
+    """Exposto à janela de alerta: dispensar ou abrir o painel no ponto certo (gravação/ao vivo)."""
+
+    def __init__(self, tray):
+        self._tray = tray
+
+    def dismiss(self):
+        self._tray.hide_alert()
+
+    def open(self, target):
+        if isinstance(target, str) and len(target) < 80:
+            self._tray.hide_alert()
+            self._tray.show(target)
+
+
 class Tray:
     def __init__(self, url, services):
         self.url = url.rstrip("/")
@@ -134,6 +150,7 @@ class Tray:
         self.state = {"server": "?", "cameras": "?", "location": "Verificando…", "health": None, "alerts": 0}
         self.seen = {"location": None, "motion": None, "health": {}}
         self.last_health = 0.0
+        self.alert, self.alert_ready, self.alert_hwnd, self.alert_generation = None, False, None, 0
         self.base = glyph_house()
         self.icon = pystray.Icon("casa", with_status(self.base, "?"), "Casa", menu=self.menu())
 
@@ -218,13 +235,24 @@ class Tray:
         if self.services:
             items.append(pystray.MenuItem("Reiniciar serviços", lambda: threading.Thread(target=self.restart, daemon=True).start()))
         items += [
-            pystray.MenuItem("Testar aviso", lambda: self.icon.notify("Se você está lendo isto, os avisos do Windows funcionam.", "Casa · Teste de aviso")),
+            pystray.MenuItem("Testar aviso", self.test_alert),
             pystray.MenuItem("Abrir no navegador", lambda: webbrowser.open(f"{self.url}/#{self.tab}")),
             pystray.MenuItem("Iniciar com o Windows", lambda: set_autostart(not autostart_enabled()), checked=lambda _: autostart_enabled()),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Sair da Casa", self.quit),
         ]
         return pystray.Menu(*items)
+
+    def test_alert(self):
+        """Notificação do Windows e janela de alerta com o movimento mais recente (ou um exemplo)."""
+        self.icon.notify("Se você está lendo isto, os avisos do Windows funcionam.", "Casa · Teste de aviso")
+        try:
+            events = self.fetch("/api/motion").get("events", [])
+        except (OSError, ValueError):
+            events = []
+        if events:
+            self.hide()
+            self.show_alert(events[0])
 
     def label(self):
         if self.state["server"] == "fora":
@@ -331,8 +359,56 @@ class Tray:
             if fresh:
                 cams = sorted({names.get(e["camera"], e["camera"]) for e in fresh})
                 self.icon.notify(f"Movimento em {', '.join(cams)}", "Casa · Câmeras")
+                self.show_alert(max(fresh, key=lambda e: e["start"]))
         self.seen["motion"] = max(newest, self.seen["motion"] or 0)
         return motion.get("unseen", 0)
+
+    # ---- alerta com foto ----
+    def show_alert(self, event):
+        """Janela de alerta acima do relógio com a foto do movimento; some sozinha em 25 s."""
+        if not (self.alert and self.alert_ready) or self.visible:
+            return  # painel aberto: a pessoa já está olhando
+        try:
+            width, height = ALERT_SIZE
+            scale = ctypes.windll.user32.GetDpiForSystem() / 96
+            _, _, right, bottom = work_area()
+            self.alert.resize(width, height)
+            self.alert.move(round(right / scale) - width - MARGIN, round(bottom / scale) - height - MARGIN)
+            target = "alerta:%s:%s:%d" % (event["camera"], event["id"], int(event["start"]))
+            self.alert.evaluate_js(f"location.hash = {json.dumps(target)}")
+            self.alert.show()
+            if self.alert_hwnd:
+                # Por cima de tudo, sem tirar o foco de quem está digitando (SWP_NOACTIVATE).
+                ctypes.windll.user32.SetWindowPos(self.alert_hwnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040)
+        except webview.errors.WebViewException:
+            return
+        self.alert_generation += 1
+        generation = self.alert_generation
+        threading.Timer(ALERT_SECONDS, lambda: generation == self.alert_generation and self.hide_alert()).start()
+
+    def hide_alert(self):
+        if self.alert:
+            try:
+                self.alert.hide()
+                self.alert.evaluate_js("location.hash = 'oculto'")
+            except webview.errors.WebViewException:
+                pass
+
+    def on_alert_shown(self):
+        try:
+            self.alert_hwnd = int(self.alert.native.Handle.ToInt64())
+            user32 = ctypes.windll.user32
+            style = user32.GetWindowLongW(self.alert_hwnd, -20)
+            user32.SetWindowLongW(self.alert_hwnd, -20, (style | 0x80 | 0x08000000) & ~0x40000)  # toolwindow, sem ativar
+            preference = ctypes.c_int(2)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(wintypes.HWND(self.alert_hwnd), 33, ctypes.byref(preference), ctypes.sizeof(preference))
+        except Exception:
+            pass
+
+    def on_alert_loaded(self):
+        if not self.alert_ready:
+            self.alert_ready = True
+            self.alert.hide()
 
     def poll_health(self):
         if time.monotonic() - self.last_health < HEALTH_EVERY:
@@ -447,6 +523,14 @@ class Tray:
         self.window.events.shown += self.on_shown
         self.window.events.loaded += self.on_loaded
         self.window.events.closing += lambda: (self.hide(), False)[1]
+        width, height = ALERT_SIZE
+        self.alert = webview.create_window(
+            "Casa · Alerta", f"{self.url}/?tray=1&alerta=1#oculto", js_api=AlertApi(self), width=width, height=height, x=-32000, y=-32000,
+            frameless=True, easy_drag=False, on_top=True, resizable=False, focus=False, background_color="#161618",
+        )
+        self.alert.events.shown += self.on_alert_shown
+        self.alert.events.loaded += self.on_alert_loaded
+        self.alert.events.closing += lambda: (self.hide_alert(), False)[1]
         self.icon.run_detached()
         threading.Thread(target=self.poll, daemon=True).start()
         threading.Thread(target=self.watch_focus, daemon=True).start()

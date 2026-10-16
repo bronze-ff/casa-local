@@ -24,7 +24,8 @@ const FANS: [string, string][] = [['auto', 'Auto'], ['low', 'Baixa'], ['medium',
 
 // O endereço pode trazer um detalhe depois de ":" (ex.: #cameras:cam4 abre a câmera 4 ao vivo).
 function hashTarget(): string | null {
-  return window.location.hash.slice(1).split(':')[1] ?? null;
+  const hash = window.location.hash.slice(1);
+  return hash.includes(':') ? hash.slice(hash.indexOf(':') + 1) : null;
 }
 function initialTab(): Tab {
   const hash = window.location.hash.slice(1).split(':')[0];

@@ -269,6 +269,15 @@ class MotionTests(Temp):
         self.assertEqual(self.motion.status()["unseen"], 1)
         self.motion.mark_seen()
         self.assertEqual(self.motion.status()["unseen"], 0)
+        self.motion.set_notify({"camera": "cam2", "on": True})
+        self.clock.now += 400  # passa da janela de evento aberto: o próximo disparo é um evento novo
+        self.motion.handle("Code=VideoMotion;action=Start;index=0")
+        self.motion.handle("Code=VideoMotion;action=Start;index=1")
+        self.assertEqual(self.motion.status()["unseenBy"], {"cam1": 1, "cam2": 1})
+        self.motion.mark_seen({"camera": "cam2"})  # abrir só a câmera 2 não zera a 1
+        self.assertEqual((self.motion.status()["unseenBy"], self.motion.status()["unseen"]), ({"cam1": 1}, 1))
+        with self.assertRaises(AppError):
+            self.motion.mark_seen({"camera": "cam99"})
         with self.assertRaises(AppError):
             self.motion.photo("../segredo")
         self.clock.now += 49 * 3600

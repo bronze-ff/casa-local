@@ -25,8 +25,15 @@ Sem tomada medidora: conta as horas em que o painel deixou o ar ligado × potên
   as mesmas credenciais que o go2rtc já usa (lidas do `go2rtc.yaml` deste PC); nada é copiado.
 - Disparos seguidos da mesma câmera (até 90 s) viram um evento só, com uma foto do momento.
 - Histórico de 48 h em `.data/movimento/`.
-- Para receber aviso no Windows, escolha a câmera no filtro e toque em **Avisar**. A bandeja fica
-  laranja com o número de eventos novos até você abrir o filtro Movimento.
+- Para receber aviso, escolha a câmera no filtro e toque em **Avisar**. Câmeras com aviso passam
+  para o começo da lista e da grade.
+- Movimento numa câmera com aviso: a bandeja (notebook e PC de casa) mostra uma **janela de alerta**
+  acima do relógio com a foto, a câmera e o horário (**Ver gravação** abre o replay no ponto;
+  **Ao vivo**), além da notificação do Windows. O alerta some sozinho em 25 s e não rouba o foco.
+  Menu da bandeja › **Testar aviso** mostra os dois.
+- A contagem fica por câmera: cada botão de câmera mostra quantos movimentos novos teve, os eventos
+  ganham a marca **Novo**, e abrir a câmera zera só a contagem dela (em Todas há "Marcar tudo como
+  visto").
 
 ## Replay das gravações (aba Câmeras)
 
