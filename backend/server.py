@@ -22,7 +22,7 @@ from .energy import AcUsage
 from .health import Backups, report as health_report
 from .location import LocationStore
 from .motion import MotionWatcher
-from .replay import Replays
+from .replay import WINDOW as REPLAY_WINDOW, Replays
 from .routines import Routines
 from .samsung_tv import SamsungTVs
 from .models import AppError, VERSION
@@ -389,7 +389,7 @@ class CasaHandler(BaseHTTPRequestHandler):
             elif (camera := re.fullmatch(r"/api/cameras/(cam[0-9]{1,2})/ws", path)) and self.command == "GET":
                 self.relay_ws(camera[1])
             elif (replay := re.fullmatch(r"/api/replays/([0-9a-f]{12})/ws", path)) and self.command == "GET":
-                self.relay_ws(None, self.server.replays.stream(replay[1]))
+                self.relay_ws(None, self.server.replays.stream(replay[1]), seconds=REPLAY_WINDOW + 60)
             elif (camera := re.fullmatch(r"/api/cameras/(cam[0-9]{1,2})/live\.mjpeg", path)) and self.command == "GET":
                 self.stream_live(camera[1])
             elif path.startswith("/api/"):
@@ -417,7 +417,7 @@ class CasaHandler(BaseHTTPRequestHandler):
         body = {} if lengths == ["0"] else self.read_json()
         self.json_response(200, self.server.location.ingest(body))
 
-    def relay_ws(self, camera_id, stream=None):
+    def relay_ws(self, camera_id, stream=None, seconds=LIVE_SECONDS):
         if self.headers.get("Upgrade", "").lower() != "websocket":
             raise AppError("Pedido de vídeo inválido.", 400, "invalid_request")
         release, upstream, handshake = self.server.cameras.open_ws(camera_id, self.headers.get("Sec-WebSocket-Key"), stream)
@@ -426,7 +426,7 @@ class CasaHandler(BaseHTTPRequestHandler):
             client.sendall(handshake)
             client.settimeout(None)
             upstream.settimeout(None)
-            deadline = time.monotonic() + LIVE_SECONDS
+            deadline = time.monotonic() + seconds
             while time.monotonic() < deadline:
                 readable, _, _ = select.select([client, upstream], [], [], 1.0)
                 for source in readable:

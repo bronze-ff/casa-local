@@ -95,7 +95,18 @@ export function useCasa() {
   // Aprender um botão do controle original: a central espera até 25 s pelo sinal, então o
   // navegador espera mais que isso antes de desistir.
   const learn = (id: string, body: Record<string, unknown>, label: string) => send(id, `/api/devices/${encodeURIComponent(id)}/learn`, body, `Aprendido: ${label}`, 40000);
+  // Pedido avulso com o token da sessão, fora da fila de "ocupado" e sem aviso (ex.: abrir e fechar
+  // replays enquanto se navega na gravação). Lança Error com a mensagem do servidor.
+  const call = useCallback(async (path: string, payload: Record<string, unknown>) => {
+    if (!token.current) await connect();
+    const post = () => localFetch(path, {method: 'POST', cache: 'no-store', headers: {'Content-Type': 'application/json', 'X-Casa-Token': token.current}, body: JSON.stringify(payload)}, 20000);
+    let response = await post();
+    let value = await response.json();
+    if (response.status === 403 && value.code === 'invalid_token') { await connect(); response = await post(); value = await response.json(); }
+    if (!response.ok) throw new Error(typeof value.error === 'string' ? value.error : 'Não foi possível concluir.');
+    return value;
+  }, [connect]);
   // Ações fora dos aparelhos (localização): mesmo token, mesma fila de ocupado e mesmos avisos.
   const post = (id: string, path: string, body: Record<string, unknown>, success?: string, timeout?: number) => send(id, path, body, success, timeout);
-  return {data, error, busy, notice, connect, command, key, scene, discover, learn, post};
+  return {data, error, busy, notice, connect, command, key, scene, discover, learn, post, call};
 }

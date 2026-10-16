@@ -23,7 +23,10 @@ function ago(at: number | undefined, now: number) {
 }
 
 /** H264 direto do DVR via go2rtc (MSE por WebSocket): primeiro quadro em ~1 s, sem conversão no PC. */
-function playMse(video: HTMLVideoElement, path: string, onLive: () => void, onFail: () => void) {
+type PlayOptions = {replay?: boolean; held?: () => boolean; onEnd?: () => void};
+/** No ao vivo segue a ponta do stream; no replay (`replay`) toca no ritmo da gravação, respeita a
+ * pausa do usuário (`held`) e avisa quando o trecho acaba (`onEnd`). */
+function playMse(video: HTMLVideoElement, path: string, onLive: () => void, onFail: () => void, options: PlayOptions = {}) {
   const source = new MSE!();
   const managed = MSE !== window.MediaSource;
   const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${path}`);
@@ -48,9 +51,14 @@ function playMse(video: HTMLVideoElement, path: string, onLive: () => void, onFa
     if (buffer.buffered.length) {
       const end = buffer.buffered.end(buffer.buffered.length - 1);
       const start = buffer.buffered.start(0);
-      // Stay at the live edge and keep only a few seconds in memory.
-      if (end - video.currentTime > 1.2) video.currentTime = end - 0.2;
-      if (end - start > 10) { try { buffer.remove(start, end - 6); } catch { /* ignore */ } }
+      if (options.replay) {
+        // Gravação: sem pular para a ponta (pausar segura a imagem); descarta só o que já passou.
+        if (video.currentTime - start > 10) { try { buffer.remove(start, video.currentTime - 5); } catch { /* ignore */ } }
+      } else {
+        // Stay at the live edge and keep only a few seconds in memory.
+        if (end - video.currentTime > 1.2) video.currentTime = end - 0.2;
+        if (end - start > 10) { try { buffer.remove(start, end - 6); } catch { /* ignore */ } }
+      }
     }
   };
   source.addEventListener('sourceopen', request, {once: true});
@@ -68,9 +76,9 @@ function playMse(video: HTMLVideoElement, path: string, onLive: () => void, onFa
     }
     queue.push(event.data as ArrayBuffer);
     pump();
-    if (video.paused) void video.play().catch(() => {});
+    if (video.paused && !options.held?.()) void video.play().catch(() => {});
   };
-  socket.onclose = () => { if (!closed && !live) onFail(); };
+  socket.onclose = () => { if (closed) return; if (!live) onFail(); else options.onEnd?.(); };
   const onPlaying = () => { if (!live) { live = true; onLive(); } };
   video.addEventListener('playing', onPlaying);
   return () => {
@@ -145,34 +153,50 @@ const stamp = (tst: number) => new Date(tst * 1000).toLocaleString('pt-BR', {day
 
 /** Gravação do próprio DVR a partir de um horário: voltar/avançar 30 s, pausar e ir ao ao vivo. */
 function ReplayView({camera, start, casa, close, goLive}: {camera: Camera; start: number; casa: Casa; close: () => void; goLive: () => void}) {
+  type State = 'loading' | 'live' | 'failed' | 'ended' | 'unsupported';
   const dialog = useRef<HTMLDialogElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const [base, setBase] = useState(Math.floor(start));
   const [replay, setReplay] = useState<string | null>(null);
-  const [state, setState] = useState<'loading' | 'live' | 'failed'>('loading');
+  const [state, setState] = useState<State>(MSE ? 'loading' : 'unsupported');
+  const [failure, setFailure] = useState('');
   const [offset, setOffset] = useState(0);
   const [paused, setPaused] = useState(false);
+  const held = useRef(false);
   const first = useRef<number | null>(null);
   const current = useRef<string | null>(null);
+  const shut = (id: string) => { void casa.call(`/api/replays/${id}/close`, {}).catch(() => {}); };
   useEffect(() => { const node = dialog.current; node?.showModal(); return () => node?.close(); }, []);
   // Cada horário pedido abre um replay novo no servidor, que já descarta o anterior.
   useEffect(() => {
+    if (!MSE) return;
     let cancelled = false;
-    setState('loading'); setReplay(null); setOffset(0); setPaused(false); first.current = null;
-    void casa.post('replay', `/api/cameras/${camera.id}/replay`, {start: base, ...(current.current ? {replace: current.current} : {})}).then(value => {
-      if (cancelled) return;
-      if (value?.id) { current.current = value.id; setReplay(value.id); } else setState('failed');
-    });
+    setState('loading'); setReplay(null); setOffset(0); setPaused(false); held.current = false; first.current = null;
+    const previous = current.current;
+    current.current = null;
+    // Chamada própria (fora da fila de botões do painel): pular 30 s nunca é recusado por "ocupado".
+    casa.call(`/api/cameras/${camera.id}/replay`, {start: base, ...(previous ? {replace: previous} : {})}).then(value => {
+      if (cancelled) { shut(value.id); return; }  // resposta de um pedido já trocado ou fechado
+      current.current = value.id;
+      setReplay(value.id);
+    }).catch((error: Error) => { if (!cancelled) { setFailure(error.message); setState('failed'); } });
     return () => { cancelled = true; };
   }, [camera.id, base]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => { if (current.current) void casa.post('replay-close', `/api/replays/${current.current}/close`, {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { if (current.current) shut(current.current); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!replay || !video.current) return;
-    return playMse(video.current, `/api/replays/${replay}/ws`, () => setState('live'), () => setState('failed'));
+    return playMse(video.current, `/api/replays/${replay}/ws`, () => setState('live'), () => setState('failed'),
+      {replay: true, held: () => held.current, onEnd: () => setState('ended')});
   }, [replay]);
   const now = base + offset;
   const jump = (seconds: number) => setBase(Math.min(Math.floor(Date.now() / 1000) - 10, Math.floor(now + seconds)));
-  const toggle = () => { const node = video.current; if (!node) return; if (node.paused) { void node.play(); setPaused(false); } else { node.pause(); setPaused(true); } };
+  const toggle = () => {
+    const node = video.current;
+    if (!node) return;
+    held.current = !node.paused;
+    if (node.paused) void node.play(); else node.pause();
+    setPaused(held.current);
+  };
   return <dialog ref={dialog} className="camera-live replay" onCancel={close} aria-label={`Gravação: ${camera.name}`}>
     <div className="camera-live__bar">
       <button className="round ghost back" aria-label="Voltar" onClick={close}><ChevronLeft size={20} /><span>Voltar</span></button>
@@ -184,7 +208,9 @@ function ReplayView({camera, start, casa, close, goLive}: {camera: Camera; start
       <video ref={video} muted autoPlay playsInline aria-label={`Gravação de ${camera.name}`}
         onTimeUpdate={event => { const t = event.currentTarget.currentTime; if (first.current === null) first.current = t; setOffset(Math.max(0, t - first.current)); }} />
       {state === 'loading' ? <div className="camera-live__overlay"><LoaderCircle className="spin" size={26} /><p>Buscando a gravação no DVR…</p></div> : null}
-      {state === 'failed' ? <div className="camera-live__overlay"><CameraOff size={26} /><p>O DVR não entregou a gravação desse horário (pode não ter sido gravado).</p></div> : null}
+      {state === 'failed' ? <div className="camera-live__overlay"><CameraOff size={26} /><p>{failure || 'O DVR não entregou a gravação desse horário (pode não ter sido gravado).'}</p></div> : null}
+      {state === 'ended' ? <div className="camera-live__overlay"><History size={26} /><p>Fim deste trecho da gravação. Avance ou volte para continuar.</p></div> : null}
+      {state === 'unsupported' ? <div className="camera-live__overlay"><CameraOff size={26} /><p>Este navegador não toca a gravação. Use o Chrome, o Edge ou o Safari atualizado.</p></div> : null}
       <div className="replay-controls" role="group" aria-label="Controle da gravação">
         <button aria-label="Voltar 30 segundos" onClick={() => jump(-30)}><RotateCcw size={18} /><span>30 s</span></button>
         <button aria-label={paused ? 'Continuar' : 'Pausar'} className="main" disabled={state !== 'live'} onClick={toggle}>{paused ? <Play size={20} /> : <Pause size={20} />}</button>
