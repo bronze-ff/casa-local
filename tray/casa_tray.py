@@ -250,9 +250,10 @@ class Tray:
             events = self.fetch("/api/motion").get("events", [])
         except (OSError, ValueError):
             events = []
-        if events:
-            self.hide()
-            self.show_alert(events[0])
+        # Sem histórico (instalação nova, ou o servidor não respondeu): um exemplo, sem foto.
+        sample = events[0] if events else {"camera": (self.cameras[0]["id"] if self.cameras else "cam1"), "id": "", "start": time.time() - 120}
+        self.hide()
+        self.show_alert(sample)
 
     def label(self):
         if self.state["server"] == "fora":

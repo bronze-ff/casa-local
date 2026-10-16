@@ -400,8 +400,11 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
   // Posição de uma câmera na grade "Todas" (que põe as com aviso primeiro).
   const indexInAll = (id: string) => watchedFirst(cameras ?? [], motion?.notify).findIndex(c => c.id === id);
   // Atalhos da bandeja: #cameras:cam4 abre ao vivo; #cameras:replay:cam4:<início> abre a gravação (alerta).
+  // Espera câmeras e movimento (ordem da grade e diferença de relógio) e abre uma vez por atalho.
+  const handled = useRef<string | null>(null);
   useEffect(() => {
-    if (!cameras || !openCamera) return;
+    if (!cameras || !openCamera || !motion || handled.current === openCamera) return;
+    handled.current = openCamera;
     const [kind, id, at] = openCamera.split(':');
     if (kind === 'replay') {
       const camera = cameras.find(c => c.id === id);
@@ -410,7 +413,7 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
     }
     const index = indexInAll(kind);
     if (index >= 0) { setFilter('todas'); setLive(index); }
-  }, [cameras, openCamera]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cameras, openCamera, motion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!visibleIds || paused) return;
