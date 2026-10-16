@@ -268,6 +268,16 @@ class TvTests(Temp):
         self.assertEqual(self.tvs.status()["tvs"][0]["label"], "TV da sala")
         self.assertNotIn(b"98765", (self.dir / "tvs.dpapi").read_bytes())
 
+    def test_power_on_when_off_only_wakes(self):
+        self.tvs.tvs[self.key]["token"] = "98765"
+        self.tvs.live[self.key]["power"] = "off"
+        woke = []
+        self.tvs.wake = lambda key: woke.append(key)
+        result = self.tvs.command(self.key, {"key": "power"})
+        self.assertEqual(woke, [self.key])
+        self.assertEqual(FakeChannel.sent, [])  # sem KEY_POWER logo depois do Wake-on-LAN
+        self.assertIn("alguns segundos", result["message"])
+
     def test_revoked_token_is_cleared(self):
         self.tvs.tvs[self.key]["token"] = "velho"
         with self.assertRaises(AppError) as error:

@@ -286,8 +286,14 @@ class SamsungTVs:
         if not isinstance(body, dict) or len(body) != 1:
             raise AppError("Comando inválido.")
         if "key" in body and body["key"] in KEYS:
-            if body["key"] == "power" and self.live.get(key, {}).get("power") != "on":
+            if body["key"] == "power" and self.live.get(key, {}).get("power") == "off":
+                # Fora da rede: só acorda. Mandar a tecla de energia logo depois falharia (a TV ainda
+                # está subindo) e, repetida depois que ela ligar, a desligaria de novo.
+                self._tv(key)
+                if not self.tvs[key].get("token"):
+                    raise AppError("Pareie a TV primeiro.", 409, "tv_unpaired")
                 self.wake(key)
+                return {"status": "sent", "message": "Sinal para ligar enviado pela rede. A TV pode levar alguns segundos."}
             self._send(key, [{"method": "ms.remote.control", "params": {"Cmd": "Click", "DataOfCmd": KEYS[body["key"]], "Option": "false", "TypeOfRemote": "SendRemoteKey"}}])
         elif "app" in body and body["app"] in APPS:
             self._send(key, [{"method": "ms.channel.emit", "params": {"event": "ed.apps.launch", "to": "host", "data": {"appId": APPS[body["app"]], "action_type": "DEEP_LINK"}}}])

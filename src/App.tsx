@@ -339,7 +339,8 @@ export default function App() {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-  const choose = (next: Tab) => { setTab(next); history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${next}`); };
+  // Trocar de aba consome o atalho da bandeja (#cameras:cam4): voltar a Câmeras não reabre a câmera.
+  const choose = (next: Tab) => { setTab(next); setTarget(null); history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${next}`); };
   const preview = casa.data?.mode === 'preview';
   // Bandeja única: o mesmo painel do celular, com as abas embaixo; dormindo enquanto escondido.
   if (tray && asleep) return <div className="tray-panel" />;
