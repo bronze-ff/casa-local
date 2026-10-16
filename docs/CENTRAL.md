@@ -28,6 +28,16 @@ Sem tomada medidora: conta as horas em que o painel deixou o ar ligado × potên
 - Para receber aviso no Windows, escolha a câmera no filtro e toque em **Avisar**. A bandeja fica
   laranja com o número de eventos novos até você abrir o filtro Movimento.
 
+## Replay das gravações (aba Câmeras)
+
+- Tocar num evento de movimento abre a **gravação do próprio DVR** a partir de 10 s antes dele;
+  no ao vivo, **Rever 1 min** volta um minuto. Nada é gravado neste PC.
+- O servidor pede ao DVR o RTSP de playback (`/cam/playback?channel=N&starttime=…`) e o registra
+  como stream temporário no go2rtc local; a senha do DVR nunca vai para o navegador.
+- Controles: voltar e avançar 30 s, pausar e **Ao vivo**. Cada replay dura até 15 min, é apagado
+  ao fechar e fica no máximo dois abertos (para não pesar no DVR). Até 30 dias para trás, se o DVR
+  ainda tiver a gravação.
+
 ## TVs na rede (aba TV)
 
 - O painel encontra TVs Samsung Tizen na rede local e mostra se estão ligadas, sem pedir nada.

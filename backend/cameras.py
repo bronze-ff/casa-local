@@ -161,14 +161,17 @@ class CameraBridge:
         finally:
             self.frames.release()
 
-    def open_ws(self, camera_id, key):
+    def open_ws(self, camera_id, key, stream=None):
         """Open go2rtc's MSE WebSocket for a camera's main stream (camN_hd, H264 passthrough).
 
         The DVR substream runs at 3 fps; the main stream (~12 fps) is what makes live view fluid.
 
         Returns (release, upstream_socket, handshake_bytes); the caller relays raw bytes both ways.
+        `stream` replaces camN_hd with another go2rtc stream (a DVR playback registered by Replays).
         """
-        self._check(camera_id)
+        if stream is None:
+            self._check(camera_id)
+            stream = f"{camera_id}_hd"
         if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z0-9+/]{22}==", key):
             raise AppError("Pedido de vídeo inválido.", 400, "invalid_request")
         if not self.live.acquire(blocking=False):
@@ -177,7 +180,7 @@ class CameraBridge:
         try:
             upstream = socket.create_connection((self.host, self.port), timeout=10)
             upstream.sendall((
-                f"GET /api/ws?src={camera_id}_hd HTTP/1.1\r\nHost: {self.host}:{self.port}\r\n"
+                f"GET /api/ws?src={stream} HTTP/1.1\r\nHost: {self.host}:{self.port}\r\n"
                 f"Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n"
             ).encode("ascii"))
             head = b""

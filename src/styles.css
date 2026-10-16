@@ -644,3 +644,14 @@ button:active:not(:disabled) { transform: scale(.95); }
 .network-tvs .loc-hint b { color: var(--text); }
 .ntv-name:disabled { opacity: 1; cursor: default; }
 .ntv-remote .remote-row { display: grid; grid-template-columns: 1fr 1fr; }
+
+/* ---- Replay da gravação do DVR ---- */
+.camera-live__bar .rewind, .camera-live__bar .live-jump { min-height: 36px; padding: 0 12px; font-size: 12.5px; flex-shrink: 0; }
+.camera-live__bar .live-jump { background: rgba(255, 97, 89, .16); color: #ffb3ae; }
+.replay .camera-live__bar small { font-variant-numeric: tabular-nums; color: var(--amber); }
+.replay-controls { position: absolute; left: 50%; bottom: 14px; z-index: 3; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 99px; background: rgba(14, 14, 16, .78); box-shadow: 0 6px 20px rgba(0, 0, 0, .45); }
+.replay-controls button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 64px; height: 42px; padding: 0 12px; border-radius: 99px; color: #fff; font-size: 12px; font-weight: 650; }
+.replay-controls button:hover:not(:disabled) { background: rgba(255, 255, 255, .1); }
+.replay-controls button.main { min-width: 46px; width: 46px; padding: 0; background: var(--blue); }
+.replay-controls button:disabled { opacity: .45; }
+@media (max-width: 520px) { .camera-live__bar .rewind span, .camera-live__bar .rewind { font-size: 0; gap: 0; padding: 0 10px; } .camera-live__bar .rewind svg { width: 18px; height: 18px; } }

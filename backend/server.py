@@ -22,6 +22,7 @@ from .energy import AcUsage
 from .health import Backups, report as health_report
 from .location import LocationStore
 from .motion import MotionWatcher
+from .replay import Replays
 from .routines import Routines
 from .samsung_tv import SamsungTVs
 from .models import AppError, VERSION
@@ -76,6 +77,7 @@ class CasaServer(ThreadingHTTPServer):
             app.listeners.append(lambda device_id, state: self.energy.observe(state.get("power")) if device_id == "ar-quarto" else None)
         self.motion = MotionWatcher(self.cameras, store)
         self.tvs = SamsungTVs(store, preview=not local)
+        self.replays = Replays(self.cameras)
         self.backups = Backups(app.data_dir)
         self.background = threading.Event()
         self.dist_dir = Path(dist_dir or ROOT / "dist").resolve()
@@ -98,6 +100,7 @@ class CasaServer(ThreadingHTTPServer):
         self.background.set()
         self.routines.close()
         self.motion.close()
+        self.replays.close_all()
         self.app.close()
         self.cameras.close()
         super().server_close()
@@ -309,8 +312,14 @@ class CasaHandler(BaseHTTPRequestHandler):
                 remove_place = re.fullmatch(r"/api/location/places/([a-z0-9-]{1,24})/remove", path)
                 remove_routine = re.fullmatch(r"/api/routines/([0-9a-f]{8})/remove", path)
                 tv = re.fullmatch(r"/api/tvs/([0-9a-f]{12})/(pair|command|label)", path)
+                replay = re.fullmatch(r"/api/cameras/(cam[0-9]{1,2})/replay", path)
+                replay_close = re.fullmatch(r"/api/replays/([0-9a-f]{12})/close", path)
                 location = self.server.location
-                if path == "/api/routines":
+                if replay:
+                    result = self.server.replays.open(replay[1], body)
+                elif replay_close and not body:
+                    result = self.server.replays.close(replay_close[1])
+                elif path == "/api/routines":
                     result = self.server.routines.save(body)
                 elif remove_routine and not body:
                     result = self.server.routines.remove(remove_routine[1])
@@ -379,6 +388,8 @@ class CasaHandler(BaseHTTPRequestHandler):
                 self.binary_response(data, "image/jpeg", {"X-Frame-Age": str(round(age))})
             elif (camera := re.fullmatch(r"/api/cameras/(cam[0-9]{1,2})/ws", path)) and self.command == "GET":
                 self.relay_ws(camera[1])
+            elif (replay := re.fullmatch(r"/api/replays/([0-9a-f]{12})/ws", path)) and self.command == "GET":
+                self.relay_ws(None, self.server.replays.stream(replay[1]))
             elif (camera := re.fullmatch(r"/api/cameras/(cam[0-9]{1,2})/live\.mjpeg", path)) and self.command == "GET":
                 self.stream_live(camera[1])
             elif path.startswith("/api/"):
@@ -406,10 +417,10 @@ class CasaHandler(BaseHTTPRequestHandler):
         body = {} if lengths == ["0"] else self.read_json()
         self.json_response(200, self.server.location.ingest(body))
 
-    def relay_ws(self, camera_id):
+    def relay_ws(self, camera_id, stream=None):
         if self.headers.get("Upgrade", "").lower() != "websocket":
             raise AppError("Pedido de vídeo inválido.", 400, "invalid_request")
-        release, upstream, handshake = self.server.cameras.open_ws(camera_id, self.headers.get("Sec-WebSocket-Key"))
+        release, upstream, handshake = self.server.cameras.open_ws(camera_id, self.headers.get("Sec-WebSocket-Key"), stream)
         client = self.connection
         try:
             client.sendall(handshake)
