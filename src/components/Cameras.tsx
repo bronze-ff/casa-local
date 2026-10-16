@@ -269,9 +269,19 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
   const urls = useRef<Record<string, string>>({});
   const [motion, setMotion] = useState<Motion | null>(null);
   const [replay, setReplay] = useState<{camera: Camera; start: number} | null>(null);
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
   const loadMotion = useCallback(async () => {
-    try { const response = await fetch('/api/motion', {cache: 'no-store'}); if (response.ok) setMotion(await response.json()); } catch { /* tenta de novo */ }
-  }, []);
+    try {
+      const response = await fetch('/api/motion', {cache: 'no-store'});
+      if (!response.ok) return;
+      const value: Motion = await response.json();
+      setMotion(value);
+      // Com o filtro Movimento aberto, cada leitura reenvia o "visto" enquanto houver não vistos:
+      // uma falha passageira não deixa o aviso da bandeja preso.
+      if (filterRef.current === 'movimento' && value.unseen) void casa.call('/api/motion/seen', {}).catch(() => {});
+    } catch { /* tenta de novo */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { void loadMotion(); const timer = setInterval(() => { if (!document.hidden) void loadMotion(); }, 15000); return () => clearInterval(timer); }, [loadMotion]);
   // Abrir a aba de movimento conta como "visto" para o aviso da bandeja.
   // Chamada própria (fora da fila de ocupado): não se perde se outra ação, como parear a TV, estiver em andamento.
