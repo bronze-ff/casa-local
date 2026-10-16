@@ -78,6 +78,7 @@ export function useCasa() {
       if (value.status === 'partial') announce('Cena incompleta. Confira as falhas em Últimas ações.');
       else if (success) announce(data?.mode === 'preview' ? `${success} · somente na prévia` : success);
       else if (value.command?.message) announce(value.command.message);
+      else if (typeof value.message === 'string') announce(value.message);
       return value;
     } catch (cause) {
       if (cause instanceof TypeError || (cause instanceof DOMException && cause.name === 'AbortError')) {

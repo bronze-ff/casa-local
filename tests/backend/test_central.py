@@ -65,6 +65,14 @@ class RoutineTests(Temp):
         self.add()
         self.assertEqual(self.routines.due(), [])
 
+    def test_saving_inside_the_grace_window_does_not_fire(self):
+        self.clock.now += 5 * 60  # 07:03, ainda dentro dos 5 min da rotina das 07:00
+        routine = self.add()
+        self.assertEqual(self.routines.due(), [])
+        self.routines.save({"id": routine["id"], "name": "Outro nome", "days": [0, 1, 2, 3, 4], "time": "07:01",
+                            "action": {"type": "device", "device": "ar-quarto", "values": {"power": False}}})
+        self.assertEqual(self.routines.due(), [])
+
     def test_run_uses_app_command_and_logs(self):
         self.add()
         self.clock.now += 3 * 60

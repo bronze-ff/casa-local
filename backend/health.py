@@ -31,10 +31,12 @@ def machine():
     """Tempo ligado, memória e disco deste PC. Campos ausentes fora do Windows."""
     result = {}
     try:
-        result["uptime"] = int(ctypes.windll.kernel32.GetTickCount64() / 1000)
+        kernel32 = ctypes.windll.kernel32
+        kernel32.GetTickCount64.restype = ctypes.c_ulonglong  # sem isto o ctypes trunca em 32 bits (~25 dias)
+        result["uptime"] = int(kernel32.GetTickCount64() / 1000)
         memory = _Memory()
         memory.dwLength = ctypes.sizeof(_Memory)
-        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(memory))
+        kernel32.GlobalMemoryStatusEx(ctypes.byref(memory))
         result["memory"] = {"used": memory.dwMemoryLoad, "totalGb": round(memory.ullTotalPhys / 2**30, 1)}
     except (AttributeError, OSError):
         pass

@@ -74,13 +74,15 @@ class Routines:
         routine = validate_routine(body)
         with self.lock:
             existing = next((r for r in self.routines if r["id"] == body.get("id")), None) if body.get("id") else None
+            # Salvar conta o último horário marcado como já feito: criar ou editar às 07:03 uma rotina
+            # das 07:00 não dispara na hora (só na próxima vez).
+            consumed = self._latest_slot(routine, datetime.fromtimestamp(self.clock()))
             if existing:
-                existing.update(routine)
+                existing.update(routine, lastRun=consumed)
             else:
                 if len(self.routines) >= MAX_ROUTINES:
                     raise AppError(f"No máximo {MAX_ROUTINES} rotinas.")
-                # Marca o minuto atual como já visto: criar às 07:00 uma rotina das 07:00 não dispara na hora.
-                self.routines.append({"id": secrets.token_hex(4), **routine, "lastRun": self._slot(datetime.fromtimestamp(self.clock()))})
+                self.routines.append({"id": secrets.token_hex(4), **routine, "lastRun": consumed})
             self._save()
         return self.status()
 
@@ -121,6 +123,16 @@ class Routines:
     @staticmethod
     def _slot(moment):
         return moment.strftime("%Y-%m-%d %H:%M")
+
+    @classmethod
+    def _latest_slot(cls, routine, now):
+        """Horário marcado mais recente (agora ou antes) num dos dias escolhidos."""
+        hour, minute = map(int, routine["time"].split(":"))
+        for back in range(8):
+            candidate = (now - timedelta(days=back)).replace(hour=hour, minute=minute, second=0, microsecond=0)
+            if candidate <= now and candidate.weekday() in routine["days"]:
+                return cls._slot(candidate)
+        return None
 
     @staticmethod
     def _next_time(routine, now):
