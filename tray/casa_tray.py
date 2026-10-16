@@ -473,8 +473,13 @@ class Tray:
     def quit(self):
         self.stop.set()
         self.icon.stop()
-        if self.window:
-            self.window.destroy()
+        # webview.start() só retorna quando a última janela fecha: fecha o alerta também.
+        for window in (self.alert, self.window):
+            if window:
+                try:
+                    window.destroy()
+                except webview.errors.WebViewException:
+                    pass
 
     def on_shown(self):
         try:
