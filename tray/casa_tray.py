@@ -475,11 +475,14 @@ class Tray:
         chosen = motion.get("notify", []) if rule["mode"] == "watched" else rule["cameras"] if rule["mode"] == "some" else []
         watched = [e for e in motion.get("events", []) if e["camera"] in chosen]
         newest = max((e["start"] for e in watched), default=0)
-        quiet = self.paused() or (rule["game"] and self.busy)
+        paused, gaming = self.paused(), rule["game"] and self.busy
+        quiet = paused or gaming
         if self.seen["motion"] is not None:
             fresh = [e for e in watched if e["start"] > self.seen["motion"]]
-            if fresh and quiet:
-                # Jogando ou pausado: não interrompe; guarda para um resumo quando terminar.
+            if paused:
+                self.held = {}  # pausa pedida: nada de alerta nem resumo depois (o histórico fica no painel)
+            elif fresh and gaming:
+                # Jogando: não interrompe; guarda para um resumo quando sair da tela cheia.
                 for event in fresh:
                     self.held[event["camera"]] = self.held.get(event["camera"], 0) + 1
             elif fresh:

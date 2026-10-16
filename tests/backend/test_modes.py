@@ -120,6 +120,8 @@ class PlaceRoutineTests(Temp):
         self.routines.save(self.base)
         self.event(age=900)  # fila antiga do celular
         self.assertEqual(self.routines.due(), [])
+        self.event(age=-3600)  # relógio do celular adiantado
+        self.assertEqual(self.routines.due(), [])
         self.clock.now = datetime(2026, 10, 19, 22, 0).timestamp()
         self.event()
         self.assertEqual(self.routines.due(), [])

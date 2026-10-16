@@ -211,8 +211,9 @@ class Routines:
     def on_place(self, event):
         """Transição da localização ({"tst", "kind": chegou|saiu, "place"}): agenda as rotinas que batem."""
         now_ts = self.clock()
-        if not isinstance(event, dict) or now_ts - event.get("tst", 0) > PLACE_FRESH:
-            return  # fila antiga reenviada pelo celular: não liga nada fora de hora
+        # Fila antiga reenviada pelo celular, ou relógio do celular adiantado: não liga nada fora de hora.
+        if not isinstance(event, dict) or not -120 <= now_ts - event.get("tst", 0) <= PLACE_FRESH:
+            return
         moment = datetime.fromtimestamp(now_ts)
         with self.lock:
             for routine in self.routines:
