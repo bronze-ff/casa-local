@@ -6,8 +6,9 @@ type Camera = {id: string; name: string; group: 'externa' | 'interna'};
 type Frame = {url?: string; at?: number; failed?: boolean};
 type Filter = 'todas' | 'externa' | 'interna' | 'movimento';
 type MotionEvent = {id: string; camera: string; start: number; end: number | null; count: number; photo: boolean; hits?: [number, number | null][]};
-type ReplayTarget = {camera: Camera; start: number; from: number; to: number};
-type Motion = {connected: boolean; error: string | null; events: MotionEvent[]; notify: string[]; unseen: number};
+// Horários no relógio do DVR (o impresso no vídeo); `offset` = DVR − este aparelho, em segundos.
+type ReplayTarget = {camera: Camera; start: number; from: number; to: number; offset: number};
+type Motion = {connected: boolean; error: string | null; events: MotionEvent[]; notify: string[]; unseen: number; dvrOffset?: number};
 type Casa = ReturnType<typeof useCasa>;
 
 const REFRESH_MS = 4000;
@@ -154,11 +155,11 @@ const stamp = (tst: number) => new Date(tst * 1000).toLocaleString('pt-BR', {day
 
 /** Gravação do próprio DVR a partir de um horário: voltar/avançar 30 s, pausar e ir ao ao vivo. */
 /** Janela da linha do tempo para um evento: 30 s antes até 1 min depois do fim, com pelo menos 3 min. */
-function eventWindow(camera: Camera, event: MotionEvent): ReplayTarget {
-  const realNow = Date.now() / 1000;
+function eventWindow(camera: Camera, event: MotionEvent, offset: number): ReplayTarget {
+  const realNow = Date.now() / 1000 + offset;
   const from = event.start - 30;
   const to = Math.min(realNow - 5, Math.max((event.end ?? realNow) + 60, from + 180));
-  return {camera, start: event.start - 10, from, to};
+  return {camera, start: event.start - 10, from, to, offset};
 }
 
 /** Barra como a do YouTube: marcações laranja onde o DVR viu movimento, traço da posição atual,
@@ -190,7 +191,8 @@ function Timeline({from, to, now, hits, seek}: {from: number; to: number; now: n
   </div>;
 }
 
-function ReplayView({camera, start, from, to, casa, close, goLive}: ReplayTarget & {casa: Casa; close: () => void; goLive: () => void}) {
+function ReplayView({camera, start, from, to, offset: clockOffset, casa, close, goLive}: ReplayTarget & {casa: Casa; close: () => void; goLive: () => void}) {
+  const dvrNow = () => Date.now() / 1000 + clockOffset;
   type State = 'loading' | 'live' | 'failed' | 'ended' | 'unsupported';
   const dialog = useRef<HTMLDialogElement>(null);
   const video = useRef<HTMLVideoElement>(null);
@@ -227,7 +229,7 @@ function ReplayView({camera, start, from, to, casa, close, goLive}: ReplayTarget
       {replay: true, held: () => held.current, onEnd: () => setState('ended')});
   }, [replay]);
   const now = base + offset;
-  const seekTo = (t: number) => setBase(Math.min(Math.floor(Date.now() / 1000) - 10, Math.floor(t)));
+  const seekTo = (t: number) => setBase(Math.min(Math.floor(dvrNow()) - 10, Math.floor(t)));
   const jump = (seconds: number) => seekTo(now + seconds);
   // Disparos de movimento desta câmera dentro da janela (eventos antigos sem disparos: início-fim).
   const [hits, setHits] = useState<[number, number][]>([]);
@@ -236,13 +238,13 @@ function ReplayView({camera, start, from, to, casa, close, goLive}: ReplayTarget
       if (!value) return;
       const all: [number, number][] = [];
       for (const event of value.events as MotionEvent[]) {
-        for (const [a, b] of event.hits ?? [[event.start, event.end]]) all.push([a, b ?? Math.max(a + 5, Date.now() / 1000)]);
+        for (const [a, b] of event.hits ?? [[event.start, event.end]]) all.push([a, b ?? Math.max(a + 5, dvrNow())]);
       }
       setHits(all.sort((x, y) => x[0] - y[0]));
     }).catch(() => {});
   }, [camera.id]);
   // A janela acompanha se o vídeo passar do fim dela (até o agora).
-  const windowEnd = Math.min(Date.now() / 1000 - 5, Math.max(to, now + 30));
+  const windowEnd = Math.min(dvrNow() - 5, Math.max(to, now + 30));
   const windowHits = hits.filter(([a, b]) => b >= from && a <= windowEnd);
   const toggle = () => {
     const node = video.current;
@@ -420,7 +422,7 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
     </div>
     <div className="segmented wide" role="group" aria-label="Filtrar câmeras">{([['todas', 'Todas'], ['externa', 'Externas'], ['interna', 'Internas'], ['movimento', 'Movimento']] as const).map(([value, label]) => <button key={value} className={filter === value ? 'selected' : ''} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}{value === 'movimento' && motion?.unseen ? <b className="count">{motion.unseen}</b> : null}</button>)}</div>
     {!available ? <div className="alert" role="alert"><p>O serviço de câmeras (go2rtc) não está rodando no PC de casa.</p><button onClick={() => void load()}><RefreshCw size={15} />Verificar</button></div> : null}
-    {filter === 'movimento' ? <MotionView cameras={cameras} motion={motion} casa={casa} reload={() => void loadMotion()} open={event => { const camera = cameras.find(c => c.id === event.camera); if (camera) setReplay(eventWindow(camera, event)); }} /> : <div className="cam-grid">
+    {filter === 'movimento' ? <MotionView cameras={cameras} motion={motion} casa={casa} reload={() => void loadMotion()} open={event => { const camera = cameras.find(c => c.id === event.camera); if (camera) setReplay(eventWindow(camera, event, motion?.dvrOffset ?? 0)); }} /> : <div className="cam-grid">
       {visible.map((camera, index) => {
         const frame = frames[camera.id];
         return <button key={camera.id} className="cam" onClick={() => setLive(index)} aria-label={`Abrir ${camera.name} ao vivo`}>
@@ -434,7 +436,7 @@ export default function Cameras({casa, openCamera}: {casa: Casa; openCamera?: st
     </div>}
     <p className={`card-foot ${available ? 'tone-online' : 'tone-offline'}`}><ShieldCheck size={14} />{available ? 'Conectado ao DVR' : 'Sem conexão'}<span>{latest ? `Automático · ${ago(latest, now)}` : 'Atualização automática'}</span></p>
     {live !== null && visible[live] ? <LiveView cameras={visible} index={live} poster={frames[visible[live].id]?.url} move={move} close={() => setLive(null)}
-      rewind={camera => { const realNow = Date.now() / 1000; setLive(null); setReplay({camera, start: realNow - 60, from: realNow - 300, to: realNow - 5}); }} /> : null}
+      rewind={camera => { const offset = motion?.dvrOffset ?? 0, realNow = Date.now() / 1000 + offset; setLive(null); setReplay({camera, start: realNow - 60, from: realNow - 300, to: realNow - 5, offset}); }} /> : null}
     {replay ? <ReplayView key={`${replay.camera.id}-${replay.start}`} {...replay} casa={casa} close={() => setReplay(null)}
       goLive={() => { const camera = replay.camera; setReplay(null); setFilter('todas'); setLive(cameras.findIndex(c => c.id === camera.id)); }} /> : null}
   </section>;

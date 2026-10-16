@@ -39,6 +39,13 @@ class ReplayTests(unittest.TestCase):
         self.assertNotIn("s3nh", str(result))
         self.assertEqual(self.replays.stream(result["id"]), f"replay_{result['id']}")
 
+    def test_requested_time_is_already_in_dvr_clock(self):
+        self.replays.offset = lambda: 92  # DVR adiantado: "agora" do DVR é 12:31:32
+        start = datetime(2026, 10, 16, 12, 31, 0).timestamp()  # no futuro para o PC, passado para o DVR
+        self.replays.open("cam13", {"start": start})
+        params = parse_qs(urlsplit(self.calls[-1][1]["src"]).query)
+        self.assertEqual((params["starttime"], params["endtime"]), (["2026_10_16_12_31_00"], ["2026_10_16_12_31_32"]))
+
     def test_rejects_future_old_unknown_and_bad_bodies(self):
         for camera, body in (("cam2", {"start": self.clock.now}), ("cam2", {"start": self.clock.now - 31 * 86400}),
                              ("cam10", {"start": self.clock.now - 60}), ("cam2", {}), ("cam2", {"start": "x"}),

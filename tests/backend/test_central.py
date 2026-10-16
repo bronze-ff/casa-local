@@ -237,6 +237,23 @@ class MotionTests(Temp):
         event = self.motion.status()["events"][0]
         self.assertEqual(event["hits"], [[start, start + 8], [start + 48, start + 58]])
 
+    def test_stale_snapshot_is_skipped(self):
+        event = self.motion.handle("Code=VideoMotion;action=Start;index=6")
+        self.clock.now += 300
+        self.motion._snapshot(event)
+        self.assertFalse(self.motion.status()["events"][0]["photo"])
+
+    def test_events_use_dvr_clock_and_old_ones_are_shifted_once(self):
+        old = self.motion.handle("Code=VideoMotion;action=Start;index=12")  # gravado na hora do PC
+        self.motion.set_offset(92)  # DVR 92 s adiantado
+        self.assertEqual(self.motion.status()["events"][0]["start"], old["start"] + 92)
+        new = self.motion.handle("Code=VideoMotion;action=Start;index=4")
+        self.assertEqual(new["start"], self.clock.now + 92)  # carimbado na hora do DVR
+        self.motion.set_offset(95)  # nova medição não desloca de novo
+        self.assertEqual(self.motion.status(camera="cam13")["events"][0]["start"], old["start"] + 92)
+        again = MotionWatcher(FakeCameras(), self.dir, source=lambda: None, clock=self.clock)
+        self.assertEqual((again.offset, again.dvr_clock), (95, True))
+
     def test_disconnect_closes_open_events(self):
         self.motion.handle("Code=VideoMotion;action=Start;index=4")
         self.motion.close_open()

@@ -77,7 +77,7 @@ class CasaServer(ThreadingHTTPServer):
             app.listeners.append(lambda device_id, state: self.energy.observe(state.get("power")) if device_id == "ar-quarto" else None)
         self.motion = MotionWatcher(self.cameras, store)
         self.tvs = SamsungTVs(store, preview=not local)
-        self.replays = Replays(self.cameras)
+        self.replays = Replays(self.cameras, offset=lambda: self.motion.offset)
         self.backups = Backups(app.data_dir)
         self.background = threading.Event()
         self.dist_dir = Path(dist_dir or ROOT / "dist").resolve()

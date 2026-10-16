@@ -29,8 +29,9 @@ def _dvr_time(moment):
 
 
 class Replays:
-    def __init__(self, cameras, source=dvr_source, clock=time.time):
-        self.cameras, self.source, self.clock = cameras, source, clock
+    def __init__(self, cameras, source=dvr_source, clock=time.time, offset=lambda: 0):
+        # `offset`: diferença DVR − PC. Os horários pedidos pelo painel já estão no relógio do DVR.
+        self.cameras, self.source, self.clock, self.offset = cameras, source, clock, offset
         self.lock = threading.Lock()
         self.active = {}  # id -> {"camera", "start", "created"}
 
@@ -62,12 +63,12 @@ class Replays:
     def open(self, camera_id, body):
         if camera_id not in IDS:
             raise AppError("Câmera não encontrada.", 404, "not_found")
-        if not isinstance(body, dict) or not {"start"} <= set(body) <= {"start", "replace"} or type(body["start"]) not in (int, float):
+        if not isinstance(body, dict) or not {"start"} <= set(body) <= {"start", "replace"} or type(body["start"]) not in (int, float) or isinstance(body["start"], bool):
             raise AppError("Informe o horário do replay.")
         replace = body.get("replace")
         if replace is not None and not (isinstance(replace, str) and re.fullmatch(r"[0-9a-f]{12}", replace)):
             raise AppError("Replay inválido.")
-        now = self.clock()
+        now = self.clock() + self.offset()
         start = int(body["start"])
         if start > now - 5:
             raise AppError("Esse horário ainda não foi gravado. Use o ao vivo.", 409, "replay_future")
