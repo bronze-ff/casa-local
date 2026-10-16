@@ -16,7 +16,7 @@ import time
 from urllib.parse import unquote, urlsplit
 
 from .app import CasaApp
-from .cameras import LIVE_SECONDS, CameraBridge
+from .cameras import IDS as CAMERA_IDS, LIVE_SECONDS, CameraBridge
 from .config import ROOT, private_ip
 from .energy import AcUsage
 from .health import Backups, report as health_report
@@ -24,6 +24,7 @@ from .location import LocationStore
 from .motion import MotionWatcher
 from .replay import WINDOW as REPLAY_WINDOW, Replays
 from .routines import Routines
+from .alert_devices import AlertDevices
 from .samsung_tv import SamsungTVs
 from .models import AppError, VERSION
 
@@ -71,7 +72,10 @@ class CasaServer(ThreadingHTTPServer):
         store = app.data_dir if local else app.data_dir / "previa"
         self.location = location or LocationStore(store)
         self.started = time.time()
-        self.routines = Routines(app, store)
+        places = lambda: [p["id"] for p in self.location.config.get("places", [])] if self.location.config else None
+        self.routines = Routines(app, store, places=places)
+        self.location.listeners.append(self.routines.on_place)
+        self.alerts = AlertDevices(store, cameras=lambda: CAMERA_IDS)
         self.energy = AcUsage(store)
         if local:
             app.listeners.append(lambda device_id, state: self.energy.observe(state.get("power")) if device_id == "ar-quarto" else None)
@@ -307,7 +311,9 @@ class CasaHandler(BaseHTTPRequestHandler):
             if mutation:
                 body = self.read_json()
                 match = re.fullmatch(r"/api/devices/([a-z-]+)/commands", path)
-                scene = re.fullmatch(r"/api/scenes/([a-z-]+)/run", path)
+                scene = re.fullmatch(r"/api/scenes/([a-z0-9-]{1,24})/run", path)
+                remove_mode = re.fullmatch(r"/api/modes/([a-z0-9-]{1,24})/remove", path)
+                alert_device = re.fullmatch(r"/api/alert-devices/([0-9a-f]{16})(/remove)?", path)
                 learn = re.fullmatch(r"/api/devices/(tv-quarto|ar-quarto)/learn", path)
                 remove_place = re.fullmatch(r"/api/location/places/([a-z0-9-]{1,24})/remove", path)
                 remove_routine = re.fullmatch(r"/api/routines/([0-9a-f]{8})/remove", path)
@@ -319,6 +325,24 @@ class CasaHandler(BaseHTTPRequestHandler):
                     result = self.server.replays.open(replay[1], body)
                 elif replay_close and not body:
                     result = self.server.replays.close(replay_close[1])
+                elif path == "/api/modes":
+                    app.modes.save(body)
+                    result = {"state": app.snapshot()}
+                elif path == "/api/modes/order" and set(body) == {"ids"}:
+                    app.modes.reorder(body["ids"])
+                    result = {"state": app.snapshot()}
+                elif remove_mode and not body:
+                    used = [r["name"] for r in self.server.routines.status()["routines"] if r["action"] == {"type": "scene", "id": remove_mode[1]}]
+                    if used:
+                        raise AppError(f"Este modo é usado pela rotina {used[0]}. Troque a ação da rotina antes de apagar.", 409, "in_use")
+                    app.modes.remove(remove_mode[1])
+                    result = {"state": app.snapshot()}
+                elif path == "/api/alert-devices/hello":
+                    result = self.server.alerts.hello(body)
+                elif alert_device and alert_device[2] and not body:
+                    result = self.server.alerts.remove(alert_device[1])
+                elif alert_device and not alert_device[2]:
+                    result = self.server.alerts.update(alert_device[1], body)
                 elif path == "/api/routines":
                     result = self.server.routines.save(body)
                 elif remove_routine and not body:
@@ -370,6 +394,8 @@ class CasaHandler(BaseHTTPRequestHandler):
                 self.json_response(200, self.server.location.status())
             elif path == "/api/routines":
                 self.json_response(200, self.server.routines.status())
+            elif path == "/api/alert-devices":
+                self.json_response(200, self.server.alerts.status())
             elif path == "/api/energy":
                 self.json_response(200, self.server.energy.summary())
             elif path == "/api/motion":

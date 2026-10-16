@@ -2,10 +2,13 @@
 relógio, com as mesmas abas do celular (Luzes, Clima, TV, Câmeras, Local, Central).
 
 - Clique: abre/fecha o painel na última aba usada. Ctrl+Alt+H faz o mesmo de qualquer lugar.
-- Botão direito: ações rápidas (cenas, ar, luzes, câmeras ao vivo) sem abrir o painel.
+- Botão direito: ações rápidas (modos, ar, luzes, câmeras ao vivo) sem abrir o painel.
 - Bolinha do ícone: verde ok, laranja com aviso novo (movimento, localização, saúde), vermelha se
   o painel caiu. Avisos do Windows para movimento nas câmeras marcadas, saída/chegada dela e
   serviços que pararam.
+- Cada computador tem sua regra de alerta (painel > Câmeras > Movimento > Onde avisar): câmeras
+  monitoradas, só algumas ou nenhuma. Com jogo ou vídeo em tela cheia os alertas esperam, e saem
+  num resumo depois. "Avisos neste computador" no menu pausa por um tempo.
 
 Uso: pythonw casa_tray.py --url https://pc.tailnet.ts.net [--servicos C:\\caminho\\CasaLocal]
 --servicos habilita "Reiniciar serviços" (apenas no PC que roda o painel e o go2rtc).
@@ -14,6 +17,8 @@ import argparse
 import ctypes
 from ctypes import wintypes
 import json
+import os
+import secrets
 import subprocess
 import sys
 import threading
@@ -39,6 +44,9 @@ HEALTH_EVERY = 60
 TABS = ("luzes", "clima", "tv", "cameras", "local", "central")
 DOT = {"ok": (58, 211, 122), "aviso": (255, 181, 71), "fora": (255, 97, 89), "?": (157, 157, 166)}
 WHITE = (255, 255, 255)
+HOME = Path.home() / "AppData" / "Local" / "CasaLocalBandeja"
+PAUSE_FOREVER = 4102444800  # o servidor entende como "até reativar"
+DEFAULT_RULE = {"mode": "watched", "cameras": [], "game": True, "pausedUntil": 0}
 HOTKEY_ID, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, WM_HOTKEY = 1, 0x1, 0x2, 0x4000, 0x0312
 
 
@@ -60,6 +68,60 @@ def with_status(base, state, count=0):
         text = str(min(count, 9))
         pen.text((51 - pen.textlength(text) / 2, 43), text, fill=(22, 22, 24))
     return image
+
+
+def device_identity():
+    """Id aleatório deste computador (não identifica a máquina; só separa as regras de alerta)."""
+    path = HOME / "aparelho.json"
+    try:
+        saved = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(saved.get("id"), str) and len(saved["id"]) == 16:
+            return saved["id"]
+    except (OSError, ValueError, AttributeError):
+        pass
+    device_id = secrets.token_hex(8)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"id": device_id}), encoding="utf-8")
+    return device_id
+
+
+def default_name(services):
+    """Nome inicial (dá para trocar no painel): PC de casa, Notebook ou Computador + nome do Windows."""
+    class Power(ctypes.Structure):
+        _fields_ = [("ac", ctypes.c_byte), ("battery", ctypes.c_byte), ("percent", ctypes.c_byte), ("saver", ctypes.c_byte), ("life", wintypes.DWORD), ("full", wintypes.DWORD)]
+    power = Power()
+    laptop = ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(power)) and not power.battery & 128
+    kind = "PC de casa" if services else "Notebook" if laptop else "Computador"
+    return f"{kind} ({os.environ.get('COMPUTERNAME', '?').title()})"[:30]
+
+
+def fullscreen_busy():
+    """Jogo, vídeo ou apresentação em tela cheia agora (para segurar os alertas)."""
+    state = ctypes.c_int(0)
+    try:
+        # 2 tela cheia ocupada, 3 jogo Direct3D exclusivo, 4 apresentação.
+        if ctypes.windll.shell32.SHQueryUserNotificationState(ctypes.byref(state)) == 0 and state.value in (2, 3, 4):
+            return True
+    except OSError:
+        pass
+    # Jogos em "janela sem bordas" não aparecem acima: confere se a janela da frente cobre o monitor.
+    user32 = ctypes.windll.user32
+    hwnd = user32.GetForegroundWindow()
+    if not hwnd:
+        return False
+    name = ctypes.create_unicode_buffer(64)
+    user32.GetClassNameW(hwnd, name, 64)
+    if name.value in ("Progman", "WorkerW", "Shell_TrayWnd", "Windows.UI.Core.CoreWindow"):
+        return False  # área de trabalho, barra de tarefas, menu Iniciar
+
+    class MonitorInfo(ctypes.Structure):
+        _fields_ = [("size", wintypes.DWORD), ("monitor", wintypes.RECT), ("work", wintypes.RECT), ("flags", wintypes.DWORD)]
+    rect, info = wintypes.RECT(), MonitorInfo()
+    info.size = ctypes.sizeof(MonitorInfo)
+    if not user32.GetWindowRect(hwnd, ctypes.byref(rect)) or not user32.GetMonitorInfoW(user32.MonitorFromWindow(hwnd, 2), ctypes.byref(info)):
+        return False
+    screen = info.monitor
+    return rect.left <= screen.left and rect.top <= screen.top and rect.right >= screen.right and rect.bottom >= screen.bottom
 
 
 def work_area():
@@ -151,6 +213,9 @@ class Tray:
         self.seen = {"location": None, "motion": None, "health": {}}
         self.last_health = 0.0
         self.alert, self.alert_ready, self.alert_hwnd, self.alert_generation = None, False, None, 0
+        self.device_id, self.device_name = device_identity(), default_name(services)
+        self.rule, self.busy, self.held = None, False, {}  # held: câmera -> movimentos segurados
+        self.modes, self.modes_at = [], 0.0
         self.base = glyph_house()
         self.icon = pystray.Icon("casa", with_status(self.base, "?"), "Casa", menu=self.menu())
 
@@ -199,6 +264,13 @@ class Tray:
         def scene(label, scene_id):
             return lambda: self.act(label, f"/api/scenes/{scene_id}/run", {})
 
+        def pause(seconds):
+            return lambda: self.set_rule({"pausedUntil": 0 if seconds == 0 else PAUSE_FOREVER if seconds is None else int(time.time() + seconds)})
+
+        def until_morning():
+            moment = time.localtime(time.time() + 86400)
+            return int(time.mktime((moment.tm_year, moment.tm_mon, moment.tm_mday, 8, 0, 0, 0, 0, -1))) - int(time.time())
+
         def camera(camera_id):
             return lambda: self.show(f"cameras:{camera_id}")
 
@@ -206,11 +278,8 @@ class Tray:
         items = [
             pystray.MenuItem("Abrir a Casa", lambda: self.toggle(), default=True),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Cenas", pystray.Menu(
-                pystray.MenuItem("Cinema", scene("Cinema", "cinema")),
-                pystray.MenuItem("Boa noite", scene("Boa noite", "boa-noite")),
-                pystray.MenuItem("Cheguei", scene("Cheguei", "cheguei")),
-            )),
+            pystray.MenuItem("Modos", pystray.Menu(*[pystray.MenuItem(m["name"], scene(m["name"], m["id"])) for m in self.modes])
+                             if self.modes else pystray.Menu(pystray.MenuItem("Carregando…", None, enabled=False))),
             pystray.MenuItem("Ar-condicionado", pystray.Menu(
                 pystray.MenuItem("Ligar · 24 °C resfriar", device("Ar", "ar-quarto", {"power": True, "temperature": 24, "mode": "cool", "fan": "auto"})),
                 pystray.MenuItem("Desligar", device("Ar", "ar-quarto", {"power": False})),
@@ -235,6 +304,17 @@ class Tray:
         if self.services:
             items.append(pystray.MenuItem("Reiniciar serviços", lambda: threading.Thread(target=self.restart, daemon=True).start()))
         items += [
+            pystray.MenuItem("Avisos neste computador", pystray.Menu(
+                pystray.MenuItem(lambda _: self.rule_label(), None, enabled=False),
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("Pausar por 1 hora", pause(3600)),
+                pystray.MenuItem("Pausar até amanhã 8h", lambda: pause(until_morning())()),
+                pystray.MenuItem("Pausar até eu reativar", pause(None)),
+                pystray.MenuItem("Reativar", pause(0), enabled=lambda _: self.paused()),
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("Segurar com jogo em tela cheia", lambda: self.set_rule({"game": not self.current_rule()["game"]}), checked=lambda _: self.current_rule()["game"]),
+                pystray.MenuItem("Escolher câmeras no painel", lambda: self.show("cameras:avisos")),
+            )),
             pystray.MenuItem("Testar aviso", self.test_alert),
             pystray.MenuItem("Abrir no navegador", lambda: webbrowser.open(f"{self.url}/#{self.tab}")),
             pystray.MenuItem("Iniciar com o Windows", lambda: set_autostart(not autostart_enabled()), checked=lambda _: autostart_enabled()),
@@ -254,6 +334,44 @@ class Tray:
         sample = events[0] if events else {"camera": (self.cameras[0]["id"] if self.cameras else "cam1"), "id": "", "start": time.time() - 120}
         self.hide()
         self.show_alert(sample)
+
+    # ---- regra de alerta deste computador ----
+    def current_rule(self):
+        return self.rule or DEFAULT_RULE
+
+    def paused(self):
+        return self.current_rule()["pausedUntil"] > time.time()
+
+    def rule_label(self):
+        rule = self.current_rule()
+        if self.paused():
+            until = rule["pausedUntil"]
+            return "Pausado até reativar" if until >= PAUSE_FOREVER else f"Pausado até {time.strftime('%d/%m %H:%M' if until - time.time() > 20 * 3600 else '%H:%M', time.localtime(until))}"
+        if rule["mode"] == "none":
+            return "Desligado neste computador"
+        if rule["game"] and self.busy:
+            return "Segurando: tela cheia"
+        return "Avisando: câmeras monitoradas" if rule["mode"] == "watched" else f"Avisando: {len(rule['cameras'])} câmera(s) escolhida(s)"
+
+    def hello(self):
+        """Apresenta-se ao servidor (conta se está em tela cheia) e recebe a regra deste computador."""
+        self.busy = fullscreen_busy()
+        try:
+            rule = self.post("/api/alert-devices/hello", {"id": self.device_id, "name": self.device_name, "busy": self.busy})
+            self.rule = {key: rule[key] for key in DEFAULT_RULE}
+        except (OSError, ValueError, RuntimeError, KeyError, TypeError):
+            pass  # servidor antigo ou fora: mantém a última regra conhecida
+
+    def set_rule(self, changes):
+        def run():
+            try:
+                self.post(f"/api/alert-devices/{self.device_id}", changes)
+                self.hello()
+                self.icon.update_menu()
+                self.icon.notify(self.rule_label(), "Casa · Avisos neste computador")
+            except (OSError, ValueError, RuntimeError) as error:
+                self.icon.notify(str(error) or "Central indisponível", "Casa · Avisos")
+        threading.Thread(target=run, daemon=True).start()
 
     def label(self):
         if self.state["server"] == "fora":
@@ -353,14 +471,29 @@ class Tray:
         except (OSError, ValueError):
             return 0
         names = {c["id"]: c["name"] for c in self.cameras}
-        watched = [e for e in motion.get("events", []) if e["camera"] in motion.get("notify", [])]
+        rule = self.current_rule()
+        chosen = motion.get("notify", []) if rule["mode"] == "watched" else rule["cameras"] if rule["mode"] == "some" else []
+        watched = [e for e in motion.get("events", []) if e["camera"] in chosen]
         newest = max((e["start"] for e in watched), default=0)
+        paused, gaming = self.paused(), rule["game"] and self.busy
+        quiet = paused or gaming
         if self.seen["motion"] is not None:
             fresh = [e for e in watched if e["start"] > self.seen["motion"]]
-            if fresh:
+            if paused:
+                self.held = {}  # pausa pedida: nada de alerta nem resumo depois (o histórico fica no painel)
+            elif fresh and gaming:
+                # Jogando: não interrompe; guarda para um resumo quando sair da tela cheia.
+                for event in fresh:
+                    self.held[event["camera"]] = self.held.get(event["camera"], 0) + 1
+            elif fresh:
                 cams = sorted({names.get(e["camera"], e["camera"]) for e in fresh})
                 self.icon.notify(f"Movimento em {', '.join(cams)}", "Casa · Câmeras")
                 self.show_alert(max(fresh, key=lambda e: e["start"]))
+        if self.held and not quiet:
+            total = sum(self.held.values())
+            cams = sorted(names.get(c, c) for c in self.held)
+            self.icon.notify(f"{total} {'movimento' if total == 1 else 'movimentos'} enquanto os avisos esperavam: {', '.join(cams)}", "Casa · Câmeras")
+            self.held = {}
         self.seen["motion"] = max(newest, self.seen["motion"] or 0)
         return motion.get("unseen", 0)
 
@@ -442,6 +575,16 @@ class Tray:
             server, camera_state = "fora", "fora"
         location, alerts = ("Central indisponível", 0) if server != "ok" else self.poll_location()
         if server == "ok":
+            self.hello()
+            if not self.modes or time.monotonic() - self.modes_at > HEALTH_EVERY:
+                try:
+                    modes = [{"id": m["id"], "name": m["name"]} for m in self.fetch("/api/state").get("scenes", [])]
+                    self.modes_at = time.monotonic()
+                    if modes != self.modes:
+                        self.modes = modes
+                        self.icon.menu = self.menu()
+                except (OSError, ValueError, KeyError, TypeError):
+                    pass
             alerts += self.poll_motion()
             self.poll_health()
         self.state.update(server=server, cameras=camera_state, location=location, alerts=alerts)
