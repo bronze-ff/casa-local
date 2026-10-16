@@ -60,6 +60,7 @@ class MotionWatcher:
         self.stop_event = threading.Event()
         self.thread = None
         self.connected, self.last_error, self.last_line = False, None, None
+        self.dropped_at = None  # o DVR fecha o canal de vez em quando; reconecta em segundos
         # Fotos dos eventos: fila atendida por dois trabalhadores (no máximo duas buscas ao go2rtc ao
         # mesmo tempo, sem descartar nenhuma quando várias câmeras disparam juntas).
         self.snapshots = queue.Queue(maxsize=500)
@@ -224,7 +225,7 @@ class MotionWatcher:
         except Exception as error:
             self.connected, self.last_error = False, "DVR não respondeu ao pedido de eventos." if not isinstance(error, urllib.error.HTTPError) else f"DVR recusou ({error.code})."
             return
-        self.connected, self.last_error = True, None
+        self.connected, self.last_error, self.dropped_at = True, None, None
         try:
             while not self.stop_event.is_set():
                 raw = response.readline()
@@ -243,6 +244,7 @@ class MotionWatcher:
             self.last_error = "Conexão de eventos caiu; reconectando."
         finally:
             self.connected = False
+            self.dropped_at = self.clock()
             self.close_open()
             response.close()
 
@@ -288,7 +290,9 @@ class MotionWatcher:
             for event in self.events:
                 if event["camera"] in self.notify and event["start"] > self.seen.get(event["camera"], 0):
                     unseen_by[event["camera"]] = unseen_by.get(event["camera"], 0) + 1
-            return {"connected": self.connected, "error": self.last_error, "events": events, "notify": sorted(self.notify), "dvrOffset": self.offset,
+            # Queda curta (menos de 30 s, reconectando) não aparece como problema no painel.
+            brief = self.dropped_at is not None and self.clock() - self.dropped_at < 30
+            return {"connected": self.connected or brief, "error": None if brief else self.last_error, "events": events, "notify": sorted(self.notify), "dvrOffset": self.offset,
                     "unseen": sum(unseen_by.values()), "unseenBy": unseen_by, "seenBy": dict(self.seen)}
 
     def set_notify(self, body):

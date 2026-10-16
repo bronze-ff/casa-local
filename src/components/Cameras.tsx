@@ -248,17 +248,23 @@ function ReplayView({camera, start, from, to, offset: clockOffset, casa, close, 
   const seekTo = (t: number) => setBase(Math.min(Math.floor(dvrNow()) - 10, Math.floor(t)));
   const jump = (seconds: number) => seekTo(now + seconds);
   // Disparos de movimento desta câmera dentro da janela (eventos antigos sem disparos: início-fim).
+  // Atualiza a cada 10 s: aberto logo depois do alerta, o movimento pode continuar acontecendo.
   const [hits, setHits] = useState<[number, number][]>([]);
+  const [ongoing, setOngoing] = useState(false);
   useEffect(() => {
-    void fetch(`/api/motion/${camera.id}`, {cache: 'no-store'}).then(r => r.ok ? r.json() : null).then(value => {
+    const load = () => fetch(`/api/motion/${camera.id}`, {cache: 'no-store'}).then(r => r.ok ? r.json() : null).then(value => {
       if (!value) return;
       const all: [number, number][] = [];
       for (const event of value.events as MotionEvent[]) {
         for (const [a, b] of event.hits ?? [[event.start, event.end]]) all.push([a, b ?? Math.max(a + 5, dvrNow())]);
       }
       setHits(all.sort((x, y) => x[0] - y[0]));
+      setOngoing((value.events as MotionEvent[]).some(event => event.end === null && event.start <= to + 60));
     }).catch(() => {});
-  }, [camera.id]);
+    void load();
+    const timer = setInterval(() => { if (!document.hidden) void load(); }, 10000);
+    return () => clearInterval(timer);
+  }, [camera.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // A janela acompanha se o vídeo passar do fim dela (até o agora).
   const windowEnd = Math.min(dvrNow() - 5, Math.max(to, now + 30));
   const windowHits = hits.filter(([a, b]) => b >= from && a <= windowEnd);
@@ -281,7 +287,9 @@ function ReplayView({camera, start, from, to, offset: clockOffset, casa, close, 
         onTimeUpdate={event => { const t = event.currentTarget.currentTime; if (first.current === null) first.current = t; setOffset(Math.max(0, t - first.current)); }} />
       {state === 'loading' ? <div className="camera-live__overlay"><LoaderCircle className="spin" size={26} /><p>Buscando a gravação no DVR…</p></div> : null}
       {state === 'failed' ? <div className="camera-live__overlay"><CameraOff size={26} /><p>{failure || 'O DVR não entregou a gravação desse horário (pode não ter sido gravado).'}</p></div> : null}
-      {state === 'ended' ? <div className="camera-live__overlay"><History size={26} /><p>Fim deste trecho da gravação. Avance ou volte para continuar.</p></div> : null}
+      {state === 'ended' ? <div className="camera-live__overlay"><History size={26} /><p>{dvrNow() - (base + offset) < 90 ? 'Você chegou ao momento atual da gravação.' : 'Fim deste trecho da gravação. Avance ou volte para continuar.'}</p>
+        {dvrNow() - (base + offset) < 90 ? <button className="pill accent" onClick={goLive}><Radio size={15} />Ver ao vivo</button> : null}</div> : null}
+      {ongoing && state !== 'ended' ? <button className="replay-ongoing" onClick={goLive}><i />Movimento ainda acontecendo · ver ao vivo</button> : null}
       {state === 'unsupported' ? <div className="camera-live__overlay"><CameraOff size={26} /><p>Este navegador não toca a gravação. Use o Chrome, o Edge ou o Safari atualizado.</p></div> : null}
       <Timeline from={from} to={windowEnd} now={now} hits={windowHits} seek={seekTo} />
       <div className="replay-controls" role="group" aria-label="Controle da gravação">
