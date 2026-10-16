@@ -374,6 +374,8 @@ class CasaHandler(BaseHTTPRequestHandler):
                 self.json_response(200, self.server.energy.summary())
             elif path == "/api/motion":
                 self.json_response(200, self.server.motion.status())
+            elif motion_camera := re.fullmatch(r"/api/motion/(cam[0-9]{1,2})", path):
+                self.json_response(200, self.server.motion.status(camera=motion_camera[1]))
             elif photo := re.fullmatch(r"/api/motion/(\d{9,11}-[0-9a-f]{6})\.jpg", path):
                 self.binary_response(self.server.motion.photo(photo[1]), "image/jpeg")
             elif path == "/api/tvs":

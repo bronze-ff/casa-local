@@ -210,6 +210,19 @@ class MotionTests(Temp):
         finally:
             motion_module.MAX_EVENTS = original
 
+    def test_quiet_camera_is_listed_even_behind_busy_ones(self):
+        self.motion.handle("Code=VideoMotion;action=Start;index=12")  # cam13, a quieta
+        for step in range(400):  # outra câmera muito movimentada depois disso
+            self.clock.now += 100
+            self.motion.handle(f"Code=VideoMotion;action=Start;index={step % 2}")
+            self.motion.handle(f"Code=VideoMotion;action=Stop;index={step % 2}")
+        self.assertNotIn("cam13", [e["camera"] for e in self.motion.status()["events"]])
+        quiet = self.motion.status(camera="cam13")["events"]
+        self.assertEqual([e["camera"] for e in quiet], ["cam13"])
+        self.assertEqual(len(self.motion.events), 401)  # nada foi cortado dentro das 24 h
+        with self.assertRaises(AppError):
+            self.motion.status(camera="cam99")
+
     def test_disconnect_closes_open_events(self):
         self.motion.handle("Code=VideoMotion;action=Start;index=4")
         self.motion.close_open()

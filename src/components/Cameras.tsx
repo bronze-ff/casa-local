@@ -226,9 +226,22 @@ const day = (tst: number) => { const d = new Date(tst * 1000), today = new Date(
 /** Linha do tempo de movimento (eventos do próprio DVR) e escolha de quais câmeras avisam. */
 function MotionView({cameras, motion, casa, open, reload}: {cameras: Camera[]; motion: Motion | null; casa: Casa; open: (event: MotionEvent) => void; reload: () => void}) {
   const [cam, setCam] = useState<string>('todas');
+  // Uma câmera escolhida busca os eventos dela no servidor (a lista geral traz só os mais recentes de todas).
+  const [only, setOnly] = useState<{camera: string; events: MotionEvent[]} | null>(null);
+  useEffect(() => {
+    if (cam === 'todas') { setOnly(null); return; }
+    let stop = false;
+    const load = async () => {
+      try { const response = await fetch(`/api/motion/${cam}`, {cache: 'no-store'}); if (response.ok && !stop) setOnly({camera: cam, events: (await response.json()).events}); } catch { /* tenta de novo */ }
+    };
+    void load();
+    const timer = setInterval(() => { if (!document.hidden) void load(); }, 15000);
+    return () => { stop = true; clearInterval(timer); };
+  }, [cam]);
   const names = Object.fromEntries(cameras.map(c => [c.id, c.name]));
   if (!motion) return <div className="empty"><LoaderCircle className="spin" size={22} /><p>Lendo eventos do DVR</p></div>;
-  const events = motion.events.filter(event => cam === 'todas' || event.camera === cam);
+  const loadingCam = cam !== 'todas' && only?.camera !== cam;
+  const events = cam === 'todas' ? motion.events : only?.camera === cam ? only.events : [];
   const watching = motion.notify.includes(cam);
   const toggle = async (id: string) => { await casa.post('motion', '/api/motion/notify', {camera: id, on: !motion.notify.includes(id)}); reload(); };
   let lastDay = '';
@@ -253,7 +266,8 @@ function MotionView({cameras, motion, casa, open, reload}: {cameras: Camera[]; m
           {motion.notify.includes(event.camera) ? <Bell size={14} className="motion-flag" /> : null}
         </button>
       </li>;
-    })}</ol> : <p className="loc-hint">Nenhum movimento {cam === 'todas' ? 'nas câmeras' : 'nesta câmera'} nas últimas 24 h.</p>}
+    })}</ol> : loadingCam ? <div className="empty small"><LoaderCircle className="spin" size={20} /></div>
+      : <p className="loc-hint">Nenhum movimento {cam === 'todas' ? 'nas câmeras' : 'nesta câmera'} nas últimas 24 h.</p>}
   </div>;
 }
 

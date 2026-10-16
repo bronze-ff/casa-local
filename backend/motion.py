@@ -20,7 +20,9 @@ from .cameras import IDS
 from .models import AppError
 
 RETENTION = 48 * 3600
-MAX_EVENTS = 500
+# 15 câmeras geram ~70 eventos por hora: 8000 cobrem as 48 h com folga (fotos ~26 KB cada).
+MAX_EVENTS = 8000
+LIST_LIMIT = 300  # eventos devolvidos por consulta (todas as câmeras, ou uma só)
 MERGE_SECONDS = 90  # novo disparo da mesma câmera dentro disto continua o mesmo evento
 OPEN_SECONDS = 300  # evento sem "Stop" (conexão caiu no meio) só junta disparos por até 5 min sem atividade
 LINE = re.compile(r"Code=VideoMotion;action=(Start|Stop);index=(\d+)")
@@ -195,10 +197,14 @@ class MotionWatcher:
         self.stop_event.set()
 
     # ---- painel ----
-    def status(self, hours=24):
+    def status(self, hours=24, camera=None):
+        """Eventos das últimas `hours` horas, mais novos primeiro. Com `camera`, só os dessa câmera
+        (o filtro é aqui: câmeras quietas não somem atrás das movimentadas)."""
+        if camera is not None and camera not in IDS:
+            raise AppError("Câmera não encontrada.", 404, "not_found")
         with self.lock:
             since = self.clock() - hours * 3600
-            events = [dict(e) for e in self.events if e["start"] >= since][-200:][::-1]
+            events = [dict(e) for e in self.events if e["start"] >= since and (camera is None or e["camera"] == camera)][-LIST_LIMIT:][::-1]
             unseen = sum(1 for e in self.events if e["start"] > self.seen_at and e["camera"] in self.notify)
             return {"connected": self.connected, "error": self.last_error, "events": events, "notify": sorted(self.notify),
                     "unseen": unseen, "seenAt": self.seen_at}
