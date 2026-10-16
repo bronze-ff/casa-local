@@ -97,9 +97,10 @@ export function useCasa() {
   const learn = (id: string, body: Record<string, unknown>, label: string) => send(id, `/api/devices/${encodeURIComponent(id)}/learn`, body, `Aprendido: ${label}`, 40000);
   // Pedido avulso com o token da sessão, fora da fila de "ocupado" e sem aviso (ex.: abrir e fechar
   // replays enquanto se navega na gravação). Lança Error com a mensagem do servidor.
-  const call = useCallback(async (path: string, payload: Record<string, unknown>) => {
+  const call = useCallback(async (path: string, payload: Record<string, unknown>, keepalive = false) => {
     if (!token.current) await connect();
-    const post = () => localFetch(path, {method: 'POST', cache: 'no-store', headers: {'Content-Type': 'application/json', 'X-Casa-Token': token.current}, body: JSON.stringify(payload)}, 20000);
+    // keepalive: o pedido segue mesmo com a página fechando (ex.: fechar o replay ao sair).
+    const post = () => localFetch(path, {method: 'POST', cache: 'no-store', keepalive, headers: {'Content-Type': 'application/json', 'X-Casa-Token': token.current}, body: JSON.stringify(payload)}, 20000);
     let response = await post();
     let value = await response.json();
     if (response.status === 403 && value.code === 'invalid_token') { await connect(); response = await post(); value = await response.json(); }

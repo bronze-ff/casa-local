@@ -205,6 +205,7 @@ function ReplayView({camera, start, from, to, offset: clockOffset, casa, close, 
   const held = useRef(false);
   const first = useRef<number | null>(null);
   const current = useRef<string | null>(null);
+  const opening = useRef<Promise<void>>(Promise.resolve());
   const shut = (id: string) => { void casa.call(`/api/replays/${id}/close`, {}).catch(() => {}); };
   useEffect(() => { const node = dialog.current; node?.showModal(); return () => node?.close(); }, []);
   // Cada horário pedido abre um replay novo no servidor, que já descarta o anterior.
@@ -212,17 +213,29 @@ function ReplayView({camera, start, from, to, offset: clockOffset, casa, close, 
     if (!MSE) return;
     let cancelled = false;
     setState('loading'); setReplay(null); setOffset(0); setPaused(false); held.current = false; first.current = null;
-    const previous = current.current;
-    current.current = null;
-    // Chamada própria (fora da fila de botões do painel): pular 30 s nunca é recusado por "ocupado".
-    casa.call(`/api/cameras/${camera.id}/replay`, {start: base, ...(previous ? {replace: previous} : {})}).then(value => {
-      if (cancelled) { shut(value.id); return; }  // resposta de um pedido já trocado ou fechado
-      current.current = value.id;
-      setReplay(value.id);
-    }).catch((error: Error) => { if (!cancelled) { setFailure(error.message); setState('failed'); } });
+    // Aberturas em fila: cada uma espera a anterior e troca o replay aberto; um pulo que já foi
+    // substituído antes da vez dele nem abre. Chamada própria, fora da fila de "ocupado" do painel.
+    opening.current = opening.current.then(async () => {
+      if (cancelled) return;
+      const previous = current.current;
+      current.current = null;
+      try {
+        const value = await casa.call(`/api/cameras/${camera.id}/replay`, {start: base, ...(previous ? {replace: previous} : {})});
+        if (cancelled) { shut(value.id); return; }  // fechado ou trocado enquanto o DVR respondia
+        current.current = value.id;
+        setReplay(value.id);
+      } catch (error) {
+        if (!cancelled) { setFailure((error as Error).message); setState('failed'); }
+      }
+    });
     return () => { cancelled = true; };
   }, [camera.id, base]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => { if (current.current) shut(current.current); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // Fechar ou recarregar a página com o replay aberto também o fecha no servidor.
+    const leave = () => { if (current.current) void casa.call(`/api/replays/${current.current}/close`, {}, true).catch(() => {}); };
+    window.addEventListener('pagehide', leave);
+    return () => { window.removeEventListener('pagehide', leave); if (current.current) shut(current.current); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!replay || !video.current) return;
     return playMse(video.current, `/api/replays/${replay}/ws`, () => setState('live'), () => setState('failed'),
