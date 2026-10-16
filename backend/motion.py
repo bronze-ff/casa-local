@@ -22,6 +22,7 @@ from .models import AppError
 RETENTION = 48 * 3600
 # 15 câmeras geram ~70 eventos por hora: 8000 cobrem as 48 h com folga (fotos ~26 KB cada).
 MAX_EVENTS = 8000
+MAX_HITS = 60  # disparos guardados por evento ([início, fim]), para a linha do tempo do replay
 LIST_LIMIT = 300  # eventos devolvidos por consulta (todas as câmeras, ou uma só)
 MERGE_SECONDS = 90  # novo disparo da mesma câmera dentro disto continua o mesmo evento
 OPEN_SECONDS = 300  # evento sem "Stop" (conexão caiu no meio) só junta disparos por até 5 min sem atividade
@@ -97,22 +98,35 @@ class MotionWatcher:
             if action == "Stop":
                 if last and last.get("end") is None:
                     last["end"] = now
+                    self._close_hit(last, now)
                     self._save()
                 return None
             still_open = last and last.get("end") is None and now - last.get("seen", last["start"]) <= OPEN_SECONDS
             recently_closed = last and last.get("end") is not None and now - last["end"] <= MERGE_SECONDS
             if last and last.get("end") is None and not still_open:
                 last["end"] = last.get("seen", last["start"])  # aberto e parado: fecha no último disparo
+                self._close_hit(last, last["end"])
             if still_open or recently_closed:
                 last["end"] = None
                 last["seen"] = now
                 last["count"] = last.get("count", 1) + 1
+                hits = last.setdefault("hits", [[last["start"], last["start"]]])
+                if hits[-1][1] is not None:
+                    hits.append([now, None])
+                    del hits[:-MAX_HITS]
                 self._save()
                 return None
-            event = {"id": f"{int(now)}-{secrets.token_hex(3)}", "camera": camera_id, "start": now, "seen": now, "end": None, "count": 1, "photo": False}
+            event = {"id": f"{int(now)}-{secrets.token_hex(3)}", "camera": camera_id, "start": now, "seen": now, "end": None, "count": 1, "photo": False,
+                     "hits": [[now, None]]}
             self.events.append(event)
             self._save()
             return dict(event)
+
+    @staticmethod
+    def _close_hit(event, moment):
+        hits = event.get("hits")
+        if hits and hits[-1][1] is None:
+            hits[-1][1] = max(moment, hits[-1][0])
 
     def close_open(self):
         """Conexão caiu: o DVR não vai mandar o "Stop" dos eventos em andamento; fecha-os."""
@@ -121,6 +135,7 @@ class MotionWatcher:
             for event in self.events:
                 if event.get("end") is None:
                     event["end"] = event.get("seen", event["start"])
+                    self._close_hit(event, event["end"])
                     changed = True
             if changed:
                 self._save()

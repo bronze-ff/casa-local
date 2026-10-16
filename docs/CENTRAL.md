@@ -34,6 +34,8 @@ Sem tomada medidora: conta as horas em que o painel deixou o ar ligado × potên
   no ao vivo, **Rever 1 min** volta um minuto. Nada é gravado neste PC.
 - O servidor pede ao DVR o RTSP de playback (`/cam/playback?channel=N&starttime=…`) e o registra
   como stream temporário no go2rtc local; a senha do DVR nunca vai para o navegador.
+- Linha do tempo como a do YouTube: marcações laranja onde o DVR viu movimento (cada disparo é
+  guardado), traço da posição atual, tocar ou arrastar para pular e **Próximo movimento**.
 - Controles: voltar e avançar 30 s, pausar e **Ao vivo**. Cada replay dura até 15 min, é apagado
   ao fechar e fica no máximo dois abertos (para não pesar no DVR). Até 30 dias para trás, se o DVR
   ainda tiver a gravação.

@@ -223,6 +223,20 @@ class MotionTests(Temp):
         with self.assertRaises(AppError):
             self.motion.status(camera="cam99")
 
+    def test_each_trigger_is_kept_for_the_replay_timeline(self):
+        self.motion.handle("Code=VideoMotion;action=Start;index=5")
+        start = self.clock.now
+        self.clock.now += 8
+        self.motion.handle("Code=VideoMotion;action=Stop;index=5")
+        self.clock.now += 40
+        self.motion.handle("Code=VideoMotion;action=Start;index=5")  # junta ao evento, novo disparo
+        self.clock.now += 5
+        self.motion.handle("Code=VideoMotion;action=Start;index=5")  # repetido com o disparo aberto
+        self.clock.now += 5
+        self.motion.handle("Code=VideoMotion;action=Stop;index=5")
+        event = self.motion.status()["events"][0]
+        self.assertEqual(event["hits"], [[start, start + 8], [start + 48, start + 58]])
+
     def test_disconnect_closes_open_events(self):
         self.motion.handle("Code=VideoMotion;action=Start;index=4")
         self.motion.close_open()
