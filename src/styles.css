@@ -553,10 +553,10 @@ button:active:not(:disabled) { transform: scale(.95); }
 .routine strong { font-size: 13.5px; font-weight: 650; color: var(--text); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .routine span { font-size: 12px; color: var(--muted); }
 .routine.off strong, .routine.off span { color: #6f6f78; }
-.switch { position: relative; width: 38px; height: 22px; border-radius: 99px; background: var(--raised-2); transition: background-color .18s; }
-.switch i { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #d4d4da; transition: transform .2s cubic-bezier(.16, 1, .3, 1); }
-.switch.on { background: var(--blue); }
-.switch.on i { transform: translateX(16px); background: #fff; }
+.routine .switch { position: relative; width: 38px; height: 22px; border-radius: 99px; background: var(--raised-2); transition: background-color .18s; }
+.routine .switch i { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #d4d4da; transition: transform .2s cubic-bezier(.16, 1, .3, 1); }
+.routine .switch.on { background: var(--blue); }
+.routine .switch.on i { transform: translateX(16px); background: #fff; }
 .routine-form { display: grid; gap: 10px; padding: 12px; border-radius: 14px; background: #18181b; border: 1px solid rgba(61, 139, 255, .35); }
 .routine-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
 .routine-row .loc-field { flex: 1 1 120px; }
