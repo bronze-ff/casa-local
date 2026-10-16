@@ -22,6 +22,7 @@ from .models import AppError
 RETENTION = 48 * 3600
 MAX_EVENTS = 500
 MERGE_SECONDS = 90  # novo disparo da mesma câmera dentro disto continua o mesmo evento
+OPEN_SECONDS = 300  # evento sem "Stop" (conexão caiu no meio) só junta disparos por até 5 min sem atividade
 LINE = re.compile(r"Code=VideoMotion;action=(Start|Stop);index=(\d+)")
 
 
@@ -95,15 +96,31 @@ class MotionWatcher:
                     last["end"] = now
                     self._save()
                 return None
-            if last and (last.get("end") is None or now - last["end"] <= MERGE_SECONDS):
+            still_open = last and last.get("end") is None and now - last.get("seen", last["start"]) <= OPEN_SECONDS
+            recently_closed = last and last.get("end") is not None and now - last["end"] <= MERGE_SECONDS
+            if last and last.get("end") is None and not still_open:
+                last["end"] = last.get("seen", last["start"])  # aberto e parado: fecha no último disparo
+            if still_open or recently_closed:
                 last["end"] = None
+                last["seen"] = now
                 last["count"] = last.get("count", 1) + 1
                 self._save()
                 return None
-            event = {"id": f"{int(now)}-{secrets.token_hex(3)}", "camera": camera_id, "start": now, "end": None, "count": 1, "photo": False}
+            event = {"id": f"{int(now)}-{secrets.token_hex(3)}", "camera": camera_id, "start": now, "seen": now, "end": None, "count": 1, "photo": False}
             self.events.append(event)
             self._save()
             return dict(event)
+
+    def close_open(self):
+        """Conexão caiu: o DVR não vai mandar o "Stop" dos eventos em andamento; fecha-os."""
+        with self.lock:
+            changed = False
+            for event in self.events:
+                if event.get("end") is None:
+                    event["end"] = event.get("seen", event["start"])
+                    changed = True
+            if changed:
+                self._save()
 
     def _snapshot(self, event):
         if not self.snapshots.acquire(blocking=False):
@@ -155,6 +172,7 @@ class MotionWatcher:
             self.last_error = "Conexão de eventos caiu; reconectando."
         finally:
             self.connected = False
+            self.close_open()
             response.close()
 
     def start(self):

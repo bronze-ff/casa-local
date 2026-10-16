@@ -50,7 +50,7 @@ class RoutineTests(Temp):
         self.assertEqual(self.routines.due(), [])
         self.clock.now += 3 * 60  # 07:01
         due = self.routines.due()
-        self.assertEqual([name for name, _ in due], ["Desligar ar cedo"])
+        self.assertEqual([name for name, *_ in due], ["Desligar ar cedo"])
         self.assertEqual(self.routines.due(), [])  # não repete no mesmo dia
         self.clock.now += 5 * 86400  # sábado 07:01
         self.assertEqual(self.routines.due(), [])
@@ -68,8 +68,8 @@ class RoutineTests(Temp):
     def test_run_uses_app_command_and_logs(self):
         self.add()
         self.clock.now += 3 * 60
-        for name, action in self.routines.due():
-            self.assertTrue(self.routines.run(name, action))
+        for name, action, timer_id in self.routines.due():
+            self.assertTrue(self.routines.run(name, action, timer_id))
         device = next(d for d in self.app.devices if d["id"] == "ar-quarto")
         self.assertFalse(device["state"]["power"])
         self.assertTrue(self.app.recent[0]["message"].startswith("Rotina Desligar ar cedo"))
@@ -81,10 +81,26 @@ class RoutineTests(Temp):
         self.clock.now += 119 * 60
         self.assertEqual(self.routines.due(), [])
         self.clock.now += 2 * 60
-        self.assertEqual([name for name, _ in self.routines.due()], ["Desligar o ar"])
+        due = self.routines.due()
+        self.assertEqual([name for name, *_ in due], ["Desligar o ar"])
+        self.routines.run(*due[0])
         self.assertEqual(self.routines.status()["timers"], [])
         with self.assertRaises(AppError):
             self.routines.set_timer({"device": "ar-quarto", "minutes": 5})
+
+    def test_failed_timer_is_retried_then_dropped(self):
+        self.routines.set_timer({"device": "ar-quarto", "minutes": 15})
+        self.clock.now += 16 * 60
+        failing = {"type": "device", "device": "ar-quarto", "values": {"power": "não"}}  # força AppError
+        for attempt in range(10):
+            name, _, timer_id = self.routines.due()[0]
+            self.assertFalse(self.routines.run(name, failing, timer_id))
+            remaining = self.routines.status()["timers"]
+            if attempt < 9:
+                self.assertEqual(len(remaining), 1)
+                self.assertEqual(self.routines.due(), [])  # espera 1 min antes de tentar de novo
+                self.clock.now += 61
+        self.assertEqual(self.routines.status()["timers"], [])
 
     def test_validation(self):
         for bad in ({"days": []}, {"time": "25:00"}, {"name": ""},
@@ -161,6 +177,22 @@ class MotionTests(Temp):
         self.motion.handle("Code=VideoMotion;action=Stop;index=3")
         self.clock.now += 200
         self.assertIsNotNone(self.motion.handle("Code=VideoMotion;action=Start;index=3"))
+
+    def test_open_event_without_stop_does_not_swallow_later_motion(self):
+        first = self.motion.handle("Code=VideoMotion;action=Start;index=2")
+        self.clock.now += 60
+        self.assertIsNone(self.motion.handle("Code=VideoMotion;action=Start;index=2"))  # ainda o mesmo
+        self.clock.now += 10 * 60  # conexão caiu sem Stop; muito tempo depois, movimento novo
+        later = self.motion.handle("Code=VideoMotion;action=Start;index=2")
+        self.assertIsNotNone(later)
+        events = self.motion.status()["events"]
+        self.assertEqual([e["id"] for e in events], [later["id"], first["id"]])
+        self.assertIsNotNone(events[1]["end"])
+
+    def test_disconnect_closes_open_events(self):
+        self.motion.handle("Code=VideoMotion;action=Start;index=4")
+        self.motion.close_open()
+        self.assertIsNotNone(self.motion.status()["events"][0]["end"])
 
     def test_photo_notify_unseen_and_retention(self):
         event = self.motion.handle("Code=VideoMotion;action=Start;index=0")

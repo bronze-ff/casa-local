@@ -16,6 +16,7 @@ import time
 from .models import INVENTORY, SCENE_COMMANDS, AppError, validate_command
 
 GRACE_SECONDS = 300
+TIMER_RETRIES, TIMER_RETRY_SECONDS = 10, 60  # ar indisponível na hora: tenta de novo por ~10 min
 MAX_ROUTINES = 20
 DEVICE_KINDS = {d["id"]: d["kind"] for d in INVENTORY if d["kind"] in {"light", "climate"}}
 
@@ -132,7 +133,8 @@ class Routines:
         return None
 
     def due(self):
-        """Ações vencidas agora (rotinas na janela de 5 min e timers), marcando-as como executadas."""
+        """Ações vencidas agora: (nome, ação, id do timer ou None). Rotinas ficam marcadas como
+        feitas; timers só saem da lista quando o comando dá certo (ver run)."""
         now_ts = self.clock()
         now = datetime.fromtimestamp(now_ts)
         ready = []
@@ -147,15 +149,14 @@ class Routines:
                 slot = self._slot(scheduled)
                 if scheduled.weekday() in routine["days"] and 0 <= (now - scheduled).total_seconds() <= GRACE_SECONDS and routine.get("lastRun") != slot:
                     routine["lastRun"] = slot
-                    ready.append((routine["name"], routine["action"]))
+                    ready.append((routine["name"], routine["action"], None))
             for timer in [t for t in self.timers if t["at"] <= now_ts]:
-                self.timers.remove(timer)
-                ready.append((timer["label"], timer["action"]))
+                ready.append((timer["label"], timer["action"], timer["id"]))
             if ready:
                 self._save()
         return ready
 
-    def run(self, name, action):
+    def run(self, name, action, timer_id=None):
         try:
             if action["type"] == "scene":
                 result = self.app.scene(action["id"])
@@ -167,6 +168,14 @@ class Routines:
         except AppError as error:
             ok, message = False, str(error)
         with self.lock:
+            timer = next((t for t in self.timers if t["id"] == timer_id), None) if timer_id else None
+            if timer and not ok and timer.get("attempts", 0) + 1 < TIMER_RETRIES:
+                # Falha passageira (ar sem resposta): o desligar é idempotente, tenta de novo em 1 min.
+                timer["attempts"] = timer.get("attempts", 0) + 1
+                timer["at"] = int(self.clock() + TIMER_RETRY_SECONDS)
+                message += " · tentando de novo em 1 min"
+            elif timer:
+                self.timers.remove(timer)
             self.log.append({"at": int(self.clock()), "name": name, "ok": ok, "message": message})
             self._save()
         return ok
@@ -177,8 +186,8 @@ class Routines:
 
         def loop():
             while not self.stop_event.is_set():
-                for name, action in self.due():
-                    self.run(name, action)
+                for name, action, timer_id in self.due():
+                    self.run(name, action, timer_id)
                 self.stop_event.wait(15)
 
         self.thread = threading.Thread(target=loop, daemon=True, name="casa-rotinas")
