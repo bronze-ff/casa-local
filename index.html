@@ -11,6 +11,12 @@
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>Casa Local</title>
+    <!-- Fundo antes do CSS carregar (nunca branco); no celular, a mesma cor do painel. -->
+    <style>html,body{margin:0;background:#08080a}@media (max-width:520px),(max-height:520px) and (pointer:coarse){html,body{background:#161618}}</style>
   </head>
-  <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
+  <body>
+    <!-- Abertura enquanto o painel carrega: nunca uma tela branca, mesmo com o PC de casa lento. -->
+    <div id="root"><div style="min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#9d9da6;font:500 14px 'Segoe UI',-apple-system,system-ui,sans-serif"><div style="width:44px;height:44px;border-radius:14px;background:#2f6bff"></div>Abrindo sua casa…</div></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

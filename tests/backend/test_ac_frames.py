@@ -111,3 +111,14 @@ class TurboSendTests(unittest.TestCase):
         validate_config({"ar-quarto": {**ir_config(self.schema), "frameFix": {"fix": FIX, "turbo": [0, 20]}}})
         with self.assertRaises(AppError):
             validate_config({"ar-quarto": {**ir_config(self.schema), "frameFix": {"fix": [[0, 1, 5]]}}})
+
+    def test_profile_off_gets_remote_bits_but_learned_off_is_untouched(self):
+        fix = {"fix": FIX, "turbo": [0, 20]}
+        self.schema["off"] = {"code": frame(*self.seg), "origem": "geonav-perfil", "validado": False}
+        _result, button = self.send({"power": False}, fix)
+        sent = ac_frames.bits(button.call_args.args[0])
+        self.assertEqual((sent[0][22], sent[1][1], sent[1][8], sent[0][20]), (1, 0, 1, 0))
+        learned = remote(*self.seg)
+        self.schema["off"] = {"code": learned, "origem": "aprendido", "validado": False}
+        _result, button = self.send({"power": False}, fix)
+        self.assertEqual(button.call_args.args[0], learned)

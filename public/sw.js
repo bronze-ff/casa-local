@@ -12,7 +12,11 @@ self.addEventListener('fetch', event => {
   // A página principal vem sempre da rede (a cópia só serve sem conexão): assim um painel novo
   // publicado no PC de casa nunca fica escondido atrás da cópia offline.
   if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
-    event.respondWith(fetch(event.request).catch(() => caches.match('/index.html')));
+    // Se o PC de casa demorar mais de 5 s, estiver fora (o Tailscale responde 502) ou sem rede,
+    // abre a cópia guardada; o painel reconecta sozinho e recarrega quando o servidor voltar.
+    const network = fetch(event.request).then(response => response.ok ? response : Promise.reject(new Error('status')));
+    const slow = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000));
+    event.respondWith(Promise.race([network, slow]).catch(async () => (await caches.match('/index.html')) || network));
     return;
   }
   if (PRE_CACHE.includes(url.pathname)) event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request)));

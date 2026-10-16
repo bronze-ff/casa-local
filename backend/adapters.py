@@ -6,7 +6,7 @@ import multiprocessing
 import socket
 
 from . import ac_frames, tuya_light
-from .ir_codes import code_of
+from .ir_codes import code_of, origin_of
 from .models import AC_STATE_FIELDS, AppError
 
 
@@ -250,9 +250,16 @@ def send(config, command, current):
             device = CheckedIR(**common, control_type=config["controlType"])
             device.set_retry(False)
             code = code_of(entry)
-            if key.startswith("{") and config.get("frameFix"):
+            if config.get("frameFix") and key.startswith("{"):
                 # Quadros do perfil viram os do controle original; o turbo é um bit sobre o estado.
                 code = ac_frames.adjust(code, config["frameFix"], bool(estimated.get("turbo")))
+            elif config.get("frameFix") and key == "off" and origin_of(entry) != "aprendido":
+                # O desligar do perfil tem os mesmos bits fixos errados. Se não tiver o formato do
+                # ar (outro tipo de quadro), vai como está.
+                try:
+                    code = ac_frames.adjust(code, config["frameFix"])
+                except ValueError:
+                    pass
             device.send_button(code)
             if isinstance(device.send_result, dict) and ("Error" in device.send_result or "Err" in device.send_result):
                 raise AppError("A central não confirmou o envio. Confira antes de repetir.", 502, "device_unavailable")

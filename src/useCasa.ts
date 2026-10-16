@@ -37,7 +37,9 @@ export function useCasa() {
     const onOnline = () => void connect();
     window.addEventListener('online', onOnline);
     const interval = setInterval(async () => {
-      if (document.hidden || busyRef.current || polling.current || !token.current) return;
+      if (document.hidden || busyRef.current || polling.current) return;
+      // Sem sessão (central fora do ar ao abrir): tenta reconectar sozinho a cada 5 s.
+      if (!token.current) { void connect(); return; }
       polling.current = true;
       try {
         const response = await localFetch('/api/state', {cache: 'no-store'});

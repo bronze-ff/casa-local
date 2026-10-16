@@ -105,14 +105,25 @@ function LiveView({cameras, index, poster, move, close}: {cameras: Camera[]; ind
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [move]);
+  // No celular: arrastar o vídeo para baixo fecha; para os lados troca de câmera.
+  const swipe = useRef<{x: number; y: number} | null>(null);
+  const onTouchStart = (event: React.TouchEvent) => { const t = event.touches[0]; swipe.current = {x: t.clientX, y: t.clientY}; };
+  const onTouchEnd = (event: React.TouchEvent) => {
+    const start = swipe.current, t = event.changedTouches[0];
+    swipe.current = null;
+    if (!start) return;
+    const dx = t.clientX - start.x, dy = t.clientY - start.y;
+    if (dy > 90 && Math.abs(dy) > Math.abs(dx) * 1.4) close();
+    else if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.4) move(dx < 0 ? 1 : -1);
+  };
   return <dialog ref={dialog} className="camera-live" onCancel={close} aria-label={`Ao vivo: ${camera.name}`}>
     <div className="camera-live__bar">
-      <button className="round ghost" aria-label="Voltar para a grade" onClick={close}><ChevronLeft size={20} /></button>
+      <button className="round ghost back" aria-label="Voltar para a grade" onClick={close}><ChevronLeft size={20} /><span>Voltar</span></button>
       <div><strong>Canal {camera.id.replace('cam', '')}</strong><small>{camera.name}</small></div>
       <span className={`live-badge ${state}`}><i />{state === 'live' ? 'Ao vivo' : state === 'failed' ? 'Sem sinal' : 'Conectando'}</span>
       <button className="round ghost close" aria-label="Fechar câmera" onClick={close}><X size={18} /></button>
     </div>
-    <div className="camera-live__stage">
+    <div className="camera-live__stage" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       {poster && state !== 'live' ? <img className="camera-live__poster" src={poster} alt="" /> : null}
       {mjpeg
         ? <img ref={image} src="data:," alt={`Imagem ao vivo: ${camera.name}`} onLoad={event => { if (!event.currentTarget.src.startsWith('data:')) setState('live'); }} onError={event => { if (!event.currentTarget.src.startsWith('data:')) setState('failed'); }} />

@@ -104,6 +104,14 @@ function Climate({casa}: {casa: Casa}) {
   const unknown = !ac || temperature == null || ac.state.mode == null || ac.state.fan == null || ac.state.power == null;
   const on = ac?.state.power === true;
   const send = (values: Record<string, unknown>) => ac && casa.command(ac.id, values);
+  // Depois de ligar/desligar, o botão espera 2 s: dois toques rápidos viravam liga-desliga e o
+  // estado estimado se perdia do aparelho.
+  const [settling, setSettling] = useState(false);
+  const togglePower = async () => {
+    setSettling(true);
+    await send({power: !(ac?.state.power === true)});
+    setTimeout(() => setSettling(false), 2000);
+  };
   const commit = async (value: number) => { editing.current = false; if (value !== temperature) { const ok = await send({temperature: value}); if (!ok) setDraft(temperature ?? 24); } };
   const modeIndex = Math.max(0, MODES.findIndex(([id]) => id === ac?.state.mode));
   const [, modeLabel, ModeIcon] = MODES[modeIndex];
@@ -158,7 +166,7 @@ function Climate({casa}: {casa: Casa}) {
     <div className="card-head">
       <div className="title"><Thermometer size={17} /><strong>Quarto</strong><span>Ar Electrolux · via Geonav</span></div>
       <button className={`learn-toggle ${learning ? 'on' : ''}`} aria-pressed={learning} disabled={!canLearn && !learning} onClick={() => setLearning(value => !value)}><Radio size={15} />Aprender</button>
-      {learning ? null : <PowerCircle on={on} label={on ? 'Desligar ar-condicionado' : 'Ligar ar-condicionado'} disabled={disabled || unknown} busy={casa.busy === ac?.id} onClick={() => void send({power: !on})} />}
+      {learning ? null : <PowerCircle on={on} label={on ? 'Desligar ar-condicionado' : 'Ligar ar-condicionado'} disabled={disabled || unknown || settling} busy={casa.busy === ac?.id} onClick={() => void togglePower()} />}
     </div>
     {learning ? <LearnBanner text="Escolha o estado abaixo, toque em Gravar e, em até 25 s, aperte Ligar no controle do ar já nesse estado, apontado para a central." /> : null}
     <div className={`ac-unit ${on ? 'running' : ''}`} data-fan={ac?.state.turbo ? 'turbo' : ac?.state.fan ?? 'auto'} data-mode={ac?.state.mode ?? 'cool'} aria-hidden="true">
@@ -274,7 +282,7 @@ function SettingsSheet({casa, close}: {casa: Casa; close: () => void}) {
       <div><dt>Aparelhos configurados</dt><dd>{hub?.configuredCount ?? 0} de {casa.data?.devices.length ?? 4}</dd></div>
       <div><dt>Versão</dt><dd>{hub?.version ?? '—'}</dd></div>
     </dl>
-    <p className="sheet-note">Luzes, ar e TV passam a responder depois que as chaves locais forem configuradas no PC de casa. As câmeras já funcionam.</p>
+    {(hub?.configuredCount ?? 0) < (casa.data?.devices.length ?? 0) ? <p className="sheet-note">Aparelhos sem chave local só respondem depois de configurados no PC de casa. As câmeras já funcionam.</p> : null}
     <div className="address"><code>{window.location.origin}</code><button className="round ghost" aria-label="Copiar endereço" onClick={async () => { try { await navigator.clipboard.writeText(window.location.origin); setCopied(true); } catch { setCopied(false); } }}>{copied ? <Check size={16} /> : <Copy size={16} />}</button></div>
     <h3>Últimas ações</h3>
     {actions?.length ? <ul className="activity">{actions.slice(0, 5).map(action => <li key={action.id}><i className={action.status === 'failed' ? 'failed' : ''} /><div><strong>{action.name}</strong><p>{action.message}</p></div>{action.createdAt ? <time dateTime={action.createdAt}>{new Date(action.createdAt).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</time> : null}</li>)}</ul> : <p className="sheet-note">Nenhuma ação ainda.</p>}
@@ -297,7 +305,16 @@ export default function App() {
       try {
         // Pela API: o service worker não intercepta /api/, então a resposta é sempre a do servidor.
         const status = await (await fetch('/api/status', {cache: 'no-store'})).json() as {build?: string | null};
-        if (status.build && status.build !== current) window.location.reload();
+        if (status.build && status.build !== current) {
+          // No máximo uma recarga por minuto para a mesma versão: com o PC lento, a página pode
+          // vir da cópia guardada de novo, e recarregar sem parar só piora.
+          let last = '';
+          try { last = sessionStorage.getItem('casa-reload') ?? ''; } catch { /* sem armazenamento */ }
+          const [build, at] = last.split('|');
+          if (build === status.build && Date.now() - Number(at) < 60000) return;
+          try { sessionStorage.setItem('casa-reload', `${status.build}|${Date.now()}`); } catch { /* sem armazenamento */ }
+          window.location.reload();
+        }
       } catch { /* sem rede: tenta na próxima vez */ }
     };
     // Ao fechar e também ao abrir o popup: quem ficou dormindo desde antes de uma atualização

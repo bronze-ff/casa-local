@@ -63,6 +63,11 @@ body.in-tray .pop { max-width: none; height: 100dvh; border: 0; border-radius: 0
   .stage { padding: 0; }
   .pop { max-width: none; height: 100dvh; border: 0; border-radius: 0; box-shadow: none; animation: none; }
 }
+/* Celular deitado: também em tela cheia, desviando do entalhe nas laterais. */
+@media (max-height: 520px) and (pointer: coarse) {
+  .stage { padding: 0; }
+  .pop { max-width: none; height: 100dvh; border: 0; border-radius: 0; box-shadow: none; animation: none; padding-inline: env(safe-area-inset-left) env(safe-area-inset-right); }
+}
 
 /* Topo */
 .top { display: flex; align-items: center; gap: 10px; padding: max(14px, env(safe-area-inset-top)) 14px 10px 16px; }
@@ -243,8 +248,9 @@ body.in-tray .camera-live__stage { aspect-ratio: auto; height: calc(100dvh - 60p
 .big-temp.unknown output { color: #6f6f78; }
 
 /* Abas inferiores */
-.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 8px 10px max(10px, env(safe-area-inset-bottom)); background: #121214; border-top: 1px solid var(--line); }
-.tabs button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 52px; border-radius: 14px; color: #8a8a93; font-size: 11px; font-weight: 600; }
+.tabs { display: flex; gap: 4px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; padding: 8px 10px max(10px, env(safe-area-inset-bottom)); background: #121214; border-top: 1px solid var(--line); }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs button { flex: 1 0 64px; scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 52px; border-radius: 14px; color: #8a8a93; font-size: 11px; font-weight: 600; }
 .tabs button:hover { color: var(--soft); }
 .tabs button.active { color: var(--text); background: var(--raised); }
 .tabs button.active svg { color: var(--blue-2); }
@@ -485,3 +491,34 @@ button:active:not(:disabled) { transform: scale(.95); }
 .loc-manual code { font: 500 11.5px "Cascadia Mono", Consolas, monospace; user-select: all; }
 .loc-renew { grid-column: 1 / -1; min-height: 38px; font-size: 12px; }
 .tray-local .location .loc-map { height: 250px; }
+
+/* ---- Câmera ao vivo no celular, em pé ou deitado (também no app da tela inicial, que ocupa a
+   tela toda). Tela cheia; a barra com "Voltar" fica embaixo, ao alcance do polegar e longe do
+   relógio; o vídeo respeita as áreas seguras (relógio em pé, entalhe deitado) e mantém 16:9 cabendo
+   no palco. Arrastar o vídeo para baixo fecha. */
+.camera-live__bar .back span { display: none; }
+@media (max-width: 520px), (max-height: 520px) and (pointer: coarse) {
+  .camera-live { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; }
+  .camera-live[open] { display: flex; flex-direction: column; }
+  .camera-live__stage { flex: 1; height: auto; min-height: 0; max-height: none; aspect-ratio: auto; grid-template: minmax(0, 1fr) / minmax(0, 1fr); overflow: hidden; margin: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); touch-action: pan-y; }
+  .camera-live .camera-live__stage > video, .camera-live .camera-live__stage > img:not(.camera-live__poster) { width: auto; height: auto; max-width: 100%; max-height: 100%; aspect-ratio: 16 / 9; object-fit: fill; }
+  .camera-live__bar { order: 2; padding: 10px max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); border-top: 1px solid var(--line); background: #0b0b0d; }
+  .camera-live__bar .back { display: inline-flex; align-items: center; flex-shrink: 0; width: auto; height: 46px; padding: 0 16px 0 10px; gap: 4px; border-radius: 99px; background: var(--raised); color: var(--text); font-size: 14px; font-weight: 650; }
+  .camera-live__bar .back span { display: inline; }
+}
+@media (max-height: 520px) and (pointer: coarse) {
+  .camera-live__bar { padding-top: 6px; padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+  .camera-live__bar .back { height: 40px; }
+}
+/* Janela "Sua central" no celular: fica dentro da área segura, sem passar por trás do relógio. */
+.sheet { inset: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0; max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px); }
+
+/* ---- App da tela inicial do iPhone ----
+   Ao voltar para o app, o iOS às vezes calcula 100dvh menor que a tela e sobra uma faixa preta
+   embaixo até a próxima rolagem. Preso às bordas (inset 0) o painel sempre cobre a tela inteira,
+   e o fundo da página tem a mesma cor do painel para nada aparecer nas frestas. */
+@media (max-width: 520px), (max-height: 520px) and (pointer: coarse) {
+  html, body { background: var(--pop); }
+  .pop { position: fixed; inset: 0; height: auto; }
+  .camera-live { inset: 0; margin: 0; width: auto; max-width: none; height: auto; max-height: none; }
+}
