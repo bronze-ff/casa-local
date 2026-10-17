@@ -82,7 +82,7 @@ class CasaServer(ThreadingHTTPServer):
         self.alerts = AlertDevices(store, cameras=lambda: CAMERA_IDS)
         self.homelab = Homelab(store, enabled=local, presence=self.at_home)
         self.shortcuts = Shortcuts(store)
-        self.notifier = Notifier(store, host=lambda: self.homelab.host, presence=self.at_home)
+        self.notifier = Notifier(store, host=lambda: self.homelab.host, presence=self.at_home, watched=lambda: set(self.motion.notify))
         self.energy = AcUsage(store)
         if local:
             app.listeners.append(lambda device_id, state: self.energy.observe(state.get("power")) if device_id == "ar-quarto" else None)

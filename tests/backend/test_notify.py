@@ -23,8 +23,9 @@ class NotifyTests(unittest.TestCase):
         self.dir = Path(self.temporary.name)
         self.home = None
         self.frigate = {}
+        self.watched = {"cam2", "cam6"}
         self.notifier = Notifier(self.dir, host=lambda: "pc.exemplo.ts.net", presence=lambda: self.home, clock=lambda: 1_000_000.0,
-                                 fetch=lambda path: self.frigate[path.split("?")[0]])
+                                 fetch=lambda path: self.frigate[path.split("?")[0]], watched=lambda: self.watched)
 
     def tearDown(self):
         self.temporary.cleanup()
@@ -72,7 +73,8 @@ class NotifyTests(unittest.TestCase):
 
     def test_frigate_waits_for_face_then_notifies_once(self):
         event = {"id": "abc", "label": "person", "camera": "cam6", "start_time": 999_998.0, "has_snapshot": True, "sub_label": None}
-        self.frigate = {"/api/events": json.dumps([event]).encode(), "/api/events/abc/snapshot.jpg": b"foto"}
+        self.frigate = {"/api/events": json.dumps([event]).encode(), "/api/events/abc/snapshot.jpg": b"foto",
+                        "/api/config": json.dumps({"cameras": {"cam6": {}, "cam1": {}}}).encode()}
         self.notifier.poll_frigate()
         self.assertEqual(self.sent(), [])  # 2 s: espera o rosto
         event["sub_label"] = ["Filippe", 0.93]
@@ -86,6 +88,22 @@ class NotifyTests(unittest.TestCase):
         self.assertTrue(click.endswith("cameras:replay:cam6:1000090"))
         self.notifier.poll_frigate()
         self.assertEqual(self.sent(), [])
+
+    def test_frigate_respects_bell_and_kinds_and_replaces_dvr(self):
+        events = [{"id": "carro", "label": "car", "camera": "cam6", "start_time": 999_000.0, "has_snapshot": False, "sub_label": None},
+                  {"id": "rua", "label": "person", "camera": "cam1", "start_time": 999_000.0, "has_snapshot": False, "sub_label": None},
+                  {"id": "gente", "label": "person", "camera": "cam6", "start_time": 999_000.0, "has_snapshot": False, "sub_label": None}]
+        self.frigate = {"/api/events": json.dumps(events).encode(), "/api/config": json.dumps({"cameras": {"cam6": {}, "cam1": {}}}).encode()}
+        self.notifier.poll_frigate()
+        self.assertEqual([item[1] for item in self.sent()], ["Pessoa em Garagem"])  # carro não; cam1 sem sino não
+        self.notifier.on_motion({"id": "x", "camera": "cam6", "start": 999_000.0}, {"cam6"}, None)
+        self.assertEqual(self.sent(), [], "Frigate vigia a Garagem: o DVR não avisa")
+        self.notifier.on_motion({"id": "y", "camera": "cam2", "start": 999_000.0}, {"cam2"}, None)
+        self.assertEqual(len(self.sent()), 1, "câmera fora do Frigate: o DVR avisa")
+        self.notifier.configure({"frigateKinds": "tudo"})
+        self.frigate["/api/events"] = json.dumps([{**events[0], "id": "carro2"}]).encode()
+        self.notifier.poll_frigate()
+        self.assertEqual([item[1] for item in self.sent()], ["Carro em Garagem"])
 
     def test_disabled_topic_and_config_validation(self):
         self.notifier.configure({"enabled": {"casa": False}})

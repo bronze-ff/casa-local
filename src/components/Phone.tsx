@@ -4,7 +4,7 @@ import type { useCasa } from '../useCasa';
 
 type Casa = ReturnType<typeof useCasa>;
 type Topics = 'cameras' | 'pessoas' | 'sistema' | 'casa';
-type Notify = {enabled: Record<Topics, boolean>; cameraScope: 'watched' | 'all'; topics: Record<Topics, string>; subscribe: string | null;
+type Notify = {enabled: Record<Topics, boolean>; cameraScope: 'watched' | 'all'; frigateKinds: 'pessoas' | 'tudo'; frigateCameras: string[]; topics: Record<Topics, string>; subscribe: string | null;
   sent: number; failed: number; lastError: string | null; frigate: boolean | null; home: boolean | null};
 const TOPICS: [Topics, string, string][] = [
   ['pessoas', 'Pessoas e rostos', 'O Frigate viu alguém ou um carro, com o nome se reconheceu o rosto.'],
@@ -38,7 +38,9 @@ export function PhoneAlerts({casa}: {casa: Casa}) {
       <div><strong>{label}</strong><span>{detail}</span></div>
     </li>)}</ul>
     <label className="mode-keep"><input type="checkbox" checked={data.cameraScope === 'all'} onChange={event => void save({cameraScope: event.target.checked ? 'all' : 'watched'})} />
-      <span>Movimento de todas as câmeras<small>Desligado: só as câmeras com sino em Câmeras › Movimento.</small></span></label>
+      <span>Avisar de todas as câmeras<small>Desligado: só as câmeras com sino em Câmeras › Movimento (vale para movimento e pessoas).</small></span></label>
+    <label className="mode-keep"><input type="checkbox" checked={data.frigateKinds === 'tudo'} onChange={event => void save({frigateKinds: event.target.checked ? 'tudo' : 'pessoas'})} />
+      <span>Pessoas: avisar também carros e animais<small>Desligado: o Frigate só avisa quando é pessoa. Nas câmeras que ele vigia{data.frigateCameras.length ? ` (${data.frigateCameras.length})` : ''}, o movimento do DVR (bicho, bandeira, sombra) não avisa enquanto ele estiver ligado.</small></span></label>
     <p className="loc-hint">{where} {data.frigate === false ? 'O Frigate está parado (modo jogo ou subindo): pessoas voltam quando ele voltar; o movimento do DVR continua.' : ''}</p>
     <details className="routine-log"><summary>Como receber no iPhone</summary>
       <ol className="phone-steps">

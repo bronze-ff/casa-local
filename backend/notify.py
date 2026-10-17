@@ -1,8 +1,10 @@
 """Avisos no celular pelo ntfy (no home lab, em http://127.0.0.1:2586).
 
 Tópicos (assine cada um no app ntfy do iPhone; dá para silenciar um sem perder os outros):
-- cameras: movimento do DVR nas câmeras com sino (foto e link para a gravação);
-- pessoas: o Frigate viu pessoa ou carro (com o nome, se reconheceu o rosto);
+- cameras: movimento do DVR nas câmeras com sino (foto e link para a gravação). Nas câmeras que o
+  Frigate vigia, com ele ligado, o DVR não avisa: quem avisa é o Frigate, que ignora bicho e bandeira;
+- pessoas: o Frigate viu pessoa (ou também carro e animal, se escolhido) numa câmera com sino, com o
+  nome se reconheceu o rosto;
 - sistema: algo da Central falhou ou voltou, serviço do home lab parou, disco ou GPU no limite;
 - casa: chegadas e saídas, e rotinas que rodaram (ou falharam).
 
@@ -27,6 +29,8 @@ TOPICS = {"cameras": "casa-cameras", "pessoas": "casa-pessoas", "sistema": "casa
 HOME_NAMES = {"casa", "home", "minha casa", "casa local"}
 FRIGATE = "http://127.0.0.1:5000"
 FRIGATE_LABELS = {"person": "Pessoa", "car": "Carro", "motorcycle": "Moto", "bicycle": "Bicicleta", "dog": "Cachorro", "cat": "Gato"}
+# O que o Frigate avisa: só pessoas, ou também veículos e animais.
+FRIGATE_KINDS = {"pessoas": {"person"}, "tudo": set(FRIGATE_LABELS)}
 NAMES = {c["id"]: c["name"] for c in CAMERAS}
 
 
@@ -53,8 +57,10 @@ def http_send(server, topic, title, message, priority=3, tags=(), click=None, at
 
 
 class Notifier:
-    def __init__(self, data_dir, host=lambda: None, presence=lambda: None, clock=time.time, sender=http_send, fetch=None):
-        """host(): nome do PC no Tailscale (links); presence(): True em casa, False fora, None sem saber."""
+    def __init__(self, data_dir, host=lambda: None, presence=lambda: None, clock=time.time, sender=http_send, fetch=None, watched=lambda: set()):
+        """host(): nome do PC no Tailscale (links); presence(): True em casa, False fora, None sem saber;
+        watched(): câmeras com sino."""
+        self.watched = watched
         self.path = Path(data_dir) / "notificacoes.json"
         self.host, self.presence, self.clock, self.sender = host, presence, clock, sender
         self.fetch = fetch or self._fetch
@@ -69,6 +75,8 @@ class Notifier:
         self.server = saved.get("server", "http://127.0.0.1:2586") if isinstance(saved.get("server"), str) else "http://127.0.0.1:2586"
         self.enabled = {k: saved.get("enabled", {}).get(k, True) is True for k in TOPICS} if isinstance(saved.get("enabled"), dict) else dict.fromkeys(TOPICS, True)
         self.camera_scope = saved.get("cameraScope", "watched") if saved.get("cameraScope") in {"watched", "all"} else "watched"
+        self.frigate_kinds = saved.get("frigateKinds", "pessoas") if saved.get("frigateKinds") in FRIGATE_KINDS else "pessoas"
+        self.frigate_cameras, self.frigate_cameras_at = set(), 0
         self.sent, self.failed, self.last_error = 0, 0, None
         self.health_states, self.lab_states = {}, {}
         self.frigate_seen, self.frigate_after, self.frigate_ok = {}, clock() - 60, None
@@ -76,19 +84,20 @@ class Notifier:
     def _save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(".tmp")
-        temporary.write_text(json.dumps({"server": self.server, "enabled": self.enabled, "cameraScope": self.camera_scope}), encoding="utf-8")
+        temporary.write_text(json.dumps({"server": self.server, "enabled": self.enabled, "cameraScope": self.camera_scope, "frigateKinds": self.frigate_kinds}), encoding="utf-8")
         temporary.replace(self.path)
 
     # ---- painel ----
     def status(self):
         with self.lock:
             host = self.host()
-            return {"enabled": dict(self.enabled), "cameraScope": self.camera_scope, "topics": dict(TOPICS),
+            return {"enabled": dict(self.enabled), "cameraScope": self.camera_scope, "frigateKinds": self.frigate_kinds,
+                    "frigateCameras": sorted(self.frigate_cameras), "topics": dict(TOPICS),
                     "subscribe": f"https://{host}:10000" if host else None, "sent": self.sent, "failed": self.failed,
                     "lastError": self.last_error, "frigate": self.frigate_ok, "home": self.presence()}
 
     def configure(self, body):
-        if not isinstance(body, dict) or not body or not set(body) <= {"enabled", "cameraScope"}:
+        if not isinstance(body, dict) or not body or not set(body) <= {"enabled", "cameraScope", "frigateKinds"}:
             raise AppError("Ajuste inválido.")
         with self.lock:
             if "enabled" in body:
@@ -100,6 +109,10 @@ class Notifier:
                 if body["cameraScope"] not in {"watched", "all"}:
                     raise AppError("Ajuste inválido.")
                 self.camera_scope = body["cameraScope"]
+            if "frigateKinds" in body:
+                if body["frigateKinds"] not in FRIGATE_KINDS:
+                    raise AppError("Ajuste inválido.")
+                self.frigate_kinds = body["frigateKinds"]
             self._save()
         return self.status()
 
@@ -147,6 +160,8 @@ class Notifier:
         """Evento novo do DVR (depois da tentativa de foto)."""
         if self.camera_scope == "watched" and event["camera"] not in watched:
             return
+        if self.frigate_ok and event["camera"] in self.frigate_cameras:
+            return  # o Frigate vigia esta câmera e avisa só se for pessoa
         name = NAMES.get(event["camera"], event["camera"])
         when = time.strftime("%H:%M:%S", time.localtime(event["start"]))
         self.push("cameras", f"Movimento · {name}", f"Às {when}. Toque para ver a gravação.", priority=self._priority(), tags=["rotating_light"],
@@ -210,15 +225,23 @@ class Notifier:
     def poll_frigate(self, dvr_offset=0.0):
         """Eventos novos do Frigate: avisa uma vez cada um, depois de ~4 s (tempo de reconhecer o rosto)."""
         try:
+            if self.clock() - self.frigate_cameras_at > 300 or not self.frigate_cameras:
+                self.frigate_cameras = set(json.loads(self.fetch("/api/config")).get("cameras", {}))
+                self.frigate_cameras_at = self.clock()
             events = json.loads(self.fetch(f"/api/events?after={self.frigate_after - 30:.0f}&limit=50&include_thumbnails=0"))
             self.frigate_ok = True
         except (OSError, ValueError):
             self.frigate_ok = False  # parado (modo jogo) ou subindo
             return
         now = self.clock()
+        allowed = FRIGATE_KINDS[self.frigate_kinds]
+        watched = self.watched()
         for event in events:
             event_id = event.get("id")
-            if not event_id or event_id in self.frigate_seen or event.get("label") not in FRIGATE_LABELS:
+            if not event_id or event_id in self.frigate_seen or event.get("label") not in allowed:
+                continue
+            if self.camera_scope == "watched" and event.get("camera") not in watched:
+                self.frigate_seen[event_id] = now  # câmera sem sino: não avisa
                 continue
             start = event.get("start_time") or now
             sub = event.get("sub_label")
