@@ -42,6 +42,29 @@ Tudo roda no PC de casa, na rede local, sem nuvem. Os dados ficam em `.data` (fo
   o jogo fecha. Se o modo jogo foi ligado à mão, só sai à mão. Não sobrevive a um reinício: ao subir,
   o servidor garante a stack ligada. Preferências em `.data/homelab.json`.
 - O status dos containers só é lido com a distro ligada, porque `wsl -d` a ligaria de novo no meio do jogo.
+- **Modo jogo (atualizado):** param só os pesados (mídia, downloads, Frigate) e o cache do Linux é
+  esvaziado para o Windows retomar a memória. ntfy, Uptime Kuma, Vaultwarden, Diun, Dozzle e openGym
+  continuam, então os avisos de câmera chegam no celular durante a partida.
+- **Frigate:** por padrão liga só com você fora de casa (localização num lugar "Casa"); sem
+  localização fica desligado. "Sempre" ou "Nunca" na aba Lab. Custa ~2 GB de memória, meia CPU e
+  ~25% da GPU com 4 câmeras.
+- Histórico de 24 h (CPU, memória, temperatura da GPU) e botão para reiniciar cada serviço.
+
+## Avisos no celular (ntfy) e Atalhos da Siri (aba Central)
+
+- O ntfy roda no home lab (`https://<host>.ts.net:10000`). No iPhone: app **ntfy**, servidor padrão
+  apontando para esse endereço e assinatura dos tópicos (Tailscale ligado):
+  - `casa-pessoas`: o Frigate viu pessoa ou carro, com o nome se reconheceu o rosto e a foto marcada;
+  - `casa-cameras`: movimento do DVR nas câmeras com sino (ou em todas), com foto e link para a gravação;
+  - `casa-sistema`: verificação da Central que falhou ou voltou, serviço do home lab que parou fora do
+    modo jogo, disco quase cheio, GPU quente, Uptime Kuma e atualizações (Diun);
+  - `casa-casa`: chegadas, saídas e rotinas executadas.
+- **Modo ausente:** com a localização num lugar chamado "Casa", câmera e pessoas chegam sem som; fora,
+  com som. Rosto conhecido com você em casa chega quase mudo.
+- Cada tópico liga e desliga na Central; **Testar** manda um aviso em cada um.
+- **Atalhos da Siri:** a Central mostra a chave e a URL de cada modo. O atalho faz `POST` com
+  `Authorization: Bearer <chave>`, aceito só nas rotas de ação (modos, aparelhos, modo jogo), e a
+  proteção de rede privada e de dono no Tailscale continua valendo. "Trocar a chave" invalida a antiga.
 
 ## Gasto do ar (aba Central e rodapé do Clima)
 

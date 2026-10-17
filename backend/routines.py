@@ -82,6 +82,7 @@ class Routines:
         self.app, self.clock, self.places = app, clock, places
         self.wake = threading.Event()
         self.pending = []
+        self.listeners = []  # f(nome, ok, mensagem) a cada execução (avisos no celular)
         self.path = Path(data_dir) / "rotinas.json"
         self.lock = threading.Lock()
         self.stop_event = threading.Event()
@@ -247,6 +248,11 @@ class Routines:
                 self.timers.remove(timer)
             self.log.append({"at": int(self.clock()), "name": name, "ok": ok, "message": message})
             self._save()
+        for listener in self.listeners:
+            try:
+                listener(name, ok, message)
+            except Exception:
+                pass
         return ok
 
     def start(self):

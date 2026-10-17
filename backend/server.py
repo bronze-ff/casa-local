@@ -26,6 +26,8 @@ from .replay import WINDOW as REPLAY_WINDOW, Replays
 from .routines import Routines
 from .alert_devices import AlertDevices
 from .homelab import Homelab
+from .notify import Notifier
+from .shortcuts import Shortcuts
 from .samsung_tv import SamsungTVs
 from .models import AppError, VERSION
 
@@ -77,13 +79,19 @@ class CasaServer(ThreadingHTTPServer):
         self.routines = Routines(app, store, places=places)
         self.location.listeners.append(self.routines.on_place)
         self.alerts = AlertDevices(store, cameras=lambda: CAMERA_IDS)
-        self.homelab = Homelab(store, enabled=local)
+        self.homelab = Homelab(store, enabled=local, presence=self.at_home)
+        self.shortcuts = Shortcuts(store)
+        self.notifier = Notifier(store, host=lambda: self.homelab.host, presence=self.at_home)
         self.energy = AcUsage(store)
         if local:
             app.listeners.append(lambda device_id, state: self.energy.observe(state.get("power")) if device_id == "ar-quarto" else None)
         self.motion = MotionWatcher(self.cameras, store)
         self.tvs = SamsungTVs(store, preview=not local)
         self.replays = Replays(self.cameras, offset=lambda: self.motion.offset)
+        if local:
+            self.motion.listeners.append(lambda event, photo: self.notifier.on_motion(event, self.motion.notify, photo))
+            self.location.listeners.append(lambda event: self.notifier.on_location(event, {p["id"]: p["name"] for p in (self.location.config or {}).get("places", [])}))
+            self.routines.listeners.append(self.notifier.on_routine)
         self.backups = Backups(app.data_dir)
         self.background = threading.Event()
         self.dist_dir = Path(dist_dir or ROOT / "dist").resolve()
@@ -102,16 +110,27 @@ class CasaServer(ThreadingHTTPServer):
             self.tvs.start(self.background)
             self.backups.start(self.background)
             self.homelab.start()
+            self.notifier.start(health=lambda: health_report(self.app, self.cameras, self.motion, self.tvs, self.backups, self.started),
+                                lab=self.homelab.status, offset=lambda: self.motion.offset)
 
     def server_close(self):
         self.background.set()
         self.routines.close()
         self.motion.close()
         self.homelab.close()
+        self.notifier.close()
         self.replays.close_all()
         self.app.close()
         self.cameras.close()
         super().server_close()
+
+    def at_home(self):
+        """Modo ausente: True se a última posição está num lugar chamado "Casa", False se fora, None se não sabe."""
+        status = self.location.status()
+        if not status.get("configured") or not status.get("last") or status.get("stale"):
+            return None
+        homes = {p["id"] for p in status.get("places", []) if p["name"].strip().casefold() in {"casa", "home", "minha casa", "casa local"}}
+        return bool(homes) and status.get("place") in homes if homes else None
 
     def process_request(self, request, client_address):
         if not self.slots.acquire(blocking=False):
@@ -171,7 +190,7 @@ class CasaHandler(BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(encoded)
 
-    def guard(self, mutation=False, phone=False):
+    def guard(self, mutation=False, phone=False, path=None):
         if not private_ip(self.client_address[0]):
             raise AppError("Acesso restrito à rede privada.", 403, "private_network_only")
         hosts = self.headers.get_all("Host", [])
@@ -207,7 +226,9 @@ class CasaHandler(BaseHTTPRequestHandler):
             raise AppError("Solicitação de outro site bloqueada.", 403, "cross_site")
         if mutation:
             tokens = self.headers.get_all("X-Casa-Token", [])
-            if len(tokens) != 1 or not hmac.compare_digest(tokens[0], self.server.app.csrf_token):
+            # Atalhos da Siri usam a chave própria (só nas rotas de ação) no lugar do token da sessão.
+            shortcut = path is not None and self.server.shortcuts.allows(path, self.headers)
+            if not shortcut and (len(tokens) != 1 or not hmac.compare_digest(tokens[0], self.server.app.csrf_token)):
                 raise AppError("Recarregue o painel para atualizar a sessão local.", 403, "invalid_token")
             instant = time.monotonic()
             with self.server.rate_lock:
@@ -304,7 +325,7 @@ class CasaHandler(BaseHTTPRequestHandler):
             if urlsplit(self.path).path == "/owntracks":
                 self.receive_owntracks()
                 return
-            self.guard(mutation)
+            self.guard(mutation, path=urlsplit(self.path).path)
             target = urlsplit(self.path)
             path = target.path
             # The page itself may carry ?tray=1 (tray popup); API routes never take a query string.
@@ -343,6 +364,12 @@ class CasaHandler(BaseHTTPRequestHandler):
                     result = {"state": app.snapshot()}
                 elif path == "/api/homelab":
                     result = self.server.homelab.set_mode(body)
+                elif path == "/api/notifications":
+                    result = self.server.notifier.configure(body)
+                elif path == "/api/notifications/test" and not body:
+                    result = self.server.notifier.test()
+                elif path == "/api/shortcuts/rotate" and not body:
+                    result = self.server.shortcuts.rotate()
                 elif path == "/api/alert-devices/hello":
                     result = self.server.alerts.hello(body)
                 elif alert_device and alert_device[2] and not body:
@@ -402,6 +429,10 @@ class CasaHandler(BaseHTTPRequestHandler):
                 self.json_response(200, self.server.routines.status())
             elif path == "/api/homelab":
                 self.json_response(200, self.server.homelab.status())
+            elif path == "/api/notifications":
+                self.json_response(200, self.server.notifier.status())
+            elif path == "/api/shortcuts":
+                self.json_response(200, self.server.shortcuts.status())
             elif path == "/api/alert-devices":
                 self.json_response(200, self.server.alerts.status())
             elif path == "/api/energy":

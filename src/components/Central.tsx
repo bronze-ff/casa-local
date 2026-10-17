@@ -3,6 +3,7 @@ import { Activity, CalendarClock, Check, LoaderCircle, MapPin, Pencil, Plus, Pow
 import type { Mode } from '../types';
 import type { useCasa } from '../useCasa';
 import ModesCard from './Modes';
+import { PhoneAlerts, SiriShortcuts } from './Phone';
 
 type Casa = ReturnType<typeof useCasa>;
 type Check = {id: string; label: string; state: 'ok' | 'warn' | 'fail'; detail: string};
@@ -188,8 +189,10 @@ export default function Central({casa}: {casa: Casa}) {
   useEffect(() => { void load(); const timer = setInterval(() => { if (!document.hidden) void load(); }, 20000); return () => clearInterval(timer); }, [load]);
   return <section className="card central" aria-label="Central">
     <HealthCard health={health} />
+    <PhoneAlerts casa={casa} />
     <ModesCard casa={casa} />
     <RoutinesCard data={routines} places={places} casa={casa} reload={() => void load()} />
     <EnergyCard data={energy} casa={casa} reload={() => void load()} />
+    <SiriShortcuts casa={casa} />
   </section>;
 }
