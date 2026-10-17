@@ -2,13 +2,18 @@
 
 - Lab: a tarefa CasaLocal-homelab mantém a distro ligada (sem cliente o WSL a desliga) e os
   containers sobem com `docker compose up -d` em ~/homelab.
-- Jogo: `docker compose stop`, fim da tarefa e `wsl --shutdown`: a RAM do WSL volta ao Windows.
-  Pode entrar sozinho quando um jogo da lista abre (ex.: cs2.exe) e sair 2 min depois que fecha;
-  o modo jogo ligado à mão só sai à mão.
-- Monitor: CPU, memória, GPU (nvidia-smi), discos e memória da VM do WSL, para a aba Lab no celular.
+- Jogo: para os serviços pesados (mídia, downloads, Frigate) e esvazia o cache do Linux para o
+  Windows retomar a memória. Os leves de aviso continuam (ntfy, Uptime Kuma, Vaultwarden...): o
+  celular segue recebendo os avisos de câmera durante a partida. Pode entrar sozinho quando um jogo
+  da lista abre (ex.: cs2.exe) e sair 2 min depois que fecha; o modo jogo ligado à mão só sai à mão.
+- Frigate (câmeras inteligentes) pesa ~2 GB e meia CPU: por padrão só liga com você fora de casa
+  (localização do celular, lugar chamado "Casa"); em casa ou sem localização, os avisos de movimento
+  vêm do DVR. Dá para deixar sempre ou nunca.
+- Monitor: CPU, memória, GPU (nvidia-smi), discos e memória da VM do WSL, com 24 h de histórico.
 
-O status dos containers é lido só com a distro já ligada (`wsl -d` a ligaria de novo no meio do jogo).
+O status dos containers é lido só com a distro já ligada (`wsl -d` a ligaria se estivesse parada).
 """
+from collections import deque
 from copy import deepcopy
 import csv
 import ctypes
@@ -29,19 +34,32 @@ GAMES = ("cs2.exe",)
 AUTO_EXIT_SECONDS = 120
 POLL_SECONDS = 15
 NO_WINDOW = 0x08000000
-# id do container, nome, para quê, porta http, porta https do Tailscale Serve (se houver)
+# Serviços na aba Lab. link: ("http", porta) no endereço do painel; ("https", porta) ou ("path", caminho)
+# pelo Tailscale Serve; ("tls", porta) https com certificado próprio do serviço; None sem página.
 SERVICES = [
-    ("jellyfin", "Jellyfin", "Filmes e séries", 8096, 10000),
-    ("jellyseerr", "Jellyseerr", "Pedir filmes e séries", 5055, None),
-    ("opengym-web", "openGym", "Treinos e peso", 8090, 8443),
-    ("qbittorrent", "qBittorrent", "Downloads", 8080, None),
-    ("radarr", "Radarr", "Filmes", 7878, None),
-    ("sonarr", "Sonarr", "Séries e animes", 8989, None),
-    ("prowlarr", "Prowlarr", "Indexadores", 9696, None),
-    ("bazarr", "Bazarr", "Legendas PT-BR", 6767, None),
-    ("filebrowser", "Arquivos", "Biblioteca pelo navegador", 8081, None),
-    ("flaresolverr", "FlareSolverr", "Apoio aos indexadores", None, None),
+    {"id": "jellyfin", "name": "Jellyfin", "purpose": "Filmes e séries", "link": ("path", "/jellyfin")},
+    {"id": "seerr", "name": "Seerr", "purpose": "Pedir filmes e séries", "link": ("http", 5055)},
+    {"id": "frigate", "name": "Frigate", "purpose": "Pessoas, carros e rostos nas câmeras", "link": ("tls", 8971)},
+    {"id": "opengym-web", "name": "openGym", "purpose": "Treinos e peso", "link": ("https", 8443)},
+    {"id": "vaultwarden", "name": "Vaultwarden", "purpose": "Senhas (app Bitwarden)", "link": ("path", "/vault")},
+    {"id": "ntfy", "name": "ntfy", "purpose": "Avisos no celular", "link": ("https", 10000)},
+    {"id": "uptime-kuma", "name": "Uptime Kuma", "purpose": "Disponibilidade dos serviços", "link": ("http", 3001)},
+    {"id": "qbittorrent", "name": "qBittorrent", "purpose": "Downloads", "link": ("http", 8080)},
+    {"id": "radarr", "name": "Radarr", "purpose": "Filmes", "link": ("http", 7878)},
+    {"id": "sonarr", "name": "Sonarr", "purpose": "Séries e animes", "link": ("http", 8989)},
+    {"id": "prowlarr", "name": "Prowlarr", "purpose": "Indexadores", "link": ("http", 9696)},
+    {"id": "bazarr", "name": "Bazarr", "purpose": "Legendas PT-BR", "link": ("http", 6767)},
+    {"id": "filebrowser", "name": "Arquivos", "purpose": "Biblioteca pelo navegador", "link": ("http", 8081)},
+    {"id": "dozzle", "name": "Dozzle", "purpose": "Logs dos serviços", "link": ("http", 8888)},
+    {"id": "unpackerr", "name": "Unpackerr", "purpose": "Extrai downloads compactados", "link": None},
+    {"id": "diun", "name": "Diun", "purpose": "Avisa atualizações", "link": None},
+    {"id": "flaresolverr", "name": "FlareSolverr", "purpose": "Apoio aos indexadores", "link": None},
 ]
+# Continuam no modo jogo: leves, e os avisos do celular dependem deles.
+KEEP_IN_GAME = {"ntfy", "uptime-kuma", "diun", "dozzle", "vaultwarden", "opengym-api", "opengym-web"}
+HISTORY_EVERY, HISTORY_POINTS = 300, 288  # um ponto a cada 5 min, 24 h
+FRIGATE_MODES = {"fora", "sempre", "nunca"}
+DROP_CACHE_EVERY = 600  # o WSL demora a devolver o cache de disco ao Windows (após um reinício, ~4 GB)
 WSL = shutil.which("wsl.exe") or r"C:\Windows\System32\wsl.exe"
 NVIDIA_SMI = shutil.which("nvidia-smi.exe") or r"C:\Windows\System32\nvidia-smi.exe"
 
@@ -114,8 +132,8 @@ class Machine:
 
 
 class Homelab:
-    def __init__(self, data_dir, enabled=True, clock=time.time, runner=run, machine=None):
-        self.enabled, self.clock, self.run = enabled, clock, runner
+    def __init__(self, data_dir, enabled=True, clock=time.time, runner=run, machine=None, presence=lambda: None):
+        self.enabled, self.clock, self.run, self.presence = enabled, clock, runner, presence
         self.path = Path(data_dir) / "homelab.json"
         self.lock = threading.Lock()
         self.busy = threading.Lock()  # uma troca de modo por vez
@@ -125,18 +143,21 @@ class Homelab:
         except (OSError, ValueError):
             saved = {}
         self.auto = saved.get("auto", True) is True
+        self.frigate_mode = saved.get("frigate", "fora") if saved.get("frigate") in FRIGATE_MODES else "fora"
         self.games = [g for g in saved.get("games", GAMES) if isinstance(g, str) and re.fullmatch(r"[\w .()-]{1,40}\.exe", g, re.I)] or list(GAMES)
         # O modo jogo não sobrevive a um reinício: ao subir, o home lab volta (a tarefa sobe no login).
         self.mode, self.reason, self.changed, self.step = "lab", None, clock(), None
         self.game_gone, self.games_open, self.host = None, [], None
         self.containers, self.running, self.stats, self.checked = {}, None, {}, 0
+        self.history, self.history_at = deque(maxlen=HISTORY_POINTS), 0
+        self.dropped_at = 0
         self.stop_event = threading.Event()
         self.thread = None
 
     def _save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(".tmp")
-        temporary.write_text(json.dumps({"auto": self.auto, "games": self.games}), encoding="utf-8")
+        temporary.write_text(json.dumps({"auto": self.auto, "games": self.games, "frigate": self.frigate_mode}), encoding="utf-8")
         temporary.replace(self.path)
 
     # ---- WSL ----
@@ -164,8 +185,21 @@ class Homelab:
     def set_mode(self, body):
         if not self.enabled:
             raise AppError("O home lab só roda no PC de casa.", 409, "preview_mode")
-        if not isinstance(body, dict) or not set(body) <= {"mode", "auto"} or not body:
+        if not isinstance(body, dict) or not set(body) <= {"mode", "auto", "restart", "frigate"} or not body:
             raise AppError("Pedido inválido.")
+        if "frigate" in body:
+            if body["frigate"] not in FRIGATE_MODES:
+                raise AppError("Escolha sempre, só fora de casa ou nunca.")
+            with self.lock:
+                self.frigate_mode = body["frigate"]
+                self._save()
+            threading.Thread(target=self.apply_frigate, daemon=True).start()
+        if "restart" in body:
+            if body["restart"] not in {s["id"] for s in SERVICES} | KEEP_IN_GAME:
+                raise AppError("Serviço desconhecido.")
+            if self.mode == "jogo" and body["restart"] not in KEEP_IN_GAME:
+                raise AppError("No modo jogo esse serviço fica parado.", 409, "game_mode")
+            threading.Thread(target=self.compose, args=("restart", body["restart"]), kwargs={"timeout": 120}, daemon=True).start()
         if "auto" in body:
             if type(body["auto"]) is not bool:
                 raise AppError("Pedido inválido.")
@@ -192,10 +226,12 @@ class Homelab:
                     with self.lock:
                         self.step = "Parando o home lab…"
                     if self.distro_running():
-                        self.compose("stop", timeout=240)
-                    self.run(["schtasks", "/end", "/tn", TASK], timeout=20)
-                    # --shutdown e não --terminate: só desligar a distro deixa a VM (e a RAM dela) de pé.
-                    self.run([WSL, "--shutdown"], timeout=60)
+                        code, out = self.compose("config", "--services", timeout=60)
+                        heavy = sorted({line.strip() for line in out.splitlines() if line.strip()} - KEEP_IN_GAME) if code == 0 else []
+                        if heavy:
+                            self.compose("stop", *heavy, timeout=240)
+                        # O Linux guarda a memória liberada como cache; esvaziar devolve ao Windows já.
+                        self.run([WSL, "-d", DISTRO, "-u", "root", "--", "sh", "-c", "sync; echo 3 > /proc/sys/vm/drop_caches"], timeout=60)
                 else:
                     with self.lock:
                         self.step = "Ligando o home lab…"
@@ -205,11 +241,31 @@ class Homelab:
                             break
                         time.sleep(2)
                     self.compose("up", "-d", timeout=300)
+                    if not self.frigate_wanted():
+                        self.compose("stop", "frigate", timeout=120)
             finally:
                 with self.lock:
                     self.mode, self.reason, self.changed, self.step = mode, reason, self.clock(), None
                     self.game_gone = None
                     self.checked = 0  # relê os containers já
+
+    def frigate_wanted(self):
+        if self.frigate_mode == "nunca":
+            return False
+        if self.frigate_mode == "sempre":
+            return True
+        return self.presence() is False  # só com a localização dizendo que você saiu
+
+    def apply_frigate(self):
+        """Liga ou desliga o Frigate conforme a escolha e a sua localização (nunca no modo jogo)."""
+        if self.mode != "lab" or self.busy.locked() or not self.distro_running():
+            return
+        running = self.containers.get("frigate", {}).get("state") == "running"
+        if self.frigate_wanted() and not running:
+            self.compose("up", "-d", "frigate", timeout=180)
+        elif not self.frigate_wanted() and running:
+            self.compose("stop", "frigate", timeout=120)
+            self.run([WSL, "-d", DISTRO, "-u", "root", "--", "sh", "-c", "sync; echo 3 > /proc/sys/vm/drop_caches"], timeout=60)
 
     def running_games(self):
         code, out = self.run(["tasklist", "/fo", "csv", "/nh"], timeout=15)
@@ -239,18 +295,30 @@ class Homelab:
             pass
         with self.lock:
             self.running, self.containers, self.stats, self.checked = running, containers or {}, stats, self.clock()
+        self.apply_frigate()
+        if running and self.clock() - self.dropped_at >= DROP_CACHE_EVERY:
+            self.dropped_at = self.clock()
+            self.run([WSL, "-d", DISTRO, "-u", "root", "--", "sh", "-c", "sync; echo 3 > /proc/sys/vm/drop_caches"], timeout=60)
+        with self.lock:
             self.games_open = games
+            if self.clock() - self.history_at >= HISTORY_EVERY:
+                self.history_at = self.clock()
+                gpu = stats.get("gpu") or {}
+                self.history.append([int(self.clock()), stats.get("cpu"), (stats.get("memory") or {}).get("used"), gpu.get("temp"), stats.get("wslGb")])
 
     def status(self):
         with self.lock:
             services = []
-            for container, name, purpose, port, https in SERVICES:
-                state = self.containers.get(container, {})
-                services.append({"id": container, "name": name, "purpose": purpose, "port": port, "https": https,
-                                 "state": state.get("state") or ("stopped" if self.running is not None else "unknown"), "status": state.get("status")})
+            for service in SERVICES:
+                state = self.containers.get(service["id"], {})
+                kind, target = service["link"] or (None, None)
+                services.append({"id": service["id"], "name": service["name"], "purpose": service["purpose"], "link": {"kind": kind, "target": target} if kind else None,
+                                 "keep": service["id"] in KEEP_IN_GAME, "state": state.get("state") or ("stopped" if self.running is not None else "unknown"),
+                                 "status": state.get("status")})
             return {"enabled": self.enabled, "mode": self.mode, "reason": self.reason, "since": int(self.changed), "step": self.step,
-                    "auto": self.auto, "games": list(self.games), "gamesOpen": list(self.games_open), "host": self.host,
-                    "wsl": self.running, "services": services, "stats": deepcopy(self.stats), "checked": int(self.checked)}
+                    "auto": self.auto, "games": list(self.games), "frigate": self.frigate_mode, "frigateOn": self.frigate_wanted(), "presence": self.presence(), "gamesOpen": list(self.games_open), "host": self.host,
+                    "wsl": self.running, "services": services, "stats": deepcopy(self.stats), "checked": int(self.checked),
+                    "history": [list(point) for point in self.history]}
 
     def tailnet_host(self):
         """Nome do PC no Tailscale (links HTTPS do openGym e do Jellyfin funcionam de qualquer aparelho)."""
@@ -271,6 +339,8 @@ class Homelab:
             # Ao subir (login), garante a stack ligada: containers parados à mão não voltam sozinhos.
             if not self.running_games():
                 self.compose("up", "-d", timeout=300)
+                if not self.frigate_wanted():
+                    self.compose("stop", "frigate", timeout=120)
             while not self.stop_event.is_set():
                 try:
                     self.tick()

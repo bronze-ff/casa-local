@@ -3,14 +3,16 @@ import { Activity, CalendarClock, Check, LoaderCircle, MapPin, Pencil, Plus, Pow
 import type { Mode } from '../types';
 import type { useCasa } from '../useCasa';
 import ModesCard from './Modes';
+import { PhoneAlerts, SiriShortcuts } from './Phone';
 
 type Casa = ReturnType<typeof useCasa>;
 type Check = {id: string; label: string; state: 'ok' | 'warn' | 'fail'; detail: string};
 type Health = {state: 'ok' | 'warn' | 'fail'; checks: Check[]};
 type Action = {type: 'scene'; id: string} | {type: 'device'; device: string; values: Record<string, unknown>};
 type Routine = {id: string; name: string; enabled: boolean; days: number[]; action: Action; next: number | null}
-  & ({trigger: 'time'; time: string} | {trigger: 'place'; place: string; event: 'chegou' | 'saiu'; between: [string, string] | null});
+  & ({trigger: 'time'; time: string} | {trigger: 'place'; place: string; event: 'chegou' | 'saiu'; between: [string, string] | null; person?: string | null});
 type Place = {id: string; name: string};
+type Person = {id: string; name: string};
 type Routines = {routines: Routine[]; timers: {id: string; at: number; label: string}[]; log: {at: number; name: string; ok: boolean; message: string}[]};
 type Energy = {config: {watts: number; tariff: number}; on: boolean; today: Block; month: Block; week: {date: string; hours: number}[]};
 type Block = {hours: number; kwh: number; cost: number};
@@ -29,10 +31,11 @@ const actionKey = (action: Action) => action.type === 'scene' ? `modo:${action.i
 const actionLabel = (action: Action, modes: Mode[]) => action.type === 'scene' ? `Modo ${modes.find(m => m.id === action.id)?.name ?? '(apagado)'}`
   : ACTIONS.find(([, , a]) => JSON.stringify(a) === JSON.stringify(action))?.[1] ?? 'Ação personalizada';
 const actionFor = (key: string): Action | undefined => key.startsWith('modo:') ? {type: 'scene', id: key.slice(5)} : ACTIONS.find(([k]) => k === key)?.[2];
-const triggerLabel = (routine: Routine, places: Place[]) => {
+const triggerLabel = (routine: Routine, places: Place[], people: Person[]) => {
   if (routine.trigger !== 'place') return '';
   const place = places.find(p => p.id === routine.place)?.name ?? 'lugar apagado';
-  return `${routine.event === 'chegou' ? 'ao chegar em' : 'ao sair de'} ${place}${routine.between ? ` (${routine.between[0]}–${routine.between[1]})` : ''}`;
+  const who = routine.person ? people.find(p => p.id === routine.person)?.name ?? 'pessoa removida' : 'alguém';
+  return `${who} ${routine.event === 'chegou' ? 'chegar em' : 'sair de'} ${place}${routine.between ? ` (${routine.between[0]}–${routine.between[1]})` : ''}`;
 };
 const money = (value: number) => value.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
 const hours = (value: number) => value < 1 ? `${Math.round(value * 60)} min` : `${value.toLocaleString('pt-BR', {maximumFractionDigits: 1})} h`;
@@ -57,20 +60,21 @@ function HealthCard({health}: {health: Health | null}) {
   </section>;
 }
 
-function RoutineForm({initial, modes, places, onSave, onCancel, busy}: {initial?: Routine; modes: Mode[]; places: Place[]; onSave: (body: Record<string, unknown>) => void; onCancel: () => void; busy: boolean}) {
+function RoutineForm({initial, modes, places, people, onSave, onCancel, busy}: {initial?: Routine; modes: Mode[]; places: Place[]; people: Person[]; onSave: (body: Record<string, unknown>) => void; onCancel: () => void; busy: boolean}) {
   const [name, setName] = useState(initial?.name ?? '');
   const [trigger, setTrigger] = useState<'time' | 'place'>(initial?.trigger ?? 'time');
   const [time, setTime] = useState(initial?.trigger === 'time' ? initial.time : '07:00');
   const [place, setPlace] = useState(initial?.trigger === 'place' ? initial.place : places[0]?.id ?? '');
   const [event, setEvent] = useState<'chegou' | 'saiu'>(initial?.trigger === 'place' ? initial.event : 'saiu');
   const [between, setBetween] = useState<[string, string] | null>(initial?.trigger === 'place' ? initial.between : null);
+  const [person, setPerson] = useState<string>(initial?.trigger === 'place' ? initial.person ?? '' : '');
   const [days, setDays] = useState<number[]>(initial?.days ?? [0, 1, 2, 3, 4]);
   const [action, setAction] = useState(initial ? actionKey(initial.action) ?? 'ar-off' : modes[0] ? `modo:${modes[0].id}` : 'ar-off');
   const chosen = actionFor(action);
   const whenValid = trigger === 'time' ? /^\d{2}:\d{2}$/.test(time) : !!place && (!between || (/^\d{2}:\d{2}$/.test(between[0]) && /^\d{2}:\d{2}$/.test(between[1]) && between[0] !== between[1]));
   const valid = name.trim().length > 0 && days.length > 0 && whenValid && !!chosen;
   const body = () => ({...(initial ? {id: initial.id, enabled: initial.enabled} : {}), name: name.trim(), days, action: chosen,
-    ...(trigger === 'time' ? {trigger, time} : {trigger, place, event, between})});
+    ...(trigger === 'time' ? {trigger, time} : {trigger, place, event, between, person: person || null})});
   return <div className="routine-form">
     <label className="loc-field"><span>Nome</span><input value={name} maxLength={40} placeholder={trigger === 'time' ? 'Ex.: Desligar o ar de manhã' : 'Ex.: Saindo da academia'} onChange={e => setName(e.target.value)} /></label>
     <div className="segmented" role="radiogroup" aria-label="Quando">
@@ -81,7 +85,8 @@ function RoutineForm({initial, modes, places, onSave, onCancel, busy}: {initial?
       <label className="loc-field"><span>Horário</span><input type="time" value={time} onChange={e => setTime(e.target.value)} /></label>
     </div> : places.length ? <>
       <div className="routine-row">
-        <label className="loc-field"><span>Quando eu</span><select value={event} onChange={e => setEvent(e.target.value as 'chegou' | 'saiu')}><option value="saiu">sair de</option><option value="chegou">chegar em</option></select></label>
+        <label className="loc-field"><span>Quem</span><select value={person} onChange={e => setPerson(e.target.value)}><option value="">Qualquer pessoa</option>{people.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+        <label className="loc-field"><span>Quando</span><select value={event} onChange={e => setEvent(e.target.value as 'chegou' | 'saiu')}><option value="saiu">sair de</option><option value="chegou">chegar em</option></select></label>
         <label className="loc-field grow"><span>Lugar</span><select value={place} onChange={e => setPlace(e.target.value)}>{places.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
       </div>
       <label className="mode-keep"><input type="checkbox" checked={!!between} onChange={e => setBetween(e.target.checked ? ['17:00', '21:00'] : null)} /><span>Só numa faixa de horário<small>Ex.: saindo do serviço entre 17h e 21h. Fora dela, a rotina não roda.</small></span></label>
@@ -102,7 +107,7 @@ function RoutineForm({initial, modes, places, onSave, onCancel, busy}: {initial?
   </div>;
 }
 
-function RoutinesCard({data, places, casa, reload}: {data: Routines | null; places: Place[]; casa: Casa; reload: () => void}) {
+function RoutinesCard({data, places, people, casa, reload}: {data: Routines | null; places: Place[]; people: Person[]; casa: Casa; reload: () => void}) {
   const modes = casa.data?.scenes ?? [];
   const [editing, setEditing] = useState<Routine | 'new' | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
@@ -110,13 +115,13 @@ function RoutinesCard({data, places, casa, reload}: {data: Routines | null; plac
   const post = async (path: string, body: Record<string, unknown>, success?: string) => { const value = await casa.post('routines', path, body, success); if (value) reload(); return value; };
   return <section className="central-block" aria-labelledby="routines-title">
     <div className="central-head"><h3 id="routines-title"><CalendarClock size={16} />Rotinas</h3>{editing ? null : <button className="link" onClick={() => setEditing('new')}><Plus size={14} />Nova</button>}</div>
-    {editing ? <RoutineForm key={editing === 'new' ? 'new' : editing.id} initial={editing === 'new' ? undefined : editing} modes={modes} places={places} busy={busy} onCancel={() => setEditing(null)}
+    {editing ? <RoutineForm key={editing === 'new' ? 'new' : editing.id} initial={editing === 'new' ? undefined : editing} modes={modes} places={places} people={people} busy={busy} onCancel={() => setEditing(null)}
       onSave={body => void post('/api/routines', body, 'Rotina salva').then(value => { if (value) setEditing(null); })} /> : null}
     {data?.timers.map(timer => <div key={timer.id} className="routine timer"><Power size={15} /><div><strong>{timer.label}</strong><span>{when(timer.at)} · timer</span></div><button className="icon-btn" aria-label="Cancelar timer" onClick={() => void post('/api/routines/timer', {device: 'ar-quarto', minutes: 0}, 'Timer cancelado')}><X size={14} /></button></div>)}
     {data && data.routines.length ? <ul className="routine-list">{data.routines.map(routine => <li key={routine.id} className={`routine ${routine.enabled ? '' : 'off'}`}>
       <button className={`switch ${routine.enabled ? 'on' : ''}`} role="switch" aria-checked={routine.enabled} aria-label={`${routine.enabled ? 'Pausar' : 'Ativar'} ${routine.name}`} disabled={busy}
         onClick={() => { const {next: _next, ...rest} = routine; void post('/api/routines', {...rest, enabled: !routine.enabled}); }}><i /></button>
-      <div><strong>{routine.trigger === 'time' ? `${routine.time} · ` : ''}{routine.name}</strong><span>{routine.trigger === 'place' ? <MapPin size={11} className="routine-pin" /> : null}{actionLabel(routine.action, modes)} · {routine.trigger === 'place' ? `${triggerLabel(routine, places)} · ` : ''}{routine.days.length === 7 ? 'todo dia' : routine.days.map(d => DAYS[d]).join(' ')}{routine.next ? ` · próxima ${when(routine.next)}` : ''}</span></div>
+      <div><strong>{routine.trigger === 'time' ? `${routine.time} · ` : ''}{routine.name}</strong><span>{routine.trigger === 'place' ? <MapPin size={11} className="routine-pin" /> : null}{actionLabel(routine.action, modes)} · {routine.trigger === 'place' ? `${triggerLabel(routine, places, people)} · ` : ''}{routine.days.length === 7 ? 'todo dia' : routine.days.map(d => DAYS[d]).join(' ')}{routine.next ? ` · próxima ${when(routine.next)}` : ''}</span></div>
       <button className="icon-btn" aria-label={`Editar ${routine.name}`} onClick={() => setEditing(routine)}><Pencil size={14} /></button>
       {confirm === routine.id ? <button className="link danger" onClick={() => { setConfirm(null); void post(`/api/routines/${routine.id}/remove`, {}, 'Rotina removida'); }}>Remover?</button>
         : <button className="icon-btn" aria-label={`Remover ${routine.name}`} onClick={() => setConfirm(routine.id)}><Trash2 size={14} /></button>}
@@ -178,18 +183,21 @@ export default function Central({casa}: {casa: Casa}) {
   const [routines, setRoutines] = useState<Routines | null>(null);
   const [energy, setEnergy] = useState<Energy | null>(null);
   const [places, setPlaces] = useState<Place[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
   const load = useCallback(async () => {
-    const [h, r, e, l] = await Promise.all([get<Health>('/api/health'), get<Routines>('/api/routines'), get<Energy>('/api/energy'), get<{places?: Place[]}>('/api/location')]);
+    const [h, r, e, l] = await Promise.all([get<Health>('/api/health'), get<Routines>('/api/routines'), get<Energy>('/api/energy'), get<{places?: Place[]; people?: Person[]}>('/api/location')]);
     if (h) setHealth(h);
     if (r) setRoutines(r);
     if (e) setEnergy(e);
-    if (l) setPlaces(l.places ?? []);
+    if (l) { setPlaces(l.places ?? []); setPeople(l.people ?? []); }
   }, []);
   useEffect(() => { void load(); const timer = setInterval(() => { if (!document.hidden) void load(); }, 20000); return () => clearInterval(timer); }, [load]);
   return <section className="card central" aria-label="Central">
     <HealthCard health={health} />
+    <PhoneAlerts casa={casa} />
     <ModesCard casa={casa} />
-    <RoutinesCard data={routines} places={places} casa={casa} reload={() => void load()} />
+    <RoutinesCard data={routines} places={places} people={people} casa={casa} reload={() => void load()} />
     <EnergyCard data={energy} casa={casa} reload={() => void load()} />
+    <SiriShortcuts casa={casa} />
   </section>;
 }

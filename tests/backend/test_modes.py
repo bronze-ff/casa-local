@@ -140,6 +140,16 @@ class PlaceRoutineTests(Temp):
         self.event()
         self.assertEqual(len(self.routines.due()), 1)
 
+    def test_routine_for_one_person_ignores_the_other(self):
+        self.routines.people = lambda: ["filippe", "lorena"]
+        self.routines.save({**self.base, "person": "filippe"})
+        self.routines.on_place({"tst": int(self.clock.now - 30), "kind": "saiu", "place": "academia", "person": "lorena"})
+        self.assertEqual(self.routines.due(), [])
+        self.routines.on_place({"tst": int(self.clock.now - 30), "kind": "saiu", "place": "academia", "person": "filippe"})
+        self.assertEqual(len(self.routines.due()), 1)
+        with self.assertRaises(AppError):
+            self.routines.save({**self.base, "person": "ninguem"})
+
     def test_validation_and_switching_trigger(self):
         for body in ({**self.base, "place": "praia"}, {**self.base, "event": "passou"}, {**self.base, "between": ["10:00", "10:00"]},
                      {**self.base, "time": "07:00"}, {**self.base, "action": {"type": "scene", "id": "sumiu"}}):
