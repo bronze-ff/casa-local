@@ -460,13 +460,16 @@ class Tray:
         if not status.get("configured"):
             return "Localização não configurada", 0
         names = {p["id"]: p["name"] for p in status.get("places", [])}
-        last = status.get("last")
-        if not last:
-            text = f"{status['name']}: aguardando o primeiro envio"
-        else:
-            where = f"em {names[status['place']]}" if status.get("place") in names else "a caminho" if (last.get("vel") or 0) >= 3 else "fora dos lugares"
+        parts = []
+        for person in status.get("people", []):
+            last = person.get("last")
+            if not last:
+                parts.append(f"{person['name']}: aguardando")
+                continue
+            where = f"em {names[person['place']]}" if person.get("place") in names else "a caminho" if (last.get("vel") or 0) >= 3 else "fora"
             age = max(0, status["now"] - last["tst"])
-            text = f"{status['name']} {where} · " + ("agora" if age < 60 else f"há {round(age / 60)} min" if age < 3600 else f"há {age // 3600} h")
+            parts.append(f"{person['name']} {where} · " + ("agora" if age < 60 else f"{round(age / 60)} min" if age < 3600 else f"{age // 3600} h"))
+        text = " | ".join(parts) or "Ninguém cadastrado na localização"
         events = status.get("events", [])
         newest = max((e["tst"] for e in events), default=0)
         fresh = 0
@@ -476,7 +479,7 @@ class Tray:
                     fresh += 1
                     verb = "saiu de" if event["kind"] == "saiu" else "chegou em"
                     when = time.strftime("%H:%M", time.localtime(event["tst"]))
-                    self.icon.notify(f"{status['name']} {verb} {names.get(event['place'], 'um lugar')} às {when}", "Casa · Localização")
+                    self.icon.notify(f"{event.get('name', 'Alguém')} {verb} {names.get(event['place'], 'um lugar')} às {when}", "Casa · Localização")
         self.seen["location"] = max(newest, self.seen["location"] or 0)
         return text, fresh
 

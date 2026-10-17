@@ -39,7 +39,7 @@ def validate_action(action):
 
 def validate_routine(body):
     """Rotina de horário ({"time"}) ou de lugar ({"trigger": "place", "place", "event", "between"})."""
-    if not isinstance(body, dict) or not set(body) <= {"id", "name", "enabled", "days", "time", "action", "trigger", "place", "event", "between"}:
+    if not isinstance(body, dict) or not set(body) <= {"id", "name", "enabled", "days", "time", "action", "trigger", "place", "event", "between", "person"}:
         raise AppError("Rotina inválida.")
     name, days = body.get("name"), body.get("days")
     if not isinstance(name, str) or not 1 <= len(name.strip()) <= 40:
@@ -53,7 +53,7 @@ def validate_routine(body):
     trigger = body.get("trigger", "time")
     if trigger == "time":
         at = body.get("time")
-        if not isinstance(at, str) or not re.fullmatch(HHMM, at) or {"place", "event", "between"} & set(body):
+        if not isinstance(at, str) or not re.fullmatch(HHMM, at) or {"place", "event", "between", "person"} & set(body):
             raise AppError("Horário inválido (use HH:MM).")
         return {**routine, "trigger": "time", "time": at}
     if trigger != "place" or "time" in body:
@@ -65,7 +65,10 @@ def validate_routine(body):
         raise AppError("Escolha chegar ou sair do lugar.")
     if between is not None and not (isinstance(between, list) and len(between) == 2 and all(isinstance(t, str) and re.fullmatch(HHMM, t) for t in between) and between[0] != between[1]):
         raise AppError("Faixa de horário inválida (use HH:MM até HH:MM).")
-    return {**routine, "trigger": "place", "place": place, "event": event, "between": between}
+    person = body.get("person")
+    if person is not None and not (isinstance(person, str) and re.fullmatch(r"[a-z0-9-]{1,24}", person)):
+        raise AppError("Pessoa inválida.")
+    return {**routine, "trigger": "place", "place": place, "event": event, "between": between, "person": person}
 
 
 def in_window(between, moment):
@@ -77,9 +80,9 @@ def in_window(between, moment):
 
 
 class Routines:
-    def __init__(self, app, data_dir, clock=time.time, places=lambda: None):
-        # places(): ids dos lugares cadastrados (None se a localização não estiver preparada).
-        self.app, self.clock, self.places = app, clock, places
+    def __init__(self, app, data_dir, clock=time.time, places=lambda: None, people=lambda: []):
+        # places(): ids dos lugares cadastrados (None se a localização não estiver preparada); people(): ids das pessoas.
+        self.app, self.clock, self.places, self.people = app, clock, places, people
         self.wake = threading.Event()
         self.pending = []
         self.listeners = []  # f(nome, ok, mensagem) a cada execução (avisos no celular)
@@ -109,13 +112,15 @@ class Routines:
             raise AppError("Esse modo não existe mais.")
         if routine["trigger"] == "place" and routine["place"] not in (self.places() or []):
             raise AppError("Lugar não encontrado (cadastre-o na aba Local).")
+        if routine.get("person") and routine["person"] not in (self.people() or []):
+            raise AppError("Pessoa não encontrada (cadastre-a na aba Local).")
         with self.lock:
             existing = next((r for r in self.routines if r["id"] == body.get("id")), None) if body.get("id") else None
             # Salvar conta o último horário marcado como já feito: criar ou editar às 07:03 uma rotina
             # das 07:00 não dispara na hora (só na próxima vez).
             consumed = self._latest_slot(routine, datetime.fromtimestamp(self.clock())) if routine["trigger"] == "time" else None
             if existing:
-                for key in ("time", "place", "event", "between"):
+                for key in ("time", "place", "event", "between", "person"):
                     existing.pop(key, None)  # trocar de horário para lugar (ou o contrário) não deixa sobra
                 existing.update(routine, lastRun=consumed)
             else:
@@ -219,6 +224,7 @@ class Routines:
         with self.lock:
             for routine in self.routines:
                 if (routine["enabled"] and routine.get("trigger") == "place" and routine["place"] == event.get("place") and routine["event"] == event.get("kind")
+                        and routine.get("person") in (None, event.get("person"))
                         and moment.weekday() in routine["days"] and in_window(routine.get("between"), moment) and now_ts - routine.get("lastFired", 0) >= PLACE_COOLDOWN):
                     routine["lastFired"] = int(now_ts)
                     self.pending.append((routine["name"], routine["action"], None))

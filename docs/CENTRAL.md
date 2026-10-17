@@ -50,6 +50,15 @@ Tudo roda no PC de casa, na rede local, sem nuvem. Os dados ficam em `.data` (fo
   ~25% da GPU com 4 câmeras.
 - Histórico de 24 h (CPU, memória, temperatura da GPU) e botão para reiniciar cada serviço.
 
+## Localização de várias pessoas (aba Local)
+
+- Até 4 pessoas, cada uma com o próprio celular (OwnTracks), login e QR. Os lugares são os mesmos
+  para todas. No próprio iPhone, "Abrir no OwnTracks" configura sem precisar ler o QR.
+- **Presença da casa:** alguém num lugar chamado **Casa** → em casa; todos com posição e fora → casa
+  vazia; sem posição de alguém → não se sabe. É o que liga o Frigate "fora de casa" e o som dos avisos.
+- Rotinas por lugar podem valer para qualquer pessoa ou só para uma ("Filippe sair do Serviço").
+- Arquivos da versão de uma pessoa migram sozinhos (o celular antigo continua com o mesmo login).
+
 ## Avisos no celular (ntfy) e Atalhos da Siri (aba Central)
 
 - O ntfy roda no home lab (`https://<host>.ts.net:10000`). No iPhone: app **ntfy**, servidor padrão

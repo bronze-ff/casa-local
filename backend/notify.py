@@ -154,8 +154,9 @@ class Notifier:
 
     def on_location(self, event, places):
         name = places.get(event.get("place"), "um lugar")
-        verb = "Chegou em" if event.get("kind") == "chegou" else "Saiu de"
-        self.push("casa", f"{verb} {name}", time.strftime("às %H:%M", time.localtime(event["tst"])), priority=2, tags=["round_pushpin"])
+        verb = "chegou em" if event.get("kind") == "chegou" else "saiu de"
+        who = event.get("name") or "Alguém"
+        self.push("casa", f"{who} {verb} {name}", time.strftime("às %H:%M", time.localtime(event["tst"])), priority=2, tags=["round_pushpin"])
 
     def on_routine(self, name, ok, message):
         self.push("casa", f"Rotina {name}", message, priority=2 if ok else 4, tags=["white_check_mark"] if ok else ["warning"])

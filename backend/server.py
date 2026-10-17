@@ -76,7 +76,8 @@ class CasaServer(ThreadingHTTPServer):
         self.location = location or LocationStore(store)
         self.started = time.time()
         places = lambda: [p["id"] for p in self.location.config.get("places", [])] if self.location.config else None
-        self.routines = Routines(app, store, places=places)
+        people = lambda: [p["id"] for p in self.location.config.get("people", [])] if self.location.config else []
+        self.routines = Routines(app, store, places=places, people=people)
         self.location.listeners.append(self.routines.on_place)
         self.alerts = AlertDevices(store, cameras=lambda: CAMERA_IDS)
         self.homelab = Homelab(store, enabled=local, presence=self.at_home)
@@ -125,12 +126,8 @@ class CasaServer(ThreadingHTTPServer):
         super().server_close()
 
     def at_home(self):
-        """Modo ausente: True se a última posição está num lugar chamado "Casa", False se fora, None se não sabe."""
-        status = self.location.status()
-        if not status.get("configured") or not status.get("last") or status.get("stale"):
-            return None
-        homes = {p["id"] for p in status.get("places", []) if p["name"].strip().casefold() in {"casa", "home", "minha casa", "casa local"}}
-        return bool(homes) and status.get("place") in homes if homes else None
+        """Modo ausente: alguém num lugar "Casa" (True), todos fora (False) ou sem saber (None)."""
+        return self.location.presence()
 
     def process_request(self, request, client_address):
         if not self.slots.acquire(blocking=False):
@@ -341,6 +338,7 @@ class CasaHandler(BaseHTTPRequestHandler):
                 alert_device = re.fullmatch(r"/api/alert-devices/([0-9a-f]{16})(/remove)?", path)
                 learn = re.fullmatch(r"/api/devices/(tv-quarto|ar-quarto)/learn", path)
                 remove_place = re.fullmatch(r"/api/location/places/([a-z0-9-]{1,24})/remove", path)
+                person_route = re.fullmatch(r"/api/location/people/([a-z0-9-]{1,24})(/remove)?", path)
                 remove_routine = re.fullmatch(r"/api/routines/([0-9a-f]{8})/remove", path)
                 tv = re.fullmatch(r"/api/tvs/([0-9a-f]{12})/(pair|command|label)", path)
                 replay = re.fullmatch(r"/api/cameras/(cam[0-9]{1,2})/replay", path)
@@ -400,10 +398,14 @@ class CasaHandler(BaseHTTPRequestHandler):
                     result = {**self.server.tvs.command(tv[1], body), **self.server.tvs.status()}
                 elif tv and tv[2] == "label" and set(body) == {"label"}:
                     result = self.server.tvs.rename(tv[1], body["label"])
-                elif path == "/api/location/setup" and set(body) == {"name"}:
-                    result = {"phone": location.setup(body["name"]), "location": location.status()}
-                elif path == "/api/location/phone" and not body:
-                    result = {"phone": location.phone_config()}
+                elif path == "/api/location/setup" and set(body) in ({"name"}, {"name", "person"}):
+                    result = {"phone": location.setup(body["name"], body.get("person")), "location": location.status()}
+                elif path == "/api/location/phone" and set(body) <= {"person"}:
+                    result = {"phone": location.phone_config(body.get("person"))}
+                elif person_route and person_route[2] and not body:
+                    result = location.remove_person(person_route[1])
+                elif person_route and not person_route[2] and set(body) == {"name"}:
+                    result = location.rename(person_route[1], body["name"])
                 elif path == "/api/location/places":
                     result = location.save_place(body)
                 elif remove_place and not body:
@@ -478,11 +480,11 @@ class CasaHandler(BaseHTTPRequestHandler):
         self.guard(phone=True)
         if self.command != "POST" or urlsplit(self.path).query:
             raise AppError("Use POST.", 405, "method_not_allowed")
-        self.server.location.authorize(self.headers.get("Authorization"), self.client_address[0])
+        person = self.server.location.authorize(self.headers.get("Authorization"), self.client_address[0])
         lengths = self.headers.get_all("Content-Length", [])
         # O app manda corpo vazio quando um amigo é apagado: nada a guardar.
         body = {} if lengths == ["0"] else self.read_json()
-        self.json_response(200, self.server.location.ingest(body))
+        self.json_response(200, self.server.location.ingest(body, person))
 
     def relay_ws(self, camera_id, stream=None, seconds=LIVE_SECONDS):
         if self.headers.get("Upgrade", "").lower() != "websocket":

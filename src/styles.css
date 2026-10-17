@@ -802,3 +802,23 @@ body.in-alert, body.in-alert #root { background: var(--pop); overflow: hidden; }
 .lab-frigate strong { font-size: 13.5px; }
 .lab-frigate small { font-size: 12px; color: var(--muted); }
 .lab-frigate .segmented button { min-height: 34px; font-size: 12.5px; }
+
+/* ---- Localização: várias pessoas ---- */
+.loc-people { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 0 12px; padding-bottom: 2px; }
+.loc-people::-webkit-scrollbar { display: none; }
+.loc-people button { display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 7px; flex-shrink: 0; padding: 7px 12px 7px 10px; border-radius: 14px; background: #18181b; border: 1px solid var(--line); color: var(--soft); font-size: 13px; font-weight: 650; text-align: left; }
+.loc-people button.on { border-color: var(--who); background: color-mix(in srgb, var(--who) 14%, #18181b); color: var(--text); }
+.loc-people button i { width: 9px; height: 9px; border-radius: 50%; background: var(--who); grid-row: span 2; }
+.loc-people button i.stale { opacity: .45; }
+.loc-people button i.idle { background: transparent; border: 2px solid var(--who); }
+.loc-people button small { grid-column: 2; font-size: 11px; font-weight: 500; color: var(--muted); }
+.loc-people button.add { display: grid; place-items: center; width: 44px; padding: 0; color: var(--blue-2); }
+.loc-people button.add.on { border-color: var(--blue); }
+.loc-rename { display: flex; align-items: center; gap: 4px; }
+.loc-rename input { width: 150px; min-height: 30px; padding: 0 8px; border-radius: 9px; background: #141416; border: 1px solid var(--line-strong); color: var(--text); font: 600 14px var(--font); }
+.loc-open { justify-self: start; text-decoration: none; }
+.loc-me i { background: var(--who, var(--rose)); }
+.loc-me i::after { border-color: var(--who, var(--rose)); }
+.loc-me b { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); padding: 1px 5px; border-radius: 6px; background: rgba(17, 19, 27, .85); color: #fff; font: 700 10px var(--font); white-space: nowrap; }
+.loc-me { position: relative; }
+.pill.danger { color: var(--red); }
