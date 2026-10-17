@@ -88,6 +88,14 @@ class HomelabTests(unittest.TestCase):
         self.assertFalse(status["wsl"])
         self.assertEqual(next(s for s in status["services"] if s["id"] == "jellyfin")["state"], "stopped")
 
+    def test_tick_drops_linux_cache_every_ten_minutes(self):
+        self.lab.tick()
+        self.lab.tick()
+        self.assertEqual(sum("drop_caches" in " ".join(c) for c in self.windows.calls), 1)
+        self.clock.now += 600
+        self.lab.tick()
+        self.assertEqual(sum("drop_caches" in " ".join(c) for c in self.windows.calls), 2)
+
     def test_restart_validation(self):
         self.lab.set_mode({"restart": "ntfy"})
         with self.assertRaises(AppError):

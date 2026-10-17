@@ -59,6 +59,7 @@ SERVICES = [
 KEEP_IN_GAME = {"ntfy", "uptime-kuma", "diun", "dozzle", "vaultwarden", "opengym-api", "opengym-web"}
 HISTORY_EVERY, HISTORY_POINTS = 300, 288  # um ponto a cada 5 min, 24 h
 FRIGATE_MODES = {"fora", "sempre", "nunca"}
+DROP_CACHE_EVERY = 600  # o WSL demora a devolver o cache de disco ao Windows (após um reinício, ~4 GB)
 WSL = shutil.which("wsl.exe") or r"C:\Windows\System32\wsl.exe"
 NVIDIA_SMI = shutil.which("nvidia-smi.exe") or r"C:\Windows\System32\nvidia-smi.exe"
 
@@ -149,6 +150,7 @@ class Homelab:
         self.game_gone, self.games_open, self.host = None, [], None
         self.containers, self.running, self.stats, self.checked = {}, None, {}, 0
         self.history, self.history_at = deque(maxlen=HISTORY_POINTS), 0
+        self.dropped_at = 0
         self.stop_event = threading.Event()
         self.thread = None
 
@@ -294,6 +296,9 @@ class Homelab:
         with self.lock:
             self.running, self.containers, self.stats, self.checked = running, containers or {}, stats, self.clock()
         self.apply_frigate()
+        if running and self.clock() - self.dropped_at >= DROP_CACHE_EVERY:
+            self.dropped_at = self.clock()
+            self.run([WSL, "-d", DISTRO, "-u", "root", "--", "sh", "-c", "sync; echo 3 > /proc/sys/vm/drop_caches"], timeout=60)
         with self.lock:
             self.games_open = games
             if self.clock() - self.history_at >= HISTORY_EVERY:
