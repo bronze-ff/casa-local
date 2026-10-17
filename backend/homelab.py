@@ -38,7 +38,7 @@ NO_WINDOW = 0x08000000
 # pelo Tailscale Serve; ("tls", porta) https com certificado próprio do serviço; None sem página.
 SERVICES = [
     {"id": "jellyfin", "name": "Jellyfin", "purpose": "Filmes e séries", "link": ("path", "/jellyfin")},
-    {"id": "jellyseerr", "name": "Jellyseerr", "purpose": "Pedir filmes e séries", "link": ("http", 5055)},
+    {"id": "seerr", "name": "Seerr", "purpose": "Pedir filmes e séries", "link": ("http", 5055)},
     {"id": "frigate", "name": "Frigate", "purpose": "Pessoas, carros e rostos nas câmeras", "link": ("tls", 8971)},
     {"id": "opengym-web", "name": "openGym", "purpose": "Treinos e peso", "link": ("https", 8443)},
     {"id": "vaultwarden", "name": "Vaultwarden", "purpose": "Senhas (app Bitwarden)", "link": ("path", "/vault")},
