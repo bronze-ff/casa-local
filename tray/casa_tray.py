@@ -41,7 +41,7 @@ SIZE = (440, 760)
 ALERT_SIZE, ALERT_SECONDS = (390, 176), 25  # alerta de movimento acima do relógio; some sozinho
 POLL_SECONDS = 20
 HEALTH_EVERY = 60
-TABS = ("luzes", "clima", "tv", "cameras", "local", "central")
+TABS = ("luzes", "clima", "tv", "cameras", "local", "lab", "central")
 DOT = {"ok": (58, 211, 122), "aviso": (255, 181, 71), "fora": (255, 97, 89), "?": (157, 157, 166)}
 WHITE = (255, 255, 255)
 HOME = Path.home() / "AppData" / "Local" / "CasaLocalBandeja"
@@ -216,6 +216,7 @@ class Tray:
         self.device_id, self.device_name = device_identity(), default_name(services)
         self.rule, self.busy, self.held = None, False, {}  # held: câmera -> movimentos segurados
         self.modes, self.modes_at = [], 0.0
+        self.lab = None  # estado do home lab / modo jogo (GET /api/homelab)
         self.base = glyph_house()
         self.icon = pystray.Icon("casa", with_status(self.base, "?"), "Casa", menu=self.menu())
 
@@ -295,6 +296,9 @@ class Tray:
                 pystray.MenuItem("Apagar banheiro", device("Luz do banheiro", "banheiro-luz", {"power": False})),
             )),
             pystray.MenuItem("Câmeras ao vivo", pystray.Menu(*cameras) if cameras else pystray.Menu(pystray.MenuItem("Carregando…", None, enabled=False))),
+            pystray.MenuItem("Modo jogo (para o home lab)", self.toggle_game, checked=lambda _: bool(self.lab) and self.lab.get("mode") == "jogo",
+                             enabled=lambda _: bool(self.lab) and self.lab.get("enabled") and not self.lab.get("step")),
+            pystray.MenuItem("Home lab", lambda: self.show("lab")),
             pystray.MenuItem("Localização", lambda: self.show("local")),
             pystray.MenuItem("Central (saúde e rotinas)", lambda: self.show("central")),
             pystray.Menu.SEPARATOR,
@@ -371,6 +375,17 @@ class Tray:
                 self.icon.notify(self.rule_label(), "Casa · Avisos neste computador")
             except (OSError, ValueError, RuntimeError) as error:
                 self.icon.notify(str(error) or "Central indisponível", "Casa · Avisos")
+        threading.Thread(target=run, daemon=True).start()
+
+    def toggle_game(self):
+        mode = "lab" if self.lab and self.lab.get("mode") == "jogo" else "jogo"
+        def run():
+            try:
+                self.lab = self.post("/api/homelab", {"mode": mode})
+                self.icon.update_menu()
+                self.icon.notify("Parando o home lab para jogar…" if mode == "jogo" else "Ligando o home lab de novo…", "Casa · Modo jogo")
+            except (OSError, ValueError, RuntimeError) as error:
+                self.icon.notify(str(error) or "Central indisponível", "Casa · Modo jogo")
         threading.Thread(target=run, daemon=True).start()
 
     def label(self):
@@ -586,6 +601,10 @@ class Tray:
                 except (OSError, ValueError, KeyError, TypeError):
                     pass
             alerts += self.poll_motion()
+            try:
+                self.lab = self.fetch("/api/homelab")
+            except (OSError, ValueError):
+                pass
             self.poll_health()
         self.state.update(server=server, cameras=camera_state, location=location, alerts=alerts)
         dot = "fora" if server == "fora" else "aviso" if alerts or camera_state != "ok" or self.state["health"] in ("warn", "fail") else "ok" if server == "ok" else "?"

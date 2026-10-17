@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from 'react';
-import { Activity, AirVent, Leaf, MoveVertical, SunDim, Zap, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Cctv, Check, Copy, Fan, House, Lightbulb, LoaderCircle, MapPin, Minus, Monitor, Plus, Power, Radio, RefreshCw, Settings2, ShieldCheck, Snowflake, Thermometer, Tv, Undo2, Volume2, VolumeX, X } from 'lucide-react';
+import { Activity, AirVent, Leaf, MoveVertical, SunDim, Zap, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Cctv, Check, Copy, Fan, House, Lightbulb, LoaderCircle, MapPin, Minus, Monitor, Plus, Power, Radio, RefreshCw, Server, Settings2, ShieldCheck, Snowflake, Thermometer, Tv, Undo2, Volume2, VolumeX, X } from 'lucide-react';
 import Cameras from './components/Cameras';
 import type { Device } from './types';
 import { FANS, MODES, PALETTE } from './constants';
@@ -10,10 +10,11 @@ const RoomScene = lazy(() => import('./components/RoomScene'));
 const Location = lazy(() => import('./components/Location'));
 const Central = lazy(() => import('./components/Central'));
 const AcTimer = lazy(() => import('./components/Central').then(module => ({default: module.AcTimer})));
+const Lab = lazy(() => import('./components/Lab'));
 const NetworkTvs = lazy(() => import('./components/NetworkTvs'));
 type Casa = ReturnType<typeof useCasa>;
-type Tab = 'luzes' | 'clima' | 'tv' | 'cameras' | 'local' | 'central';
-const TABS: [Tab, string, typeof Lightbulb][] = [['luzes', 'Luzes', Lightbulb], ['clima', 'Clima', AirVent], ['tv', 'TV', Tv], ['cameras', 'Câmeras', Cctv], ['local', 'Local', MapPin], ['central', 'Central', Activity]];
+type Tab = 'luzes' | 'clima' | 'tv' | 'cameras' | 'local' | 'lab' | 'central';
+const TABS: [Tab, string, typeof Lightbulb][] = [['luzes', 'Luzes', Lightbulb], ['clima', 'Clima', AirVent], ['tv', 'TV', Tv], ['cameras', 'Câmeras', Cctv], ['local', 'Local', MapPin], ['lab', 'Lab', Server], ['central', 'Central', Activity]];
 
 // Botões do controle original que não existem no perfil Geonav: funcionam depois de gravados com Aprender.
 const AC_EXTRAS: [string, string, typeof Zap][] = [['turbo', 'Turbo', Zap], ['eco', 'Eco', Leaf], ['brisa', 'Brisa', MoveVertical], ['display', 'Display', SunDim]];
@@ -350,10 +351,11 @@ export default function App() {
         <button className="round ghost" aria-label="Central e últimas ações" onClick={() => setSheet(true)}><Settings2 size={18} /></button>
       </header>
       <main className="body">
-        {casa.error && !['cameras', 'local', 'central'].includes(tab) ? <div className="alert" role="alert"><p>{casa.error}</p><button onClick={() => void casa.connect()}><RefreshCw size={15} />Tentar de novo</button></div> : null}
+        {casa.error && !['cameras', 'local', 'lab', 'central'].includes(tab) ? <div className="alert" role="alert"><p>{casa.error}</p><button onClick={() => void casa.connect()}><RefreshCw size={15} />Tentar de novo</button></div> : null}
         {tab === 'cameras' ? <Cameras casa={casa} openCamera={target} />
           : tab === 'local' ? <Suspense fallback={null}><Location casa={casa} /></Suspense>
           : tab === 'central' ? <Suspense fallback={null}><Central casa={casa} /></Suspense>
+          : tab === 'lab' ? <Suspense fallback={null}><Lab casa={casa} /></Suspense>
           : !casa.data ? <div className="empty"><LoaderCircle className={casa.error ? '' : 'spin'} size={24} /><p>{casa.error ? 'Aguardando a central' : 'Abrindo sua casa'}</p></div>
           : tab === 'luzes' ? <Lights casa={casa} /> : tab === 'clima' ? <Climate casa={casa} />
           : <><Television casa={casa} /><Suspense fallback={null}><NetworkTvs casa={casa} /></Suspense></>}
