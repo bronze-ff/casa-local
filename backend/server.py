@@ -25,6 +25,7 @@ from .motion import MotionWatcher
 from .replay import WINDOW as REPLAY_WINDOW, Replays
 from .routines import Routines
 from .alert_devices import AlertDevices
+from .homelab import Homelab
 from .samsung_tv import SamsungTVs
 from .models import AppError, VERSION
 
@@ -76,6 +77,7 @@ class CasaServer(ThreadingHTTPServer):
         self.routines = Routines(app, store, places=places)
         self.location.listeners.append(self.routines.on_place)
         self.alerts = AlertDevices(store, cameras=lambda: CAMERA_IDS)
+        self.homelab = Homelab(store, enabled=local)
         self.energy = AcUsage(store)
         if local:
             app.listeners.append(lambda device_id, state: self.energy.observe(state.get("power")) if device_id == "ar-quarto" else None)
@@ -99,11 +101,13 @@ class CasaServer(ThreadingHTTPServer):
             self.motion.start()
             self.tvs.start(self.background)
             self.backups.start(self.background)
+            self.homelab.start()
 
     def server_close(self):
         self.background.set()
         self.routines.close()
         self.motion.close()
+        self.homelab.close()
         self.replays.close_all()
         self.app.close()
         self.cameras.close()
@@ -337,6 +341,8 @@ class CasaHandler(BaseHTTPRequestHandler):
                         raise AppError(f"Este modo é usado pela rotina {used[0]}. Troque a ação da rotina antes de apagar.", 409, "in_use")
                     app.modes.remove(remove_mode[1])
                     result = {"state": app.snapshot()}
+                elif path == "/api/homelab":
+                    result = self.server.homelab.set_mode(body)
                 elif path == "/api/alert-devices/hello":
                     result = self.server.alerts.hello(body)
                 elif alert_device and alert_device[2] and not body:
@@ -394,6 +400,8 @@ class CasaHandler(BaseHTTPRequestHandler):
                 self.json_response(200, self.server.location.status())
             elif path == "/api/routines":
                 self.json_response(200, self.server.routines.status())
+            elif path == "/api/homelab":
+                self.json_response(200, self.server.homelab.status())
             elif path == "/api/alert-devices":
                 self.json_response(200, self.server.alerts.status())
             elif path == "/api/energy":

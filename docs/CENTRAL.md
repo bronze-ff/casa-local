@@ -28,6 +28,21 @@ Tudo roda no PC de casa, na rede local, sem nuvem. Os dados ficam em `.data` (fo
 - **Desligar em…** (aba Clima ou menu da bandeja): timer de uma vez para desligar o ar em 30 min,
   1, 2 ou 4 h.
 
+## Lab: home lab e modo jogo (aba Lab e menu da bandeja)
+
+- O home lab roda neste PC num Debian do WSL2 (`homelab`) com Docker: Jellyfin, Jellyseerr,
+  Radarr, Sonarr, Prowlarr, Bazarr, qBittorrent, Filebrowser, FlareSolverr e openGym. A instalação
+  está no repositório Homelab (`WSL.md`).
+- A aba mostra cada serviço (rodando ou parado, com link), CPU, memória, GPU (temperatura, uso e
+  VRAM pelo `nvidia-smi`), espaço dos discos e a memória da VM do WSL. Feita para olhar pelo celular.
+- **Modo jogo:** para os containers, encerra a tarefa `CasaLocal-homelab` (que mantém a distro ligada)
+  e roda `wsl --shutdown`, devolvendo toda a RAM do WSL. Ao sair, liga a tarefa e roda `docker compose up -d`.
+  Entrar leva ~20 s e sair ~15 s.
+- **Automático** (ligado por padrão): com `cs2.exe` aberto entra sozinho e volta 2 min depois que
+  o jogo fecha. Se o modo jogo foi ligado à mão, só sai à mão. Não sobrevive a um reinício: ao subir,
+  o servidor garante a stack ligada. Preferências em `.data/homelab.json`.
+- O status dos containers só é lido com a distro ligada, porque `wsl -d` a ligaria de novo no meio do jogo.
+
 ## Gasto do ar (aba Central e rodapé do Clima)
 
 Sem tomada medidora: conta as horas em que o painel deixou o ar ligado × potência média
