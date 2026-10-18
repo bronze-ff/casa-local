@@ -167,6 +167,12 @@ class HomelabTests(unittest.TestCase):
         self.assertEqual(status["stats"]["gpu"]["temp"], 41.0)
         self.assertEqual(status["stats"]["wslGb"], 2.1)
 
+    def test_tailnet_host_empty_at_boot_is_none(self):
+        answers = iter([json.dumps({"Self": {"DNSName": ""}}), json.dumps({"Self": {"DNSName": "pc.exemplo.ts.net."}})])
+        lab = Homelab(Path(self.temporary.name), runner=lambda args, timeout=60: (0, next(answers)), machine=Still())
+        self.assertIsNone(lab.tailnet_host(), "nome vazio no boot não vira link https:///jellyfin")
+        self.assertEqual(lab.tailnet_host(), "pc.exemplo.ts.net")
+
 
 if __name__ == "__main__":
     unittest.main()

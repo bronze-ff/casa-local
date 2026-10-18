@@ -325,8 +325,9 @@ class Homelab:
         tailscale = shutil.which("tailscale.exe") or r"C:\Program Files\Tailscale\tailscale.exe"
         code, out = self.run([tailscale, "status", "--json"], timeout=20)
         try:
-            return json.loads(out)["Self"]["DNSName"].rstrip(".") if code == 0 else None
-        except (ValueError, KeyError, TypeError):
+            # No boot o Tailscale ainda pode estar subindo e devolver o nome vazio.
+            return json.loads(out)["Self"]["DNSName"].rstrip(".") or None if code == 0 else None
+        except (ValueError, KeyError, TypeError, AttributeError):
             return None
 
     def start(self):
@@ -343,6 +344,8 @@ class Homelab:
                     self.compose("stop", "frigate", timeout=120)
             while not self.stop_event.is_set():
                 try:
+                    if not self.host:
+                        self.host = self.tailnet_host()  # tenta de novo até o Tailscale responder
                     self.tick()
                 except Exception:
                     pass

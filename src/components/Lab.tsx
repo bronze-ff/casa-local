@@ -22,8 +22,8 @@ function link(service: Service, host: string | null) {
   const here = window.location.hostname;
   const link = service.link;
   if (!link) return null;
-  if (link.kind === 'path') return `https://${host ?? here}${link.target}`;
-  if (link.kind === 'https') return `https://${host ?? here}:${link.target}`;
+  if (link.kind === 'path') return `https://${host || here}${link.target}`;
+  if (link.kind === 'https') return `https://${host || here}:${link.target}`;
   if (link.kind === 'tls') return `https://${here}:${link.target}`;
   return `http://${here}:${link.target}`;
 }
