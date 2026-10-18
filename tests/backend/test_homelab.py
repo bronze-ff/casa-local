@@ -80,6 +80,17 @@ class HomelabTests(unittest.TestCase):
         self.lab._switch("lab", "manual")
         self.assertIn("docker compose up -d", "\n".join(self.commands()))
 
+    def test_game_mode_stops_services_docker_brought_back(self):
+        self.lab._switch("jogo", "manual")
+        self.windows.calls.clear()
+        self.lab.tick()  # o Docker religou o jellyfin depois do boot
+        self.assertIn("docker compose stop jellyfin", "\n".join(self.commands()))
+        self.windows.calls.clear()
+        self.lab._switch("lab", "manual")
+        self.windows.calls.clear()
+        self.lab.tick()
+        self.assertFalse(any("stop jellyfin" in c for c in self.commands()), "no modo lab nada é parado")
+
     def test_status_does_not_wake_a_stopped_distro(self):
         self.windows.running = False
         self.lab.tick()

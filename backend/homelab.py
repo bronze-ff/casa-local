@@ -295,6 +295,13 @@ class Homelab:
             pass
         with self.lock:
             self.running, self.containers, self.stats, self.checked = running, containers or {}, stats, self.clock()
+        # No boot o Docker religa os containers sozinho (restart policy), às vezes depois de o modo
+        # jogo já ter parado tudo: no modo jogo, qualquer serviço pesado que aparecer ligado é parado de novo.
+        if self.mode == "jogo" and not self.busy.locked():
+            awake = sorted(name for name, info in (containers or {}).items() if info.get("state") == "running" and name not in KEEP_IN_GAME)
+            if awake:
+                self.compose("stop", *awake, timeout=240)
+                self.run([WSL, "-d", DISTRO, "-u", "root", "--", "sh", "-c", "sync; echo 3 > /proc/sys/vm/drop_caches"], timeout=60)
         self.apply_frigate()
         if running and self.clock() - self.dropped_at >= DROP_CACHE_EVERY:
             self.dropped_at = self.clock()
