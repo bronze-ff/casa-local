@@ -26,6 +26,8 @@ from .cameras import CAMERAS
 from .models import AppError
 
 TOPICS = {"cameras": "casa-cameras", "pessoas": "casa-pessoas", "sistema": "casa-sistema", "casa": "casa-casa"}
+# Publicados direto por outros serviços no mesmo ntfy (só aparecem aqui para assinar).
+EXTERNAL_TOPICS = [{"topic": "casa-filmes", "label": "Filmes e séries", "detail": "O Seerr avisa quando o que você pediu fica pronto no Jellyfin (ou falha)."}]
 HOME_NAMES = {"casa", "home", "minha casa", "casa local"}
 FRIGATE = "http://127.0.0.1:5000"
 FRIGATE_LABELS = {"person": "Pessoa", "car": "Carro", "motorcycle": "Moto", "bicycle": "Bicicleta", "dog": "Cachorro", "cat": "Gato"}
@@ -92,7 +94,7 @@ class Notifier:
         with self.lock:
             host = self.host()
             return {"enabled": dict(self.enabled), "cameraScope": self.camera_scope, "frigateKinds": self.frigate_kinds,
-                    "frigateCameras": sorted(self.frigate_cameras), "topics": dict(TOPICS),
+                    "frigateCameras": sorted(self.frigate_cameras), "topics": dict(TOPICS), "external": [dict(t) for t in EXTERNAL_TOPICS],
                     "subscribe": f"https://{host}:10000" if host else None, "sent": self.sent, "failed": self.failed,
                     "lastError": self.last_error, "frigate": self.frigate_ok, "home": self.presence()}
 
@@ -175,6 +177,19 @@ class Notifier:
 
     def on_routine(self, name, ok, message):
         self.push("casa", f"Rotina {name}", message, priority=2 if ok else 4, tags=["white_check_mark"] if ok else ["warning"])
+
+    def on_network(self, device):
+        """Aparelho nunca visto na rede de casa."""
+        detail = " · ".join(part for part in (device.get("host"), device["ip"], device["mac"]) if part)
+        self.push("sistema", "Aparelho novo na rede", f"{detail}. Se não reconhecer, veja na aba Lab.", priority=4, tags=["satellite"], click=self._link("lab"))
+
+    def on_network_presence(self, device, online):
+        """Aparelho vigiado (DVR, central IR, roteador...) sumiu da rede ou voltou."""
+        if online:
+            self.push("sistema", f"Voltou: {device['label']}", f"Respondendo de novo na rede ({device['ip']}).", priority=2, tags=["white_check_mark"])
+        else:
+            self.push("sistema", f"Sumiu da rede: {device['label']}", f"Sem resposta há ~30 min ({device['ip']}). Pode estar desligado da tomada.",
+                      priority=4, tags=["warning"], click=self._link("lab"))
 
     def check_health(self, report):
         """Avisa quando uma verificação da Central passa a falhar e quando volta."""

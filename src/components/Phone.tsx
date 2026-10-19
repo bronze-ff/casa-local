@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BellRing, KeyRound, LoaderCircle, RefreshCw, Send } from 'lucide-react';
+import { BellRing, Clapperboard, KeyRound, LoaderCircle, RefreshCw, Send } from 'lucide-react';
 import type { useCasa } from '../useCasa';
 
 type Casa = ReturnType<typeof useCasa>;
 type Topics = 'cameras' | 'pessoas' | 'sistema' | 'casa';
 type Notify = {enabled: Record<Topics, boolean>; cameraScope: 'watched' | 'all'; frigateKinds: 'pessoas' | 'tudo'; frigateCameras: string[]; topics: Record<Topics, string>; subscribe: string | null;
+  external?: {topic: string; label: string; detail: string}[];
   sent: number; failed: number; lastError: string | null; frigate: boolean | null; home: boolean | null};
 const TOPICS: [Topics, string, string][] = [
   ['pessoas', 'Pessoas e rostos', 'O Frigate viu alguém ou um carro, com o nome se reconheceu o rosto.'],
@@ -36,7 +37,11 @@ export function PhoneAlerts({casa}: {casa: Casa}) {
     <ul className="routine-list">{TOPICS.map(([id, label, detail]) => <li key={id} className={`routine ${data.enabled[id] ? '' : 'off'}`} style={{gridTemplateColumns: 'auto 1fr'}}>
       <button className={`switch ${data.enabled[id] ? 'on' : ''}`} role="switch" aria-checked={data.enabled[id]} aria-label={label} onClick={() => void save({enabled: {[id]: !data.enabled[id]}})}><i /></button>
       <div><strong>{label}</strong><span>{detail}</span></div>
-    </li>)}</ul>
+    </li>)}
+      {(data.external ?? []).map(item => <li key={item.topic} className="routine external" style={{gridTemplateColumns: 'auto 1fr'}}>
+        <span className="topic-icon" aria-hidden="true"><Clapperboard size={16} /></span>
+        <div><strong>{item.label}</strong><span>{item.detail} Assine <b>{item.topic}</b> no app ntfy para receber.</span></div>
+      </li>)}</ul>
     <label className="mode-keep"><input type="checkbox" checked={data.cameraScope === 'all'} onChange={event => void save({cameraScope: event.target.checked ? 'all' : 'watched'})} />
       <span>Avisar de todas as câmeras<small>Desligado: só as câmeras com sino em Câmeras › Movimento (vale para movimento e pessoas).</small></span></label>
     <label className="mode-keep"><input type="checkbox" checked={data.frigateKinds === 'tudo'} onChange={event => void save({frigateKinds: event.target.checked ? 'tudo' : 'pessoas'})} />
@@ -47,7 +52,7 @@ export function PhoneAlerts({casa}: {casa: Casa}) {
         <li>Instale o app <b>ntfy</b> da App Store e, nas configurações dele, ponha o servidor padrão:
           <code className="copyable" onClick={() => data.subscribe && copy(data.subscribe, setHint)}>{data.subscribe ?? '—'}</code></li>
         <li>Toque em <b>+</b> e assine cada tópico (com o Tailscale ligado no celular):
-          {Object.values(data.topics).map(topic => <code key={topic} className="copyable" onClick={() => copy(topic, setHint)}>{topic}</code>)}</li>
+          {[...Object.values(data.topics), ...(data.external ?? []).map(item => item.topic)].map(topic => <code key={topic} className="copyable" onClick={() => copy(topic, setHint)}>{topic}</code>)}</li>
         <li>Toque em <b>Testar</b> aqui em cima: chega um aviso em cada tópico.</li>
       </ol>
       {hint ? <p className="loc-hint">{hint}</p> : null}

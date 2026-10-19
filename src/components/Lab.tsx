@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Cpu, ExternalLink, Gamepad2, HardDrive, LoaderCircle, MemoryStick, RotateCw, Server, Thermometer } from 'lucide-react';
+import { Archive, Cpu, ExternalLink, Gamepad2, HardDrive, LoaderCircle, MemoryStick, RotateCw, Server, Thermometer } from 'lucide-react';
 import type { useCasa } from '../useCasa';
+import HomeNetwork from './Network';
 
 type Casa = ReturnType<typeof useCasa>;
 type Service = {id: string; name: string; purpose: string; link: {kind: 'http' | 'https' | 'path' | 'tls'; target: number | string} | null; keep: boolean; state: string; status: string | null};
@@ -10,7 +11,7 @@ type Stats = {
   disks?: {drive: string; label: string; freeGb: number; totalGb: number; used: number}[];
 };
 type Lab = {frigate: 'fora' | 'sempre' | 'nunca'; frigateOn: boolean; presence: boolean | null; enabled: boolean; mode: 'lab' | 'jogo'; reason: string | null; since: number; step: string | null; auto: boolean; games: string[]; gamesOpen: string[];
-  wsl: boolean | null; host: string | null; services: Service[]; stats: Stats; checked: number; history: [number, number | null, number | null, number | null, number | null][]};
+  wsl: boolean | null; host: string | null; services: Service[]; stats: Stats; checked: number; backups?: {last: number | null; count: number; sizeMb: number | null}; history: [number, number | null, number | null, number | null, number | null][]};
 
 const tone = (value: number | null | undefined, warn: number, bad: number) => value == null ? '' : value >= bad ? 'bad' : value >= warn ? 'warn' : 'ok';
 const since = (ts: number) => {
@@ -98,6 +99,14 @@ export default function LabTab({casa}: {casa: Casa}) {
     {stats.disks?.length ? <ul className="lab-disks">{stats.disks.map(disk => <li key={disk.drive} className={tone(disk.used, 85, 95)}>
       <HardDrive size={14} /><span>{disk.drive}: {disk.label}</span><i><b style={{width: `${disk.used}%`}} /></i><small>{disk.freeGb} GB livres</small>
     </li>)}</ul> : null}
+    {lab.backups ? <div className={`lab-backup ${!lab.backups.last ? 'warn' : Date.now() / 1000 - lab.backups.last > 36 * 3600 ? 'bad' : 'ok'}`}>
+      <Archive size={15} />
+      <span><strong>Backup noturno</strong><small>{lab.backups.last
+        ? `Último ${since(lab.backups.last)} · ${lab.backups.count} guardado${lab.backups.count > 1 ? 's' : ''}${lab.backups.sizeMb != null ? ` · ${lab.backups.sizeMb} MB` : ''} no HD D:`
+        : 'Ainda não rodou: sai às 04:30 para o HD D:'}</small></span>
+    </div> : null}
+
+    <HomeNetwork casa={casa} />
 
     <h3 className="lab-title">Serviços</h3>
     <ul className="lab-services">{lab.services.map(service => {

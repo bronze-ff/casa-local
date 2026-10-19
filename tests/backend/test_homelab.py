@@ -178,6 +178,22 @@ class HomelabTests(unittest.TestCase):
         self.assertEqual(status["stats"]["gpu"]["temp"], 41.0)
         self.assertEqual(status["stats"]["wslGb"], 2.1)
 
+    def test_backups_report_latest_nightly_file(self):
+        folder = Path(self.temporary.name) / "backups"
+        folder.mkdir()
+        original = homelab.BACKUP_DIR
+        homelab.BACKUP_DIR = folder
+        try:
+            self.assertEqual(self.lab.status()["backups"], {"last": None, "count": 0, "sizeMb": None})
+            for day in ("20261017", "20261018"):
+                (folder / f"homelab-{day}.tar.gz").write_bytes(b"x" * 2048)
+            (folder / "outro.txt").write_text("não conta")
+            backups = self.lab.status()["backups"]
+            self.assertEqual((backups["count"], backups["sizeMb"]), (2, 0))
+            self.assertIsInstance(backups["last"], int)
+        finally:
+            homelab.BACKUP_DIR = original
+
     def test_tailnet_host_empty_at_boot_is_none(self):
         answers = iter([json.dumps({"Self": {"DNSName": ""}}), json.dumps({"Self": {"DNSName": "pc.exemplo.ts.net."}})])
         lab = Homelab(Path(self.temporary.name), runner=lambda args, timeout=60: (0, next(answers)), machine=Still())
