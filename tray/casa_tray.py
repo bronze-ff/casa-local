@@ -44,7 +44,10 @@ HEALTH_EVERY = 60
 TABS = ("luzes", "clima", "tv", "cameras", "local", "lab", "central")
 DOT = {"ok": (58, 211, 122), "aviso": (255, 181, 71), "fora": (255, 97, 89), "?": (157, 157, 166)}
 WHITE = (255, 255, 255)
-HOME = Path.home() / "AppData" / "Local" / "CasaLocalBandeja"
+# Dados da bandeja ficam na pasta do próprio script (identidade do aparelho, WebView, log).
+HOME = Path(__file__).resolve().parent
+# Marca de "Sair da Casa": a tarefa de vigia (--vigia, a cada 5 min) não reabre a bandeja que você fechou.
+QUIT_MARK = HOME / "saiu-pelo-menu"
 PAUSE_FOREVER = 4102444800  # o servidor entende como "até reativar"
 DEFAULT_RULE = {"mode": "watched", "cameras": [], "game": True, "pausedUntil": 0}
 HOTKEY_ID, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, WM_HOTKEY = 1, 0x1, 0x2, 0x4000, 0x0312
@@ -636,6 +639,10 @@ class Tray:
         user32.UnregisterHotKey(None, HOTKEY_ID)
 
     def quit(self):
+        try:
+            QUIT_MARK.touch()
+        except OSError:
+            pass
         self.stop.set()
         self.icon.stop()
         # webview.start() só retorna quando a última janela fecha: fecha o alerta também.
@@ -713,18 +720,32 @@ class Tray:
                 if self.stop.wait(15):
                     return
         threading.Thread(target=keep_pinning, daemon=True).start()
-        webview.start(private_mode=False, storage_path=str(Path.home() / "AppData" / "Local" / "CasaLocalBandeja" / "webview"))
+        webview.start(private_mode=False, storage_path=str(HOME / "webview"))
 
 
 def main():
     parser = argparse.ArgumentParser(description="Casa Local na bandeja do Windows.")
     parser.add_argument("--url", required=True, help="Endereço do painel, ex.: http://127.0.0.1:8787")
     parser.add_argument("--servicos", help="Pasta do Casa Local neste PC, para reiniciar os serviços.")
+    parser.add_argument("--vigia", action="store_true", help="Chamada da tarefa de vigia: só abre se a bandeja caiu sozinha.")
     args = parser.parse_args()
     mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "Local\\CasaLocalBandeja")
     if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS: uma instância por usuário
         return
-    Tray(args.url, args.servicos).run()
+    if args.vigia and QUIT_MARK.exists():
+        return
+    QUIT_MARK.unlink(missing_ok=True)
+    # pythonw não tem console: erros e o motivo da saída vão para bandeja.log (até ~1 MB).
+    log = HOME / "bandeja.log"
+    if log.exists() and log.stat().st_size > 1_000_000:
+        log.unlink()
+    if sys.stderr is None or Path(sys.executable).name.lower() == "pythonw.exe":
+        sys.stderr = open(log, "a", encoding="utf-8", buffering=1)
+    stamp = lambda: time.strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{stamp()} abriu ({'vigia' if args.vigia else 'login/atalho'})", file=sys.stderr)
+    tray = Tray(args.url, args.servicos)
+    tray.run()
+    print(f"{stamp()} fechou: {'pelo menu' if tray.stop.is_set() else 'sozinha (a janela do WebView2 foi encerrada)'}", file=sys.stderr)
     ctypes.windll.kernel32.CloseHandle(mutex)
 
 
