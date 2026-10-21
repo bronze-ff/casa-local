@@ -21,7 +21,8 @@ from .config import ROOT, private_ip
 from .energy import AcUsage
 from .health import Backups, report as health_report
 from .location import LocationStore
-from .motion import MotionWatcher
+from .motion import MotionWatcher, dvr_source
+from .network import Network
 from .replay import WINDOW as REPLAY_WINDOW, Replays
 from .routines import Routines
 from .alert_devices import AlertDevices
@@ -94,6 +95,7 @@ class CasaServer(ThreadingHTTPServer):
             self.location.listeners.append(lambda event: self.notifier.on_location(event, {p["id"]: p["name"] for p in (self.location.config or {}).get("places", [])}))
             self.routines.listeners.append(self.notifier.on_routine)
         self.backups = Backups(app.data_dir)
+        self.network = Network(store, hints=self.network_hints, notify=self.notifier.on_network, presence=self.notifier.on_network_presence)
         self.background = threading.Event()
         self.dist_dir = Path(dist_dir or ROOT / "dist").resolve()
         self.allowed_hosts = local_hosts(allowed_hosts)
@@ -111,6 +113,7 @@ class CasaServer(ThreadingHTTPServer):
             self.tvs.start(self.background)
             self.backups.start(self.background)
             self.homelab.start()
+            self.network.start(self.background)
             self.notifier.start(health=lambda: health_report(self.app, self.cameras, self.motion, self.tvs, self.backups, self.started),
                                 lab=self.homelab.status, offset=lambda: self.motion.offset)
 
@@ -124,6 +127,26 @@ class CasaServer(ThreadingHTTPServer):
         self.app.close()
         self.cameras.close()
         super().server_close()
+
+    def network_hints(self):
+        """Nomes dos aparelhos que a Casa já conhece, pelo IP (lâmpadas, central IR, DVR)."""
+        names = {}
+        for device in self.app.devices:
+            ip = (self.app.config.get(device["id"]) or {}).get("ip")
+            if isinstance(ip, str):
+                names.setdefault(ip, []).append(device["name"])
+        hints = {ip: found[0] if len(found) == 1 else "Central infravermelho (" + ", ".join(found) + ")" for ip, found in names.items()}
+        with self.tvs.lock:
+            for tv in self.tvs.tvs.values():
+                if isinstance(tv.get("ip"), str):
+                    hints.setdefault(tv["ip"], tv.get("label") or tv.get("model") or "TV Samsung")
+        try:
+            source = dvr_source()
+            if source:
+                hints.setdefault(source[0].split(":")[0], "DVR das câmeras")
+        except Exception:
+            pass
+        return hints
 
     def at_home(self):
         """Modo ausente: alguém num lugar "Casa" (True), todos fora (False) ou sem saber (None)."""
@@ -343,6 +366,7 @@ class CasaHandler(BaseHTTPRequestHandler):
                 tv = re.fullmatch(r"/api/tvs/([0-9a-f]{12})/(pair|command|label)", path)
                 replay = re.fullmatch(r"/api/cameras/(cam[0-9]{1,2})/replay", path)
                 replay_close = re.fullmatch(r"/api/replays/([0-9a-f]{12})/close", path)
+                network_device = re.fullmatch(r"/api/network/([0-9a-f]{12})(/remove)?", path)
                 location = self.server.location
                 if replay:
                     result = self.server.replays.open(replay[1], body)
@@ -368,6 +392,15 @@ class CasaHandler(BaseHTTPRequestHandler):
                     result = self.server.notifier.test()
                 elif path == "/api/shortcuts/rotate" and not body:
                     result = self.server.shortcuts.rotate()
+                elif path == "/api/network/scan" and not body:
+                    if app.mode != "local":
+                        raise AppError("A varredura só roda no PC de casa.", 409, "preview_mode")
+                    self.server.network.scan()
+                    result = self.server.network.status()
+                elif network_device and network_device[2] and not body:
+                    result = self.server.network.remove(network_device[1])
+                elif network_device and not network_device[2]:
+                    result = self.server.network.update(network_device[1], body)
                 elif path == "/api/alert-devices/hello":
                     result = self.server.alerts.hello(body)
                 elif alert_device and alert_device[2] and not body:
@@ -437,6 +470,8 @@ class CasaHandler(BaseHTTPRequestHandler):
                 self.json_response(200, self.server.shortcuts.status())
             elif path == "/api/alert-devices":
                 self.json_response(200, self.server.alerts.status())
+            elif path == "/api/network":
+                self.json_response(200, self.server.network.status())
             elif path == "/api/energy":
                 self.json_response(200, self.server.energy.summary())
             elif path == "/api/motion":

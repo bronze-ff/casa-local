@@ -38,9 +38,10 @@ NO_WINDOW = 0x08000000
 # pelo Tailscale Serve; ("tls", porta) https com certificado próprio do serviço; None sem página.
 SERVICES = [
     {"id": "jellyfin", "name": "Jellyfin", "purpose": "Filmes e séries", "link": ("path", "/jellyfin")},
-    {"id": "seerr", "name": "Seerr", "purpose": "Pedir filmes e séries", "link": ("http", 5055)},
+    {"id": "seerr", "name": "Seerr", "purpose": "Pedir filmes e séries", "link": ("https", 8446)},
     {"id": "frigate", "name": "Frigate", "purpose": "Pessoas, carros e rostos nas câmeras", "link": ("tls", 8971)},
     {"id": "opengym-web", "name": "openGym", "purpose": "Treinos e peso", "link": ("https", 8443)},
+    {"id": "actual", "name": "Actual", "purpose": "Finanças da casa", "link": ("https", 8445)},
     {"id": "vaultwarden", "name": "Vaultwarden", "purpose": "Senhas (app Bitwarden)", "link": ("path", "/vault")},
     {"id": "ntfy", "name": "ntfy", "purpose": "Avisos no celular", "link": ("https", 10000)},
     {"id": "uptime-kuma", "name": "Uptime Kuma", "purpose": "Disponibilidade dos serviços", "link": ("http", 3001)},
@@ -59,6 +60,8 @@ SERVICES = [
 KEEP_IN_GAME = {"ntfy", "uptime-kuma", "diun", "dozzle", "vaultwarden", "opengym-api", "opengym-web"}
 HISTORY_EVERY, HISTORY_POINTS = 300, 288  # um ponto a cada 5 min, 24 h
 FRIGATE_MODES = {"fora", "sempre", "nunca"}
+# Backup noturno do home lab (timer homelab-backup no WSL): configs dos serviços e o .env no HD.
+BACKUP_DIR = Path(os.environ.get("CASA_HOMELAB_BACKUPS", r"D:\Homelab\backups"))
 DROP_CACHE_EVERY = 600  # o WSL demora a devolver o cache de disco ao Windows (após um reinício, ~4 GB)
 WSL = shutil.which("wsl.exe") or r"C:\Windows\System32\wsl.exe"
 NVIDIA_SMI = shutil.which("nvidia-smi.exe") or r"C:\Windows\System32\nvidia-smi.exe"
@@ -313,7 +316,20 @@ class Homelab:
                 gpu = stats.get("gpu") or {}
                 self.history.append([int(self.clock()), stats.get("cpu"), (stats.get("memory") or {}).get("used"), gpu.get("temp"), stats.get("wslGb")])
 
+    @staticmethod
+    def backups():
+        """Último backup noturno do home lab (o arquivo mais novo da pasta de backups no HD)."""
+        try:
+            files = sorted(BACKUP_DIR.glob("homelab-*.tar.gz"))
+        except OSError:
+            files = []
+        if not files:
+            return {"last": None, "count": 0, "sizeMb": None}
+        latest = files[-1].stat()
+        return {"last": int(latest.st_mtime), "count": len(files), "sizeMb": round(latest.st_size / 2**20)}
+
     def status(self):
+        backups = self.backups()
         with self.lock:
             services = []
             for service in SERVICES:
@@ -324,7 +340,7 @@ class Homelab:
                                  "status": state.get("status")})
             return {"enabled": self.enabled, "mode": self.mode, "reason": self.reason, "since": int(self.changed), "step": self.step,
                     "auto": self.auto, "games": list(self.games), "frigate": self.frigate_mode, "frigateOn": self.frigate_wanted(), "presence": self.presence(), "gamesOpen": list(self.games_open), "host": self.host,
-                    "wsl": self.running, "services": services, "stats": deepcopy(self.stats), "checked": int(self.checked),
+                    "wsl": self.running, "services": services, "stats": deepcopy(self.stats), "checked": int(self.checked), "backups": backups,
                     "history": [list(point) for point in self.history]}
 
     def tailnet_host(self):
