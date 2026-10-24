@@ -105,6 +105,30 @@ class NotifyTests(unittest.TestCase):
         self.notifier.poll_frigate()
         self.assertEqual([item[1] for item in self.sent()], ["Carro em Garagem"])
 
+    def test_disabled_people_topic_still_tracks_frigate(self):
+        self.frigate = {"/api/events": b"[]", "/api/config": json.dumps({"cameras": {"cam6": {}}}).encode()}
+        self.notifier._watch(None, None, lambda: 0.0, False)
+        self.assertTrue(self.notifier.frigate_ok)
+        self.assertEqual(self.notifier.frigate_cameras, {"cam6"})
+        self.notifier.configure({"enabled": {"pessoas": False}})
+        event = {"id": "abc", "label": "person", "camera": "cam6", "start_time": 999_000.0, "has_snapshot": False, "sub_label": "Ana"}
+        self.frigate["/api/events"] = json.dumps([event]).encode()
+        self.notifier._watch(None, None, lambda: 0.0, False)
+        self.assertEqual(self.sent(), [], "pessoas desligado: não avisa")
+        self.assertTrue(self.notifier.frigate_ok)
+        motion = {"id": "z", "camera": "cam6", "start": 999_000.0}
+        self.notifier.on_motion(motion, {"cam6"}, None)
+        self.assertEqual(self.sent(), [], "Frigate no ar: o DVR continua calado nesta câmera")
+
+        def down(_path):
+            raise OSError("frigate parado")
+
+        self.notifier.fetch = down
+        self.notifier._watch(None, None, lambda: 0.0, False)
+        self.assertFalse(self.notifier.frigate_ok)
+        self.notifier.on_motion(motion, {"cam6"}, None)
+        self.assertEqual(len(self.sent()), 1, "Frigate parou: o DVR volta a avisar")
+
     def test_disabled_topic_and_config_validation(self):
         self.notifier.configure({"enabled": {"casa": False}})
         self.notifier.on_routine("Cheguei", True, "executada")

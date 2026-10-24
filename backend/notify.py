@@ -233,6 +233,10 @@ class Notifier:
         except (OSError, ValueError):
             self.frigate_ok = False  # parado (modo jogo) ou subindo
             return
+        # Tópico de pessoas desligado: a saúde acima já basta. Sem isso o DVR continuaria
+        # calado nas câmeras do Frigate depois que o container para.
+        if not self.enabled.get("pessoas"):
+            return
         now = self.clock()
         allowed = FRIGATE_KINDS[self.frigate_kinds]
         watched = self.watched()
@@ -271,6 +275,15 @@ class Notifier:
                 del self.frigate_seen[event_id]
 
     # ---- ciclo ----
+    def _watch(self, health, lab, offset, minute):
+        """Uma volta. O Frigate é sondado mesmo com o tópico de pessoas desligado."""
+        self.poll_frigate(offset())
+        if minute:
+            if health:
+                self.check_health(health())
+            if lab:
+                self.check_lab(lab())
+
     def start(self, health=None, lab=None, offset=lambda: 0.0):
         if self.threads:
             return
@@ -282,13 +295,7 @@ class Notifier:
             while not self.stop_event.wait(5):
                 ticks += 1
                 try:
-                    if self.enabled.get("pessoas"):
-                        self.poll_frigate(offset())
-                    if ticks % 12 == 0:  # a cada minuto
-                        if health:
-                            self.check_health(health())
-                        if lab:
-                            self.check_lab(lab())
+                    self._watch(health, lab, offset, ticks % 12 == 0)
                 except Exception:
                     pass
 
