@@ -368,10 +368,31 @@ class LocationStore:
                 pass
 
     # ---- leitura para o painel ----
+    def _recent(self, tst, now):
+        return type(tst) in (int, float) and not isinstance(tst, bool) and now - STALE_SECONDS <= tst <= now + 300
+
+    def _at_home(self, person_id, homes, now):
+        """True em casa, False fora, None sem sinal recente. A cerca (enter/leave de um lugar Casa)
+        mais nova que o GPS vale na hora: o app avisa a saída antes de mandar outra posição."""
+        track = self.tracks.get(person_id, {})
+        points = track.get("points", [])
+        last = points[-1] if points else None
+        state, at = None, None
+        if last is not None and self._recent(last["tst"], now):
+            state, at = self._inside(last) in homes, last["tst"]
+        for event in track.get("events", []):
+            tst = event.get("tst")
+            if event.get("place") not in homes or event.get("kind") not in {"chegou", "saiu"}:
+                continue
+            if not self._recent(tst, now) or (at is not None and tst < at):
+                continue
+            state, at = event["kind"] == "chegou", tst
+        return state
+
     def presence(self):
-        """True: alguém num lugar "Casa". False: todos com posição recente e fora.
-        None: sem lugar Casa, ou sem dado recente de alguém. Ponto com mais de 30 min não conta:
-        o painel já marca esse ponto como parado, e aqui a casa fica "não se sabe"."""
+        """True: alguém num lugar "Casa". False: todos com dado recente e fora.
+        None: sem lugar Casa, ou sem dado recente de alguém. Ponto ou transição com mais de
+        30 min não conta: o painel já marca esse ponto como parado, e aqui a casa fica "não se sabe"."""
         with self.lock:
             if not self.config:
                 return None
@@ -380,14 +401,7 @@ class LocationStore:
             if not homes or not people:
                 return None
             now = self.clock()
-            states = []
-            for person in people:
-                points = self.tracks.get(person["id"], {}).get("points", [])
-                last = points[-1] if points else None
-                if last is None or now - last["tst"] > STALE_SECONDS:
-                    states.append(None)
-                else:
-                    states.append(self._inside(last) in homes)
+            states = [self._at_home(person["id"], homes, now) for person in people]
             if any(state is True for state in states):
                 return True
             return False if all(state is False for state in states) else None

@@ -127,6 +127,21 @@ class StoreTests(unittest.TestCase):
         self.point(*STOP)
         self.assertFalse(self.store.presence())
 
+    def test_newer_geofence_updates_presence_before_the_next_gps(self):
+        self.store.save_place({"name": "Casa", "lat": HOME[0], "lon": HOME[1], "radius": 80})
+        self.point(*HOME)
+        self.assertTrue(self.store.presence())
+        self.clock.now += 30
+        self.store.ingest({"_type": "transition", "event": "leave", "desc": "Casa", "tst": self.clock.now}, "maria-clara")
+        self.assertFalse(self.store.presence(), "saiu da Casa; o GPS antigo ainda está dentro")
+        self.clock.now += 30
+        self.store.ingest({"_type": "transition", "event": "enter", "desc": "Casa", "tst": self.clock.now}, "maria-clara")
+        self.assertTrue(self.store.presence(), "voltou pela cerca, antes de um GPS novo")
+        self.point(*STOP)
+        self.assertFalse(self.store.presence(), "GPS mais novo que a cerca manda")
+        self.clock.now += STALE_SECONDS + 1
+        self.assertIsNone(self.store.presence(), "cerca velha também deixa de valer")
+
     def test_two_people_regions_presence_and_events(self):
         joao = self.store.setup("João")
         self.assertEqual(self.store.authorize(basic(joao["username"], joao["password"]), "x"), "joao")
