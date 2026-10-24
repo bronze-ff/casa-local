@@ -64,6 +64,8 @@ class MotionWatcher:
         # Fotos dos eventos: fila atendida por dois trabalhadores (no máximo duas buscas ao go2rtc ao
         # mesmo tempo, sem descartar nenhuma quando várias câmeras disparam juntas).
         self.snapshots = queue.Queue(maxsize=500)
+        # Quem quer saber de cada evento novo depois da foto (avisos no celular): f(evento, bytes|None).
+        self.listeners = []
         try:
             saved = json.loads((self.dir / "eventos.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -259,6 +261,13 @@ class MotionWatcher:
                 except queue.Empty:
                     continue
                 self._snapshot(event)
+                photo = self.dir / f"{event['id']}.jpg"
+                data = photo.read_bytes() if photo.exists() else None
+                for listener in self.listeners:
+                    try:
+                        listener(event, data)
+                    except Exception:
+                        pass
 
         for index in range(2):
             threading.Thread(target=photographer, daemon=True, name=f"casa-movimento-foto-{index}").start()

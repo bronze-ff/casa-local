@@ -26,6 +26,8 @@ from .replay import WINDOW as REPLAY_WINDOW, Replays
 from .routines import Routines
 from .alert_devices import AlertDevices
 from .homelab import Homelab
+from .notify import Notifier
+from .shortcuts import Shortcuts
 from .samsung_tv import SamsungTVs
 from .models import AppError, VERSION
 
@@ -74,16 +76,23 @@ class CasaServer(ThreadingHTTPServer):
         self.location = location or LocationStore(store)
         self.started = time.time()
         places = lambda: [p["id"] for p in self.location.config.get("places", [])] if self.location.config else None
-        self.routines = Routines(app, store, places=places)
+        people = lambda: [p["id"] for p in self.location.config.get("people", [])] if self.location.config else []
+        self.routines = Routines(app, store, places=places, people=people)
         self.location.listeners.append(self.routines.on_place)
         self.alerts = AlertDevices(store, cameras=lambda: CAMERA_IDS)
-        self.homelab = Homelab(store, enabled=local)
+        self.homelab = Homelab(store, enabled=local, presence=self.at_home)
+        self.shortcuts = Shortcuts(store)
+        self.notifier = Notifier(store, host=lambda: self.homelab.host, presence=self.at_home, watched=lambda: set(self.motion.notify))
         self.energy = AcUsage(store)
         if local:
             app.listeners.append(lambda device_id, state: self.energy.observe(state.get("power")) if device_id == "ar-quarto" else None)
         self.motion = MotionWatcher(self.cameras, store)
         self.tvs = SamsungTVs(store, preview=not local)
         self.replays = Replays(self.cameras, offset=lambda: self.motion.offset)
+        if local:
+            self.motion.listeners.append(lambda event, photo: self.notifier.on_motion(event, self.motion.notify, photo))
+            self.location.listeners.append(lambda event: self.notifier.on_location(event, {p["id"]: p["name"] for p in (self.location.config or {}).get("places", [])}))
+            self.routines.listeners.append(self.notifier.on_routine)
         self.backups = Backups(app.data_dir)
         self.background = threading.Event()
         self.dist_dir = Path(dist_dir or ROOT / "dist").resolve()
@@ -102,16 +111,23 @@ class CasaServer(ThreadingHTTPServer):
             self.tvs.start(self.background)
             self.backups.start(self.background)
             self.homelab.start()
+            self.notifier.start(health=lambda: health_report(self.app, self.cameras, self.motion, self.tvs, self.backups, self.started),
+                                lab=self.homelab.status, offset=lambda: self.motion.offset)
 
     def server_close(self):
         self.background.set()
         self.routines.close()
         self.motion.close()
         self.homelab.close()
+        self.notifier.close()
         self.replays.close_all()
         self.app.close()
         self.cameras.close()
         super().server_close()
+
+    def at_home(self):
+        """Modo ausente: alguém num lugar "Casa" (True), todos fora (False) ou sem saber (None)."""
+        return self.location.presence()
 
     def process_request(self, request, client_address):
         if not self.slots.acquire(blocking=False):
@@ -171,7 +187,7 @@ class CasaHandler(BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(encoded)
 
-    def guard(self, mutation=False, phone=False):
+    def guard(self, mutation=False, phone=False, path=None):
         if not private_ip(self.client_address[0]):
             raise AppError("Acesso restrito à rede privada.", 403, "private_network_only")
         hosts = self.headers.get_all("Host", [])
@@ -207,7 +223,9 @@ class CasaHandler(BaseHTTPRequestHandler):
             raise AppError("Solicitação de outro site bloqueada.", 403, "cross_site")
         if mutation:
             tokens = self.headers.get_all("X-Casa-Token", [])
-            if len(tokens) != 1 or not hmac.compare_digest(tokens[0], self.server.app.csrf_token):
+            # Atalhos da Siri usam a chave própria (só nas rotas de ação) no lugar do token da sessão.
+            shortcut = path is not None and self.server.shortcuts.allows(path, self.headers)
+            if not shortcut and (len(tokens) != 1 or not hmac.compare_digest(tokens[0], self.server.app.csrf_token)):
                 raise AppError("Recarregue o painel para atualizar a sessão local.", 403, "invalid_token")
             instant = time.monotonic()
             with self.server.rate_lock:
@@ -304,7 +322,7 @@ class CasaHandler(BaseHTTPRequestHandler):
             if urlsplit(self.path).path == "/owntracks":
                 self.receive_owntracks()
                 return
-            self.guard(mutation)
+            self.guard(mutation, path=urlsplit(self.path).path)
             target = urlsplit(self.path)
             path = target.path
             # The page itself may carry ?tray=1 (tray popup); API routes never take a query string.
@@ -320,6 +338,7 @@ class CasaHandler(BaseHTTPRequestHandler):
                 alert_device = re.fullmatch(r"/api/alert-devices/([0-9a-f]{16})(/remove)?", path)
                 learn = re.fullmatch(r"/api/devices/(tv-quarto|ar-quarto)/learn", path)
                 remove_place = re.fullmatch(r"/api/location/places/([a-z0-9-]{1,24})/remove", path)
+                person_route = re.fullmatch(r"/api/location/people/([a-z0-9-]{1,24})(/remove)?", path)
                 remove_routine = re.fullmatch(r"/api/routines/([0-9a-f]{8})/remove", path)
                 tv = re.fullmatch(r"/api/tvs/([0-9a-f]{12})/(pair|command|label)", path)
                 replay = re.fullmatch(r"/api/cameras/(cam[0-9]{1,2})/replay", path)
@@ -343,6 +362,12 @@ class CasaHandler(BaseHTTPRequestHandler):
                     result = {"state": app.snapshot()}
                 elif path == "/api/homelab":
                     result = self.server.homelab.set_mode(body)
+                elif path == "/api/notifications":
+                    result = self.server.notifier.configure(body)
+                elif path == "/api/notifications/test" and not body:
+                    result = self.server.notifier.test()
+                elif path == "/api/shortcuts/rotate" and not body:
+                    result = self.server.shortcuts.rotate()
                 elif path == "/api/alert-devices/hello":
                     result = self.server.alerts.hello(body)
                 elif alert_device and alert_device[2] and not body:
@@ -373,10 +398,14 @@ class CasaHandler(BaseHTTPRequestHandler):
                     result = {**self.server.tvs.command(tv[1], body), **self.server.tvs.status()}
                 elif tv and tv[2] == "label" and set(body) == {"label"}:
                     result = self.server.tvs.rename(tv[1], body["label"])
-                elif path == "/api/location/setup" and set(body) == {"name"}:
-                    result = {"phone": location.setup(body["name"]), "location": location.status()}
-                elif path == "/api/location/phone" and not body:
-                    result = {"phone": location.phone_config()}
+                elif path == "/api/location/setup" and set(body) in ({"name"}, {"name", "person"}):
+                    result = {"phone": location.setup(body["name"], body.get("person")), "location": location.status()}
+                elif path == "/api/location/phone" and set(body) <= {"person"}:
+                    result = {"phone": location.phone_config(body.get("person"))}
+                elif person_route and person_route[2] and not body:
+                    result = location.remove_person(person_route[1])
+                elif person_route and not person_route[2] and set(body) == {"name"}:
+                    result = location.rename(person_route[1], body["name"])
                 elif path == "/api/location/places":
                     result = location.save_place(body)
                 elif remove_place and not body:
@@ -402,6 +431,10 @@ class CasaHandler(BaseHTTPRequestHandler):
                 self.json_response(200, self.server.routines.status())
             elif path == "/api/homelab":
                 self.json_response(200, self.server.homelab.status())
+            elif path == "/api/notifications":
+                self.json_response(200, self.server.notifier.status())
+            elif path == "/api/shortcuts":
+                self.json_response(200, self.server.shortcuts.status())
             elif path == "/api/alert-devices":
                 self.json_response(200, self.server.alerts.status())
             elif path == "/api/energy":
@@ -447,11 +480,11 @@ class CasaHandler(BaseHTTPRequestHandler):
         self.guard(phone=True)
         if self.command != "POST" or urlsplit(self.path).query:
             raise AppError("Use POST.", 405, "method_not_allowed")
-        self.server.location.authorize(self.headers.get("Authorization"), self.client_address[0])
+        person = self.server.location.authorize(self.headers.get("Authorization"), self.client_address[0])
         lengths = self.headers.get_all("Content-Length", [])
         # O app manda corpo vazio quando um amigo é apagado: nada a guardar.
         body = {} if lengths == ["0"] else self.read_json()
-        self.json_response(200, self.server.location.ingest(body))
+        self.json_response(200, self.server.location.ingest(body, person))
 
     def relay_ws(self, camera_id, stream=None, seconds=LIVE_SECONDS):
         if self.headers.get("Upgrade", "").lower() != "websocket":

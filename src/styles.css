@@ -785,3 +785,40 @@ body.in-alert, body.in-alert #root { background: var(--pop); overflow: hidden; }
 .lab-services strong { font-size: 13.5px; font-weight: 650; }
 .lab-services span { font-size: 12px; color: var(--muted); }
 .lab-services a { display: grid; place-items: center; }
+
+/* ---- Avisos no celular / Atalhos da Siri ---- */
+.phone-steps { display: grid; gap: 10px; margin: 10px 0 0; padding-left: 1.2em; font-size: 12.5px; color: var(--soft); line-height: 1.5; }
+.phone-steps code { font: 500 11.5px "Cascadia Mono", Consolas, monospace; }
+.copyable { display: block; margin-top: 5px; padding: 7px 9px; border-radius: 9px; background: #141416; border: 1px solid var(--line-strong); color: var(--blue-2); overflow-wrap: anywhere; cursor: copy; user-select: all; }
+.sparks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.spark { display: grid; gap: 4px; padding: 8px 10px; border-radius: 14px; background: #18181b; border: 1px solid var(--line); min-width: 0; }
+.spark svg { width: 100%; height: 28px; }
+.spark path { fill: none; stroke: var(--blue-2); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.spark span { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.lab-actions { display: inline-flex; gap: 2px; }
+.lab-services li { grid-template-columns: auto 1fr auto; }
+.lab-frigate { display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: #18181b; border: 1px solid var(--line); }
+.lab-frigate > span { display: grid; gap: 2px; }
+.lab-frigate strong { font-size: 13.5px; }
+.lab-frigate small { font-size: 12px; color: var(--muted); }
+.lab-frigate .segmented button { min-height: 34px; font-size: 12.5px; }
+
+/* ---- Localização: várias pessoas ---- */
+.loc-people { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 0 12px; padding-bottom: 2px; }
+.loc-people::-webkit-scrollbar { display: none; }
+.loc-people button { display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 7px; flex-shrink: 0; padding: 7px 12px 7px 10px; border-radius: 14px; background: #18181b; border: 1px solid var(--line); color: var(--soft); font-size: 13px; font-weight: 650; text-align: left; }
+.loc-people button.on { border-color: var(--who); background: color-mix(in srgb, var(--who) 14%, #18181b); color: var(--text); }
+.loc-people button i { width: 9px; height: 9px; border-radius: 50%; background: var(--who); grid-row: span 2; }
+.loc-people button i.stale { opacity: .45; }
+.loc-people button i.idle { background: transparent; border: 2px solid var(--who); }
+.loc-people button small { grid-column: 2; font-size: 11px; font-weight: 500; color: var(--muted); }
+.loc-people button.add { display: grid; place-items: center; width: 44px; padding: 0; color: var(--blue-2); }
+.loc-people button.add.on { border-color: var(--blue); }
+.loc-rename { display: flex; align-items: center; gap: 4px; }
+.loc-rename input { width: 150px; min-height: 30px; padding: 0 8px; border-radius: 9px; background: #141416; border: 1px solid var(--line-strong); color: var(--text); font: 600 14px var(--font); }
+.loc-open { justify-self: start; text-decoration: none; }
+.loc-me i { background: var(--who, var(--rose)); }
+.loc-me i::after { border-color: var(--who, var(--rose)); }
+.loc-me b { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); padding: 1px 5px; border-radius: 6px; background: rgba(17, 19, 27, .85); color: #fff; font: 700 10px var(--font); white-space: nowrap; }
+.loc-me { position: relative; }
+.pill.danger { color: var(--red); }
