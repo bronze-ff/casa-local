@@ -195,9 +195,11 @@ class Notifier:
             if service["id"] == "frigate" and not lab.get("frigateOn"):
                 continue  # desligado de propósito (você em casa, ou "nunca")
             state = service["state"]
+            if state == "unknown":
+                continue  # leitura falhou: não é parada, e o estado anterior continua valendo
             before = self.lab_states.get(service["id"])
             self.lab_states[service["id"]] = state
-            if not stable or before is None or state in {"unknown"} or before == state:
+            if not stable or before is None or before == state:
                 continue
             if before == "running":
                 self.push("sistema", f"Parou: {service['name']}", f"{service['purpose']} · {service.get('status') or state}", priority=4, tags=["warning"], click=self._link("lab"))

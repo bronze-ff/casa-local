@@ -14,6 +14,7 @@ class FakeWindows:
 
     def __init__(self):
         self.calls, self.running, self.processes = [], True, ["explorer.exe"]
+        self.ps_code, self.ps_body = 0, None
 
     def __call__(self, args, timeout=60):
         self.calls.append(args)
@@ -31,6 +32,10 @@ class FakeWindows:
         if "config" in args and "--services" in args:
             return 0, "jellyfin\nntfy\nfrigate\nvaultwarden\nqbittorrent\n"
         if "docker" in args and "ps" in args:
+            if self.ps_code != 0:
+                return self.ps_code, "erro ao ler containers"
+            if self.ps_body is not None:
+                return 0, self.ps_body
             return 0, json.dumps({"Names": "jellyfin", "State": "running", "Status": "Up 5 minutes"}) + "\n"
         return 0, joined
 
@@ -90,6 +95,24 @@ class HomelabTests(unittest.TestCase):
         self.windows.calls.clear()
         self.lab.tick()
         self.assertFalse(any("stop jellyfin" in c for c in self.commands()), "no modo lab nada é parado")
+
+    def test_failed_docker_read_is_unknown_and_does_not_act(self):
+        self.windows.ps_body = "\n".join([
+            json.dumps({"Names": "jellyfin", "State": "running", "Status": "Up 5 minutes"}),
+            json.dumps({"Names": "frigate", "State": "running", "Status": "Up 5 minutes"}),
+        ]) + "\n"
+        self.lab.presence = lambda: False
+        self.lab.tick()
+        self.windows.calls.clear()
+        self.windows.ps_code = -1  # timeout
+        self.lab.tick()
+        states = {s["id"]: s["state"] for s in self.lab.status()["services"]}
+        self.assertTrue(all(state == "unknown" for state in states.values()))
+        self.assertIsNone(next(s["status"] for s in self.lab.status()["services"] if s["id"] == "jellyfin"))
+        self.assertFalse(any("compose" in " ".join(c) for c in self.windows.calls), "leitura ruim não liga nem para serviço")
+        self.windows.ps_code = 0
+        self.lab.tick()
+        self.assertEqual(next(s["state"] for s in self.lab.status()["services"] if s["id"] == "jellyfin"), "running")
 
     def test_status_does_not_wake_a_stopped_distro(self):
         self.windows.running = False

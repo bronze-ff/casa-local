@@ -65,6 +65,13 @@ class NotifyTests(unittest.TestCase):
         self.notifier.check_lab(lab("running"))
         self.notifier.check_lab(lab("exited"))
         self.assertEqual([item[1] for item in self.sent()], ["Voltou: Jellyfin", "Parou: Jellyfin"])
+        self.notifier.check_lab(lab("running"))
+        self.assertEqual([item[1] for item in self.sent()], ["Voltou: Jellyfin"])
+        self.notifier.check_lab(lab("unknown"))
+        self.notifier.check_lab(lab("running"))
+        self.assertEqual(self.sent(), [], "falha de leitura não é parada nem volta")
+        self.notifier.check_lab(lab("exited"))
+        self.assertEqual([item[1] for item in self.sent()], ["Parou: Jellyfin"])
         hot = lab("exited")
         hot["stats"]["gpu"]["temp"] = 90.0
         hot["stats"]["disks"][0]["freeGb"] = 8

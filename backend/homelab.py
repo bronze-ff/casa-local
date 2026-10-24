@@ -149,6 +149,7 @@ class Homelab:
         self.mode, self.reason, self.changed, self.step = "lab", None, clock(), None
         self.game_gone, self.games_open, self.host = None, [], None
         self.containers, self.running, self.stats, self.checked = {}, None, {}, 0
+        self.containers_ok = None  # None ainda não leu; False = docker ps falhou com a distro no ar
         self.history, self.history_at = deque(maxlen=HISTORY_POINTS), 0
         self.dropped_at = 0
         self.stop_event = threading.Event()
@@ -287,6 +288,9 @@ class Homelab:
             self.game_gone = None
         running = self.distro_running()
         containers = self.read_containers() if running else {}
+        # Timeout ou erro do docker ps, com o WSL ainda no ar: mapa vazio faria cada serviço
+        # parecer parado. Guarda a falha e não age em cima dela.
+        read_ok = containers is not None
         stats = {"cpu": self.machine.cpu(), "gpu": self.machine.gpu(), "disks": self.machine.disks(), "wslGb": self.machine.wsl_memory()}
         try:
             from .health import machine
@@ -294,15 +298,19 @@ class Homelab:
         except Exception:
             pass
         with self.lock:
-            self.running, self.containers, self.stats, self.checked = running, containers or {}, stats, self.clock()
+            self.running, self.stats, self.checked = running, stats, self.clock()
+            self.containers_ok = read_ok
+            if read_ok:
+                self.containers = containers
         # No boot o Docker religa os containers sozinho (restart policy), às vezes depois de o modo
         # jogo já ter parado tudo: no modo jogo, qualquer serviço pesado que aparecer ligado é parado de novo.
-        if self.mode == "jogo" and not self.busy.locked():
-            awake = sorted(name for name, info in (containers or {}).items() if info.get("state") == "running" and name not in KEEP_IN_GAME)
+        if read_ok and self.mode == "jogo" and not self.busy.locked():
+            awake = sorted(name for name, info in containers.items() if info.get("state") == "running" and name not in KEEP_IN_GAME)
             if awake:
                 self.compose("stop", *awake, timeout=240)
                 self.run([WSL, "-d", DISTRO, "-u", "root", "--", "sh", "-c", "sync; echo 3 > /proc/sys/vm/drop_caches"], timeout=60)
-        self.apply_frigate()
+        if read_ok:
+            self.apply_frigate()
         if running and self.clock() - self.dropped_at >= DROP_CACHE_EVERY:
             self.dropped_at = self.clock()
             self.run([WSL, "-d", DISTRO, "-u", "root", "--", "sh", "-c", "sync; echo 3 > /proc/sys/vm/drop_caches"], timeout=60)
@@ -316,12 +324,17 @@ class Homelab:
     def status(self):
         with self.lock:
             services = []
+            failed = self.containers_ok is False
             for service in SERVICES:
                 state = self.containers.get(service["id"], {})
                 kind, target = service["link"] or (None, None)
+                if failed:
+                    reported, detail = "unknown", None
+                else:
+                    reported = state.get("state") or ("stopped" if self.running is not None else "unknown")
+                    detail = state.get("status")
                 services.append({"id": service["id"], "name": service["name"], "purpose": service["purpose"], "link": {"kind": kind, "target": target} if kind else None,
-                                 "keep": service["id"] in KEEP_IN_GAME, "state": state.get("state") or ("stopped" if self.running is not None else "unknown"),
-                                 "status": state.get("status")})
+                                 "keep": service["id"] in KEEP_IN_GAME, "state": reported, "status": detail})
             return {"enabled": self.enabled, "mode": self.mode, "reason": self.reason, "since": int(self.changed), "step": self.step,
                     "auto": self.auto, "games": list(self.games), "frigate": self.frigate_mode, "frigateOn": self.frigate_wanted(), "presence": self.presence(), "gamesOpen": list(self.games_open), "host": self.host,
                     "wsl": self.running, "services": services, "stats": deepcopy(self.stats), "checked": int(self.checked),
