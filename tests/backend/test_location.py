@@ -10,7 +10,7 @@ import unittest
 
 from backend.app import CasaApp
 from backend.config import dpapi
-from backend.location import LocationStore, distance
+from backend.location import STALE_SECONDS, LocationStore, distance
 from backend.models import AppError
 from backend.server import CasaServer
 
@@ -114,6 +114,18 @@ class StoreTests(unittest.TestCase):
             with self.assertRaises(AppError):
                 self.store.save_place(bad)
 
+
+    def test_stale_position_is_unknown_presence(self):
+        self.store.save_place({"name": "Casa", "lat": HOME[0], "lon": HOME[1], "radius": 80})
+        self.point(*HOME)
+        self.assertTrue(self.store.presence())
+        self.clock.now += STALE_SECONDS
+        self.assertTrue(self.store.presence(), "30 min ainda vale")
+        self.clock.now += 1
+        self.assertIsNone(self.store.presence(), "celular parado: não se sabe se continua em casa")
+        self.assertTrue(self.person()["stale"])
+        self.point(*STOP)
+        self.assertFalse(self.store.presence())
 
     def test_two_people_regions_presence_and_events(self):
         joao = self.store.setup("João")

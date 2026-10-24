@@ -369,7 +369,9 @@ class LocationStore:
 
     # ---- leitura para o painel ----
     def presence(self):
-        """True: alguém num lugar "Casa". False: todos com posição e fora. None: sem lugar Casa ou sem dado de alguém."""
+        """True: alguém num lugar "Casa". False: todos com posição recente e fora.
+        None: sem lugar Casa, ou sem dado recente de alguém. Ponto com mais de 30 min não conta:
+        o painel já marca esse ponto como parado, e aqui a casa fica "não se sabe"."""
         with self.lock:
             if not self.config:
                 return None
@@ -377,10 +379,15 @@ class LocationStore:
             people = self.config.get("people", [])
             if not homes or not people:
                 return None
+            now = self.clock()
             states = []
             for person in people:
                 points = self.tracks.get(person["id"], {}).get("points", [])
-                states.append(self._inside(points[-1]) in homes if points else None)
+                last = points[-1] if points else None
+                if last is None or now - last["tst"] > STALE_SECONDS:
+                    states.append(None)
+                else:
+                    states.append(self._inside(last) in homes)
             if any(state is True for state in states):
                 return True
             return False if all(state is False for state in states) else None
