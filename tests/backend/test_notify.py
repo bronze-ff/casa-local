@@ -154,6 +154,18 @@ class NotifyTests(unittest.TestCase):
         self.notifier.on_motion(motion, {"cam6"}, None)
         self.assertEqual(len(self.sent()), 1, "Frigate parou: o DVR volta a avisar")
 
+    def test_frigate_stopped_on_purpose_stays_quiet(self):
+        service = {"id": "frigate", "name": "Frigate", "purpose": "Câmeras", "state": "running"}
+        off = {"mode": "lab", "step": None, "frigateWanted": False, "frigateOn": False, "services": [service], "stats": {}}
+        self.notifier.check_lab(off)
+        service["state"] = "exited"
+        self.notifier.check_lab(off)
+        self.assertEqual(self.sent(), [])
+        on = {"mode": "lab", "step": None, "frigateWanted": True, "frigateOn": True, "services": [{**service, "state": "running"}], "stats": {}}
+        self.notifier.check_lab(on)
+        self.notifier.check_lab({**on, "frigateOn": False, "services": [{**service, "state": "exited"}]})
+        self.assertEqual([item[1] for item in self.sent()], ["Parou: Frigate"])
+
     def test_disabled_topic_and_config_validation(self):
         self.notifier.configure({"enabled": {"casa": False}})
         self.notifier.on_routine("Cheguei", True, "executada")

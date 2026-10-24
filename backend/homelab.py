@@ -335,8 +335,10 @@ class Homelab:
                     detail = state.get("status")
                 services.append({"id": service["id"], "name": service["name"], "purpose": service["purpose"], "link": {"kind": kind, "target": target} if kind else None,
                                  "keep": service["id"] in KEEP_IN_GAME, "state": reported, "status": detail})
+            # frigateOn é o container agora; frigateWanted é a escolha (sempre / fora / nunca).
+            frigate_on = self.containers_ok is not False and self.containers.get("frigate", {}).get("state") == "running"
             return {"enabled": self.enabled, "mode": self.mode, "reason": self.reason, "since": int(self.changed), "step": self.step,
-                    "auto": self.auto, "games": list(self.games), "frigate": self.frigate_mode, "frigateOn": self.frigate_wanted(), "presence": self.presence(), "gamesOpen": list(self.games_open), "host": self.host,
+                    "auto": self.auto, "games": list(self.games), "frigate": self.frigate_mode, "frigateOn": frigate_on, "frigateWanted": self.frigate_wanted(), "presence": self.presence(), "gamesOpen": list(self.games_open), "host": self.host,
                     "wsl": self.running, "services": services, "stats": deepcopy(self.stats), "checked": int(self.checked),
                     "history": [list(point) for point in self.history]}
 

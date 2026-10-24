@@ -192,6 +192,24 @@ class HomelabTests(unittest.TestCase):
         with self.assertRaises(AppError):
             lab.set_mode({"frigate": "talvez"})
 
+    def test_frigate_on_follows_the_container(self):
+        self.lab.containers_ok = True
+        self.lab.running = True
+        self.lab.presence = lambda: False  # desejado: fora de casa
+        self.lab.containers = {"frigate": {"state": "exited", "status": "Exited (1) 2 minutes ago"}}
+        status = self.lab.status()
+        self.assertFalse(status["frigateOn"])
+        self.assertTrue(status["frigateWanted"])
+        self.lab.mode, self.lab.frigate_mode = "jogo", "sempre"
+        self.assertTrue(self.lab.status()["frigateWanted"])
+        self.assertFalse(self.lab.status()["frigateOn"], "modo jogo: desejado, mas o container está parado")
+        self.lab.containers["frigate"]["state"] = "running"
+        self.assertTrue(self.lab.status()["frigateOn"])
+        self.lab.containers_ok = False
+        failed = self.lab.status()
+        self.assertFalse(failed["frigateOn"])
+        self.assertEqual(next(s["state"] for s in failed["services"] if s["id"] == "frigate"), "unknown")
+
     def test_status_lists_services_with_links(self):
         self.lab.tick()
         status = self.lab.status()

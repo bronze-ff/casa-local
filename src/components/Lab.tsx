@@ -9,7 +9,7 @@ type Stats = {
   gpu?: {name: string; temp: number | null; use: number | null; memUsed: number | null; memTotal: number | null; watts: number | null} | null;
   disks?: {drive: string; label: string; freeGb: number; totalGb: number; used: number}[];
 };
-type Lab = {frigate: 'fora' | 'sempre' | 'nunca'; frigateOn: boolean; presence: boolean | null; enabled: boolean; mode: 'lab' | 'jogo'; reason: string | null; since: number; step: string | null; auto: boolean; games: string[]; gamesOpen: string[];
+type Lab = {frigate: 'fora' | 'sempre' | 'nunca'; frigateOn: boolean; frigateWanted: boolean; presence: boolean | null; enabled: boolean; mode: 'lab' | 'jogo'; reason: string | null; since: number; step: string | null; auto: boolean; games: string[]; gamesOpen: string[];
   wsl: boolean | null; host: string | null; services: Service[]; stats: Stats; checked: number; history: [number, number | null, number | null, number | null, number | null][]};
 
 const tone = (value: number | null | undefined, warn: number, bad: number) => value == null ? '' : value >= bad ? 'bad' : value >= warn ? 'warn' : 'ok';
@@ -54,6 +54,8 @@ export default function LabTab({casa}: {casa: Casa}) {
   if (!lab) return <section className="card lab"><div className="empty"><LoaderCircle className="spin" size={22} /><p>Lendo o home lab</p></div></section>;
   if (!lab.enabled) return <section className="card lab"><p className="loc-hint">O home lab roda só no PC de casa (esta é a prévia).</p></section>;
   const gaming = lab.mode === 'jogo';
+  const frigateNow = lab.services.some(service => service.id === 'frigate' && service.state === 'unknown')
+    ? 'Sem leitura agora' : lab.frigateOn ? 'Ligado agora' : 'Desligado agora';
   const busy = !!lab.step || casa.busy === 'homelab';
   const { stats } = lab;
   const up = lab.services.filter(s => s.state === 'running').length;
@@ -77,7 +79,7 @@ export default function LabTab({casa}: {casa: Casa}) {
     </div>
 
     <div className="lab-frigate">
-      <span><strong>Câmeras inteligentes (Frigate)</strong><small>{lab.frigateOn ? 'Ligado agora' : 'Desligado agora'}{lab.frigate === 'fora' && lab.presence == null ? ' · sem localização do celular: configure na aba Local um lugar chamado "Casa"' : ''} · usa ~2 GB de memória e parte da GPU</small></span>
+      <span><strong>Câmeras inteligentes (Frigate)</strong><small>{frigateNow}{lab.frigate === 'fora' && lab.presence == null ? ' · sem localização do celular: configure na aba Local um lugar chamado "Casa"' : ''} · usa ~2 GB de memória e parte da GPU</small></span>
       <div className="segmented" role="radiogroup" aria-label="Quando ligar o Frigate">
         {([['fora', 'Fora de casa'], ['sempre', 'Sempre'], ['nunca', 'Nunca']] as const).map(([id, label]) =>
           <button key={id} role="radio" aria-checked={lab.frigate === id} className={lab.frigate === id ? 'selected' : ''} disabled={busy}

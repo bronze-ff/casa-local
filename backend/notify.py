@@ -192,8 +192,8 @@ class Notifier:
         """Serviço do home lab que parou fora do modo jogo, disco quase cheio, GPU quente."""
         stable = lab.get("mode") == "lab" and not lab.get("step")
         for service in lab.get("services", []):
-            if service["id"] == "frigate" and not lab.get("frigateOn"):
-                continue  # desligado de propósito (você em casa, ou "nunca")
+            if service["id"] == "frigate" and not lab.get("frigateWanted"):
+                continue  # desligado de propósito (você em casa, ou "nunca"); frigateOn é o container
             state = service["state"]
             if state == "unknown":
                 continue  # leitura falhou: não é parada, e o estado anterior continua valendo
