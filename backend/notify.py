@@ -244,15 +244,16 @@ class Notifier:
             event_id = event.get("id")
             if not event_id or event_id in self.frigate_seen or event.get("label") not in allowed:
                 continue
-            if self.camera_scope == "watched" and event.get("camera") not in watched:
-                self.frigate_seen[event_id] = now  # câmera sem sino: não avisa
-                continue
             start = event.get("start_time") or now
+            if self.camera_scope == "watched" and event.get("camera") not in watched:
+                self.frigate_seen[event_id] = start  # câmera sem sino: não avisa
+                self.frigate_after = max(self.frigate_after, start)
+                continue
             sub = event.get("sub_label")
             person = sub[0] if isinstance(sub, list) and sub else sub if isinstance(sub, str) else None
             if not person and now - start < 4:
                 continue  # ainda pode reconhecer o rosto
-            self.frigate_seen[event_id] = now
+            self.frigate_seen[event_id] = start
             self.frigate_after = max(self.frigate_after, start)
             camera = event.get("camera", "")
             name = NAMES.get(camera, camera)
@@ -270,8 +271,11 @@ class Notifier:
             link = self._link(f"cameras:replay:{camera}:{int(start + dvr_offset)}") if re.fullmatch(r"cam\d{1,2}", camera) else None
             self.push("pessoas", title, f"Às {when}" + (f" · {label.lower()} reconhecida" if person else "") + ". Toque para ver a gravação.",
                       priority=priority, tags=["bust_in_silhouette" if event["label"] == "person" else "red_car"], click=link, attach=photo, filename=f"{camera}.jpg")
-        for event_id, seen in list(self.frigate_seen.items()):
-            if now - seen > 3600:
+        # A consulta pede `after = cursor - 30`, então o último evento continua voltando
+        # enquanto nada mais novo empurra o cursor. Esquecer o id pela idade o reenviaria.
+        horizon = self.frigate_after - 30
+        for event_id, start in list(self.frigate_seen.items()):
+            if start <= horizon:
                 del self.frigate_seen[event_id]
 
     # ---- ciclo ----

@@ -89,6 +89,24 @@ class NotifyTests(unittest.TestCase):
         self.notifier.poll_frigate()
         self.assertEqual(self.sent(), [])
 
+    def test_frigate_event_is_not_resent_while_the_query_keeps_it(self):
+        now = {"t": 1_000_000.0}
+        self.notifier.clock = lambda: now["t"]
+        event = {"id": "abc", "label": "person", "camera": "cam6", "start_time": 999_990.0, "has_snapshot": False, "sub_label": "Ana"}
+        self.frigate = {"/api/events": json.dumps([event]).encode(), "/api/config": json.dumps({"cameras": {"cam6": {}}}).encode()}
+        self.notifier.poll_frigate()
+        self.assertEqual(len(self.sent()), 1)
+        now["t"] += 3601
+        self.notifier.poll_frigate()
+        self.assertEqual(self.sent(), [])
+        self.assertIn("abc", self.notifier.frigate_seen)
+        self.notifier.frigate_after = event["start_time"] + 31
+        fresh = {**event, "id": "novo", "start_time": event["start_time"] + 40}
+        self.frigate["/api/events"] = json.dumps([fresh]).encode()
+        self.notifier.poll_frigate()
+        self.assertEqual([item[1] for item in self.sent()], ["Ana em Garagem"])
+        self.assertNotIn("abc", self.notifier.frigate_seen, "id atrás da janela do after pode sair")
+
     def test_frigate_respects_bell_and_kinds_and_replaces_dvr(self):
         events = [{"id": "carro", "label": "car", "camera": "cam6", "start_time": 999_000.0, "has_snapshot": False, "sub_label": None},
                   {"id": "rua", "label": "person", "camera": "cam1", "start_time": 999_000.0, "has_snapshot": False, "sub_label": None},
