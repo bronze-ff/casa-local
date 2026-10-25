@@ -1,0 +1,47 @@
+{
+  "version": "0.1",
+  "status": "proposta baseada em análise estática; não implementada",
+  "integrations": {
+    "isolation": "Uma identidade operacional por integração/conta; nenhuma fusão automática de contas OEM",
+    "adapter_operations": ["listDevices", "getCapabilities", "readState", "executeCommand", "subscribeState"],
+    "optional_adapter_operations": ["listRemotes", "listRemoteKeys", "learnInfraredCommand", "listVendorScenes", "triggerVendorScene"],
+    "transport_candidates": ["local", "authorized_cloud", "home_assistant_bridge"],
+    "secrets": "Apenas no backend/armazenamento privado; o frontend recebe referências opacas"
+  },
+  "device_required_fields": ["id", "integrationId", "providerDeviceId", "name", "kind", "capabilities", "connectivity", "state"],
+  "device_optional_fields": ["homeId", "roomId", "productId", "parentDeviceId", "remoteId", "model", "firmware", "protocolVersion", "localAddress", "secretRef"],
+  "device_kinds": ["light", "infrared_hub", "television", "air_conditioner"],
+  "capability_binding": {
+    "fields": ["name", "readable", "writable", "valueType", "providerBinding"],
+    "providerBinding_fields": ["bindingType", "identifier"],
+    "bindingType_candidates": ["dp", "command", "infrared_key", "learned_code"],
+    "constraints_when_applicable": ["min", "max", "step", "scale", "unit", "enumValues"],
+    "rule": "Preencher com o esquema retornado pelo aparelho/integração; nenhum DP de lâmpada foi confirmado"
+  },
+  "proposed_commands": [
+    {"type": "light.set", "optional_fields": ["power", "brightness", "colorTemperature", "color"], "validation": "Capacidades e intervalos do dispositivo"},
+    {"type": "remote.press", "required_fields": ["remoteId", "key"], "validation": "Vínculo com emissor e distinção entre alternância e comando explícito"},
+    {"type": "climate.set", "optional_fields": ["power", "mode", "temperature", "fanSpeed"], "validation": "Combinações e formato IR comprovados para o controle real"},
+    {"type": "scene.run", "required_fields": ["sceneId"], "validation": "Autorizações por etapa e registro de execução parcial"}
+  ],
+  "proposed_api": [
+    {"method": "GET", "path": "/api/devices", "purpose": "Inventário permitido pela sessão do proprietário"},
+    {"method": "GET", "path": "/api/devices/{id}/capabilities", "purpose": "Esquema normalizado de recursos"},
+    {"method": "GET", "path": "/api/devices/{id}/state", "purpose": "Valor, horário, origem e confiança do estado"},
+    {"method": "POST", "path": "/api/devices/{id}/commands", "purpose": "Validar, autorizar e registrar uma execução"},
+    {"method": "GET", "path": "/api/commands/{id}", "purpose": "Consultar o resultado da execução"},
+    {"method": "GET", "path": "/api/scenes", "purpose": "Cenas acessíveis ao proprietário"},
+    {"method": "POST", "path": "/api/scenes/{id}/runs", "purpose": "Executar etapas e expor falhas parciais"},
+    {"method": "GET", "path": "/api/events", "purpose": "Atualizações de estado/conectividade por sessão autenticada"}
+  ],
+  "command_states": ["queued", "sent", "acknowledged", "confirmed", "failed", "unknown"],
+  "device_state_fields": ["value", "observedAt", "source", "confidence"],
+  "state_confidence": ["reported", "estimated", "unknown"],
+  "operational_rules": [
+    "Um callback de envio não confirma que o aparelho IR recebeu o sinal.",
+    "Comandos alternantes não devem ser reenviados automaticamente sem conhecer o efeito.",
+    "IDs de recursos devem ser autorizados pela sessão, além de existirem no inventário.",
+    "Cenas entre fornecedores devem registrar resultado por etapa, sem pressupor atomicidade.",
+    "Chaves locais, sessões e segredos não devem aparecer em respostas públicas, URLs ou logs."
+  ]
+}

@@ -1,0 +1,7 @@
+.venv/
+.data/
+__pycache__/
+*.pyc
+node_modules/
+dist-antigo/
+site.json

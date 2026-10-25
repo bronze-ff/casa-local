@@ -1,0 +1,10 @@
+{
+  "id": "/", "name": "Casa Local", "short_name": "Casa",
+  "description": "Seu painel pessoal de controle da casa.",
+  "lang": "pt-BR", "start_url": "/", "scope": "/", "display": "standalone",
+  "background_color": "#0c0f16", "theme_color": "#0c0f16",
+  "icons": [
+    {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
