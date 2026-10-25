@@ -26,8 +26,11 @@ const DESKTOP_TABS = ['', 'luzes', 'clima', 'tv', 'cameras', 'local', 'lab', 'ce
 const MOBILE_TABS = [['', 'Início', 'home'], ['luzes', 'Casa', 'bulb'], ['cameras', 'Câmeras', 'camera'], ['lab', 'Lab', 'server'], ['central', 'Central', 'bell']];
 
 const readRoute = () => {
-  const [name = '', ...rest] = window.location.hash.replace(/^#\/?/, '').split('/');
-  return { name: ROUTES[name] ? name : '', param: rest.join('/') };
+  // Aceita também o formato das notificações antigas: #cameras:replay:cam2:1730000000.
+  const raw = decodeURIComponent(window.location.hash.replace(/^#\/?/, ''));
+  const cut = raw.search(/[/:]/);
+  const name = cut < 0 ? raw : raw.slice(0, cut);
+  return { name: ROUTES[name] ? name : '', param: cut < 0 ? '' : raw.slice(cut + 1) };
 };
 export const href = (name, param) => `#/${name}${param ? `/${param}` : ''}`;
 

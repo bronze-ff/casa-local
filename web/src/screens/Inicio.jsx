@@ -3,7 +3,7 @@ import { fmtAgo, fmtTime, get, usePoll } from '../api.js';
 import { href, useHome } from '../App.jsx';
 import { Bar, Card, Icon, Stale, Switch, useAction } from '../ui.jsx';
 
-const SCENE_ICONS = { film: 'film', moon: 'moon', door: 'door', sun: 'sun' };
+const SCENE_ICONS = { home: 'home', film: 'film', moon: 'moon', book: 'book', sun: 'sun', sofa: 'sofa', coffee: 'coffee', bed: 'bed', power: 'power' };
 
 function useClock() {
   const [now, setNow] = useState(() => new Date());
