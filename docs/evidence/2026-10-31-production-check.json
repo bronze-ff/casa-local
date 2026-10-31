@@ -1,0 +1,93 @@
+{
+  "checkedAt": "2026-10-31T21:15:30.772025+00:00",
+  "sourceCommit": "868cea8",
+  "build": "/assets/index-C97ctc30.js",
+  "stylesheet": "/assets/index-BGMK1WQK.css",
+  "serviceActive": "active",
+  "restart": {
+    "oldPid": 274016,
+    "newPid": 509948,
+    "method": "SIGTERM of same-user service process; systemd Restart=always"
+  },
+  "backendMode": "local",
+  "backendVersionedSnapshotVerified": true,
+  "routes": [
+    {
+      "route": "inicio",
+      "title": "In\u00edcio",
+      "errors": [],
+      "overflow": false,
+      "build": "/assets/index-C97ctc30.js"
+    },
+    {
+      "route": "luzes",
+      "title": "Luzes",
+      "errors": [],
+      "overflow": false,
+      "build": "/assets/index-C97ctc30.js"
+    },
+    {
+      "route": "clima",
+      "title": "Clima",
+      "errors": [],
+      "overflow": false,
+      "build": "/assets/index-C97ctc30.js"
+    },
+    {
+      "route": "tv",
+      "title": "TV",
+      "errors": [],
+      "overflow": false,
+      "build": "/assets/index-C97ctc30.js"
+    },
+    {
+      "route": "local",
+      "title": "Local",
+      "errors": [],
+      "overflow": false,
+      "build": "/assets/index-C97ctc30.js"
+    },
+    {
+      "route": "cameras",
+      "title": "C\u00e2meras",
+      "errors": [],
+      "overflow": false,
+      "build": "/assets/index-C97ctc30.js"
+    },
+    {
+      "route": "lab",
+      "title": "Lab",
+      "errors": [],
+      "overflow": false,
+      "build": "/assets/index-C97ctc30.js"
+    },
+    {
+      "route": "central",
+      "title": "Central",
+      "errors": [],
+      "overflow": false,
+      "build": "/assets/index-C97ctc30.js"
+    }
+  ],
+  "mutationPolicy": "GET/HEAD only; POST and WebSocket blocked in browser smoke; no device commands",
+  "precache": {
+    "entries": 26,
+    "apiEntries": 0,
+    "functionalOfflineNotFullyVerified": true
+  },
+  "apiCacheLoopback20Sequential": {
+    "before": {
+      "medianMs": 0.6005,
+      "p95Ms": 0.739,
+      "maxMs": 8.132
+    },
+    "after": {
+      "medianMs": 0.5925,
+      "p95Ms": 0.739,
+      "maxMs": 8.107
+    },
+    "limitation": "small sequential loopback samples; not physical latency or statistically controlled benchmark"
+  },
+  "rollback": "~/.local/state/casalocal/rollback/20261031-172336",
+  "verificationScope": "browser fixtures/preview Pass plus read-only production smoke; no real video or physical command baseline"
+}
