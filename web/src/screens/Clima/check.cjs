@@ -43,7 +43,7 @@ console.log('Coverage OK: sparse ranges, fallback fan, nearest temperature, miss
 let snapshot, pollingError = null, polls = {}, preview = false;
 const calls = [];
 const api = { fmtAgo: () => 'há 1 min', fmtTime: () => '23:40', usePoll: (route) => ({ data: route === '/api/state' ? snapshot : polls[route] || null, error: pollingError, reload: async () => {}, at: Date.now() }) };
-const uiReal = compile(path.join(root, '../ui.jsx'), (id) => id === './api.js' ? { post: async () => { throw Error('Network forbidden'); } } : mainRequire(id));
+const uiReal = compile(path.join(root, '../ui.jsx'), (id) => id === './api.js' ? { homeStore: { run: async () => { throw Error('Network forbidden'); }, commandFor: () => null }, useHomeStore: () => ({}) } : id === './homeStore.js' ? { resultNotice: () => ({ kind: 'ok' }) } : mainRequire(id));
 const ui = { ...uiReal, useConfidence: () => 'estimated', useAction: () => [async (route, body) => { calls.push({ route, body }); return {}; }, false], useToast: () => () => {} };
 const resolve = (id) => id === '../App.jsx' ? { useHome: () => ({ home: snapshot, refresh: async () => {}, mode: preview ? 'preview' : 'local' }) } : id === '../api.js' ? api : id === '../ui.jsx' ? ui : id === './Clima/coverage.js' ? coverage : mainRequire(id);
 const Luzes = compile(path.join(root, 'Luzes.jsx'), resolve).default;

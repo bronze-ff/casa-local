@@ -17,6 +17,7 @@ function load(file) {
   if (file.endsWith('App.jsx')) return { useHome: () => home };
   if (file.endsWith('api.js')) return {
     usePoll: () => poll, post: async () => { throw Error('POST proibido no teste'); },
+    homeStore: { run: async () => { throw Error('POST proibido no teste'); }, commandFor: () => null }, useHomeStore: () => ({}),
     fmtAgo: () => 'há 40 min', fmtTime: () => '12:00',
   };
   if (cache.has(file)) return cache.get(file).exports;

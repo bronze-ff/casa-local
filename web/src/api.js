@@ -70,7 +70,7 @@ const browserVisibility = {
 export function useStatePoll(enabled, every = 5000) {
   useEffect(() => {
     if (!enabled) return undefined;
-    const poller = createPoller({ read: () => homeStore.refresh({ force: true }), every, visibility: browserVisibility, timers: browserTimers });
+    const poller = createPoller({ read: ({ isCurrent }) => homeStore.refresh({ force: true, isCurrent }), every, visibility: browserVisibility, timers: browserTimers });
     poller.start();
     return () => poller.stop();
   }, [enabled, every]);
@@ -85,7 +85,7 @@ export function usePoll(path, every = 5000) {
   useEffect(() => {
     if (!path || shared) return undefined;
     const mine = createPoller({
-      read: () => get(path),
+      read: () => get(path), // poll próprio: o poller já descarta no onData, não há store por trás
       every,
       onData: (data) => setState({ data, error: null, at: Date.now() }),
       onError: (error) => setState((old) => ({ ...old, error })),
@@ -97,7 +97,7 @@ export function usePoll(path, every = 5000) {
     return () => { mine.stop(); if (poller.current === mine) poller.current = null; };
   }, [path, every, shared]);
   const reload = useCallback(() => (shared ? homeStore.refresh().catch(() => {}) : poller.current?.refresh() ?? Promise.resolve()), [shared]);
-  if (shared) return { data: store.home, error: store.stateError, at: store.home ? 1 : 0, reload, stale: !!store.stateError && !!store.home };
+  if (shared) return { data: store.home, error: store.stateError, at: store.homeAt, reload, stale: !!store.stateError && !!store.home };
   return { ...state, reload, stale: !!state.error && !!state.data };
 }
 

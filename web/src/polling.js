@@ -1,10 +1,11 @@
-// Poller sem React: no máximo uma leitura em voo, pausa quando oculto, sem timer órfão.
-// read() devolve Promise; visibility = { isVisible(), subscribe(listener) -> unsubscribe }; timers = { setTimeout, clearTimeout }.
+// Poller sem React: UMA leitura real em voo por vez, pausa quando oculto, sem timer órfão.
+// read({isCurrent}) devolve Promise; isCurrent() fica falso ao ocultar/parar, para quem aplica o resultado (a store) descartá-lo.
+// visibility = { isVisible(), subscribe(listener) -> unsubscribe }; timers = { setTimeout, clearTimeout }.
 export function createPoller({ read, every = 5000, onData = () => {}, onError = () => {}, visibility, timers }) {
   let running = false;
   let generation = 0;
   let timer = null;
-  let inflight = null;
+  let inflight = null; // a leitura REAL continua única até terminar; ocultar/reexibir não abre outra
   let unsubscribe = null;
   let wasVisible = true;
 
@@ -21,29 +22,31 @@ export function createPoller({ read, every = 5000, onData = () => {}, onError = 
     if (inflight) return inflight;
     clear();
     const mine = generation;
+    const current = () => running && mine === generation && visible();
     let reading;
-    try { reading = Promise.resolve(read()); } catch (error) { reading = Promise.reject(error); }
-    inflight = reading
+    try { reading = Promise.resolve(read({ isCurrent: current })); } catch (error) { reading = Promise.reject(error); }
+    const promise = reading
       .then(
-        (data) => { if (mine === generation) onData(data); },
-        (error) => { if (mine === generation) onError(error); },
+        (data) => { if (current()) onData(data); },
+        (error) => { if (current()) onError(error); },
       )
       .finally(() => {
-        if (mine !== generation) return;
-        inflight = null;
-        schedule();
+        if (inflight === promise) inflight = null;
+        if (!running) return;
+        if (mine !== generation && visible()) refresh(); // ocultou/reexibiu durante a leitura: o resultado foi descartado, lê de novo agora
+        else schedule();
       });
-    return inflight;
+    inflight = promise;
+    return promise;
   }
 
   function onVisibility() {
     const now = visible();
-    if (now === wasVisible) return; // notificação repetida não reinicia a leitura em voo
+    if (now === wasVisible) return; // notificação repetida não mexe em nada
     wasVisible = now;
-    generation += 1; // resposta em voo de antes da mudança de visibilidade não vale mais
-    inflight = null;
+    generation += 1; // resultado de antes da mudança não vale mais
     clear();
-    if (visible()) refresh();
+    if (now) refresh(); // com leitura ainda em voo, refresh() só espera: a nova leitura sai quando a real terminar
   }
 
   function start() {
@@ -58,7 +61,6 @@ export function createPoller({ read, every = 5000, onData = () => {}, onError = 
   function stop() {
     running = false;
     generation += 1;
-    inflight = null;
     clear();
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
   }

@@ -267,3 +267,169 @@ test('reset invalida a geração: resposta tardia não altera a store', async ()
   await read.catch(() => {});
   assert.equal(store.getSnapshot().home, null);
 });
+
+// ---------- Reparo Etapa 1: 6 achados do Crivo ----------
+const lamp = (power, extra = {}) => ({ id: 'quarto-luz', physicalId: 'physical-1', state: { power, brightness: 50 }, confidence: 'reported', fieldObservations: {}, ...extra });
+const snapL = (revision, power, epoch = 'A') => ({ stateVersion: { epoch, revision }, mode: 'local', devices: [lamp(power), DEVICES[1], DEVICES[2], DEVICES[3]], scenes: [], recentActions: [] });
+const rc = (revision, over = {}) => ({ requestId: `req-${revision}`, delivery: 'sent', stateVersion: { epoch: 'A', revision }, outcome: 'diverged', requested: { power: true }, reported: { power: false }, confirmedFields: [], divergedFields: ['power'], observedAt: '2026-10-31T20:00:00Z', timing: { budgetMs: 6000, elapsedMs: 10, overrunMs: 0 }, ...over });
+const errWith = (receipt, status = 502) => new ApiError('falhou', status, 'command_result_unknown', receipt);
+function makeL({ post, get, now, boot = () => snapL(12, true) } = {}) {
+  const calls = { boots: 0, get: 0 };
+  const store = createHomeStore({
+    bootstrap: async () => { calls.boots += 1; return { ...boot(), csrfToken: 't' }; },
+    get: get || (async () => { calls.get += 1; return snapL(12, true); }),
+    post, ApiError, now,
+  });
+  return { store, calls };
+}
+
+test('achado 1: receipt velho (A10) depois de snapshot A12 não rebaixa valor nem vira divergente; fica em histórico', async () => {
+  const { store } = makeL({ post: async () => { throw errWith(rc(10)); } });
+  await store.bootstrap();
+  await assert.rejects(store.run(light, {}));
+  const command = store.commandFor('quarto-luz');
+  assert.equal(command.phase, 'unknown');
+  assert.equal(command.receipt, null);
+  assert.equal(command.staleReceipt.stateVersion.revision, 10);
+  const { home } = store.getSnapshot();
+  assert.equal(home.stateVersion.revision, 12);
+  assert.equal(home.devices[0].state.power, true);
+});
+
+test('achado 1: receipt novo parcial (A13) mescla SÓ reported e metadados reais ao snapshot', async () => {
+  const { store } = makeL({ post: async () => { throw errWith(rc(13)); } });
+  await store.bootstrap();
+  await assert.rejects(store.run(light, {}));
+  const command = store.commandFor('quarto-luz');
+  assert.equal(command.phase, 'diverged');
+  assert.equal(command.receipt.stateVersion.revision, 13);
+  const { home } = store.getSnapshot();
+  assert.equal(home.stateVersion.revision, 13);
+  const device = home.devices[0];
+  assert.equal(device.state.power, false, 'campo observado entra');
+  assert.equal(device.state.brightness, 50, 'campo não observado fica como estava, sem inventar');
+  assert.deepEqual(device.fieldObservations.power, { observedAt: '2026-10-31T20:00:00Z', revision: 13 });
+  assert.equal(device.fieldObservations.brightness, undefined);
+});
+
+test('achado 1: receipt de epoch diferente não mescla, fica inconclusivo e pede bootstrap', async () => {
+  const { store, calls } = makeL({ post: async () => { throw errWith(rc(3, { stateVersion: { epoch: 'B', revision: 3 } })); } });
+  await store.bootstrap();
+  await assert.rejects(store.run(light, {}));
+  await flush();
+  assert.equal(store.commandFor('quarto-luz').phase, 'unknown');
+  assert.equal(store.getSnapshot().home.devices[0].state.power, true);
+  assert.equal(calls.boots, 2);
+});
+
+test('achado 1: sucesso com receipt/snapshot mais velho que o aplicado não confirma', async () => {
+  const { store } = makeL({ post: async () => ({ state: snapL(11, false), device: lamp(false), command: { status: 'acknowledged', receipt: rc(11, { outcome: 'confirmed', confirmedFields: ['power'], divergedFields: [], requested: { power: false } }) } }) });
+  await store.bootstrap();
+  await store.run(light, {});
+  assert.equal(store.commandFor('quarto-luz').phase, 'unknown');
+  assert.equal(store.getSnapshot().home.stateVersion.revision, 12);
+  assert.equal(store.getSnapshot().home.devices[0].state.power, true);
+});
+
+test('achado 2: bootstrap/remount da MESMA epoch durante o POST não descarta o snapshot novo nem confirma valor velho', async () => {
+  const pending = deferred();
+  const { store } = makeL({ post: () => pending.promise });
+  await store.bootstrap();
+  const action = store.run(light, {});
+  await store.bootstrap();
+  pending.resolve({ state: snapL(13, false), device: lamp(false), command: { status: 'acknowledged', receipt: rc(13, { outcome: 'confirmed', confirmedFields: ['power'], divergedFields: [], requested: { power: false } }) } });
+  await action;
+  const { home } = store.getSnapshot();
+  assert.equal(home.stateVersion.revision, 13);
+  assert.equal(home.devices[0].state.power, false);
+  assert.equal(store.commandFor('quarto-luz').phase, 'confirmed');
+});
+
+test('achado 2: backend antigo (sem stateVersion) e bootstrap durante o POST terminam inconclusivos, nunca confirmados', async () => {
+  const pending = deferred();
+  const legacy = (power) => ({ mode: 'local', devices: [lamp(power)], scenes: [], recentActions: [] });
+  const { store } = makeL({ boot: () => legacy(true), post: () => pending.promise });
+  await store.bootstrap();
+  const action = store.run(light, {});
+  await store.bootstrap();
+  pending.resolve({ state: legacy(false), command: { status: 'acknowledged' } });
+  await action;
+  assert.equal(store.commandFor('quarto-luz').phase, 'unknown');
+  assert.equal(store.getSnapshot().home.devices[0].state.power, true, 'snapshot sem versão de geração antiga é descartado');
+});
+
+test('achado 3: modo preserva receipt por aparelho/físico ao liberar o busy; parcial não vira confirmado', async () => {
+  const modeResult = {
+    state: snapL(13, true), status: 'partial',
+    results: [
+      { deviceId: 'quarto-luz', status: 'acknowledged', operation: 'accepted', evidence: 'unconfirmed', confirmationExpected: true, receipt: rc(13, { outcome: 'unconfirmed', requested: { power: false }, reported: { brightness: 50 }, divergedFields: [], confirmedFields: [] }) },
+      { deviceId: 'banheiro-luz', status: 'failed', operation: 'failed', evidence: 'unconfirmed', confirmationExpected: true, receipt: rc(13, { outcome: 'unconfirmed', delivery: 'unknown', reported: {}, divergedFields: [], confirmedFields: [] }) },
+      { deviceId: 'ar-quarto', status: 'sent', operation: 'accepted', evidence: 'unconfirmed', confirmationExpected: false, receipt: rc(13, { outcome: 'unconfirmed', requested: {}, reported: {}, divergedFields: [], confirmedFields: [] }) },
+    ],
+    evidenceSummary: { confirmed: 0, unconfirmed: 3, diverged: 0, operationalFailures: 1 },
+  };
+  const { store } = makeL({ post: async () => modeResult });
+  await store.bootstrap();
+  await store.run('/api/scenes/noite/run', {});
+  const light1 = store.commandFor('quarto-luz');
+  assert.equal(light1.phase, 'sent');
+  assert.equal(light1.receipt.reported.brightness, 50);
+  assert.equal(store.commandFor('banheiro-luz').phase, 'unknown');
+  assert.equal(store.commandFor('ar-quarto').phase, 'sent');
+  assert.equal(store.commandFor('tv-quarto').phase, 'sent', 'mesmo físico do ar enxerga o resultado, sem confirmação');
+  // busy liberado: novo comando é aceito
+  assert.equal(Object.values(store.getSnapshot().commands).some((c) => c.phase === 'pending'), false);
+});
+
+test('achado 3: modo completed misto (DP confirmado + IR) qualifica a incerteza', () => {
+  const notice = resultNotice('/api/scenes/mix/run', { status: 'completed', evidenceSummary: { confirmed: 1, unconfirmed: 1, operationalFailures: 0 } });
+  assert.equal(notice.kind, 'warn');
+  assert.match(notice.text, /parte/i);
+  assert.match(notice.text, /confirmação física/i);
+});
+
+test('achado 4: refresh só aplica se algum chamador ainda está vigente; chamador legítimo junto mantém o commit', async () => {
+  const slow = deferred();
+  const { store } = makeL({ get: () => slow.promise });
+  await store.bootstrap();
+  const stale = store.refresh({ force: true, isCurrent: () => false });
+  slow.resolve(snapL(13, false));
+  await stale;
+  assert.equal(store.getSnapshot().home.stateVersion.revision, 12, 'poll oculto não publica');
+  const slow2 = deferred();
+  const second = makeL({ get: () => slow2.promise });
+  await second.store.bootstrap();
+  const a = second.store.refresh({ force: true, isCurrent: () => false });
+  const b = second.store.refresh({ force: true }); // legítimo, junta-se à leitura em voo
+  slow2.resolve(snapL(13, false));
+  await Promise.all([a, b]);
+  assert.equal(second.store.getSnapshot().home.stateVersion.revision, 13);
+});
+
+test('achado 5: GET velho que falha DEPOIS de um POST bem sucedido não derruba a conexão atual', async () => {
+  const slow = deferred();
+  const { store } = makeL({ get: () => slow.promise, post: async () => ({ state: snapL(13, false), device: lamp(false), command: { status: 'acknowledged', receipt: rc(13, { outcome: 'confirmed', requested: { power: false }, confirmedFields: ['power'], divergedFields: [] }) } }) });
+  await store.bootstrap();
+  const old = store.refresh().catch(() => {});
+  await store.run(light, {});
+  slow.reject(new ApiError('old GET failed', 0, 'offline'));
+  await old;
+  const s = store.getSnapshot();
+  assert.equal(s.stateError, null);
+  assert.equal(s.home.stateVersion.revision, 13);
+  assert.equal(store.commandFor('quarto-luz').phase, 'confirmed');
+});
+
+test('achado 6: homeAt guarda o horário REAL da última aplicação e não muda por erro de leitura', async () => {
+  let clock = 1000;
+  let fail = false;
+  const { store } = makeL({ now: () => clock, get: async () => { if (fail) throw new ApiError('x', 0, 'offline'); return snapL(14, true); } });
+  assert.equal(store.getSnapshot().homeAt, 0);
+  await store.bootstrap();
+  assert.equal(store.getSnapshot().homeAt, 1000);
+  clock = 2000; await store.refresh({ force: true });
+  assert.equal(store.getSnapshot().homeAt, 2000);
+  clock = 3000; fail = true; await store.refresh({ force: true }).catch(() => {});
+  assert.equal(store.getSnapshot().homeAt, 2000, 'erro não renova o horário');
+  assert.ok(store.getSnapshot().stateError);
+});

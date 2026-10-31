@@ -100,3 +100,32 @@ test('every=0 lê uma vez e não agenda timer', async () => {
   assert.equal(h.timers.size, 0);
   poller.stop();
 });
+
+// ---------- Reparo Etapa 1: achado 4 ----------
+test('achado 4: ocultar e reexibir com leitura pendente NÃO inicia segunda leitura (pico 1) e o resultado velho é descartado', async () => {
+  const h = harness();
+  const poller = createPoller({ ...h.api, every: 5000 });
+  poller.start();
+  h.setVisible(false); h.setVisible(true);
+  assert.equal(h.reads.length, 1, 'a leitura real continua única');
+  h.reads[0].resolve('velho');
+  await flush();
+  assert.deepEqual(h.data, [], 'resultado de antes da ocultação não é aplicado');
+  assert.equal(h.reads.length, 2, 'só depois de a leitura real terminar, uma nova leitura');
+  h.reads[1].resolve('novo');
+  await flush();
+  assert.deepEqual(h.data, ['novo']);
+  poller.stop();
+});
+
+test('achado 4: read recebe isCurrent, que fica falso ao ocultar, parar ou trocar de geração', async () => {
+  const h = harness();
+  let ctx;
+  const poller = createPoller({ ...h.api, every: 5000, read: (c) => { ctx = c; return new Promise(() => {}); } });
+  poller.start();
+  assert.equal(ctx.isCurrent(), true);
+  h.setVisible(false);
+  assert.equal(ctx.isCurrent(), false);
+  poller.stop();
+  assert.equal(ctx.isCurrent(), false);
+});
