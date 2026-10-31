@@ -1,7 +1,7 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import { useHome } from '../App.jsx';
 import { fmtAgo, usePoll } from '../api.js';
-import { Card, Confidence, Dot, Icon, Key, Lcd, PixelSlider, Segmented, Stale, Switch, useAction, useConfidence, useToast } from '../ui.jsx';
+import { Card, Confidence, Dot, Icon, Key, Lcd, Segmented, Stale, Switch, VSlider, useAction, useConfidence, useToast } from '../ui.jsx';
 
 const COLORS = [
   ['#FF3B30', 'Vermelho'], ['#FF6A2B', 'Laranja'], ['#FFA51F', 'Âmbar'], ['#FFD84D', 'Amarelo'],
@@ -58,35 +58,42 @@ export default function Luzes({ param }) {
       <Stale poll={poll} what="estados das luzes" />
       <Segmented label="Escolher lâmpada" value={device.id} onChange={setSelected}
         options={lights.map((light) => [light.id, `${ROOMS[light.roomId] || light.name} · ${light.state?.power == null ? '– –' : light.state.power ? `${light.state.brightness ?? '—'}%` : 'off'}`])} />
-      <Lcd className="stack">
-        <div className="row"><span className="lbl">{device.name.toLowerCase()} · brilho</span><Confidence kind={kind}>{device.updatedAt ? fmtAgo(device.updatedAt) : ''}</Confidence></div>
-        <div className="row" style={{ alignItems: 'flex-end' }}>
-          <Dot size={64}>{state.brightness == null ? '–' : `${brightness}%`}</Dot>
-          <span className="dim" style={{ fontSize: 12, textAlign: 'right' }}>{state.brightness != null && brightness !== state.brightness ? <>rascunho<br />agora {state.brightness}%</> : state.power == null ? 'estado desconhecido' : state.power ? 'acesa' : 'apagada'}</span>
+      <div className="stage two">
+        <div className={`halo-scene ${state.power === true ? '' : 'off'}`} style={{ '--k': state.power === true ? 0.55 + brightness / 100 * 0.6 : 0.3, '--o': state.power === true ? 0.3 + brightness / 100 * 0.7 : 0.05, '--halo': color || '#FFD08A' }}>
+          <div className="halo" aria-hidden="true" />
+          <span className="lamp-fig" aria-hidden="true" />
+          <div className="stack" style={{ position: 'absolute', left: 14, bottom: 14, right: 96, background: 'color-mix(in srgb, var(--modulo) 92%, transparent)', borderRadius: 20, padding: '12px 14px', gap: 4 }} aria-live="polite">
+            <div className="row"><span className="lbl">{device.name.toLowerCase()} · brilho</span><Confidence kind={kind}>{device.updatedAt ? fmtAgo(device.updatedAt) : ''}</Confidence></div>
+            <Dot size={64}>{state.brightness == null ? '–' : `${brightness}%`}</Dot>
+            <span className="mut small">{state.brightness != null && brightness !== state.brightness ? `rascunho · agora ${state.brightness}%` : state.power == null ? 'estado desconhecido' : state.power ? 'acesa' : 'apagada'}</span>
+          </div>
+          <div style={{ position: 'absolute', right: 20, top: 20, bottom: 20, display: 'grid' }}>
+            <VSlider label="Brilho" value={brightness} min={10} max={100} step={10} disabled={disabled} onChange={setBrightness} />
+          </div>
         </div>
-        <PixelSlider label="Brilho" value={brightness} min={10} max={100} step={10} disabled={disabled} onChange={setBrightness} />
-        <div className="scale"><span>10</span><span>50</span><span>100</span></div>
-      </Lcd>
-      {reason && <p className="mut" role="status" style={{ fontSize: 12 }}>{reason}</p>}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, alignItems: 'center' }}>
-        <Key signal center disabled={disabled || brightness === state.brightness} reason={brightness === state.brightness ? 'brilho já aplicado' : undefined} onClick={() => command({ brightness })}>Aplicar {brightness}%</Key>
-        <div className="list" style={{ border: 0 }}>
-          <div style={{ border: 0, minHeight: 48 }}><span>{state.power ? 'Acesa' : 'Apagada'}</span><Switch on={state.power === true} label={`Ligar ou apagar ${device.name.toLowerCase()}`} disabled={disabled} onChange={(power) => command({ power })} /></div>
+        <div className="stack" style={{ gap: 12 }}>
+          {reason && <p className="mut" role="status" style={{ fontSize: 13 }}>{reason}</p>}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, alignItems: 'center' }}>
+            <Key signal center disabled={disabled || brightness === state.brightness} reason={brightness === state.brightness ? 'brilho já aplicado' : undefined} onClick={() => command({ brightness })}>Aplicar {brightness}%</Key>
+            <div className="list" style={{ border: 0 }}>
+              <div style={{ border: 0, minHeight: 48 }}><span>{state.power ? 'Acesa' : 'Apagada'}</span><Switch on={state.power === true} label={`Ligar ou apagar ${device.name.toLowerCase()}`} disabled={disabled} onChange={(power) => command({ power })} /></div>
+            </div>
+          </div>
+          <span className="lbl">Atalhos · aplicam ao tocar</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>{[20, 40, 60, 80, 100].map(shortcut)}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <Key center aria-label="Diminuir brilho" disabled={disabled || brightness <= 10} onClick={() => command({ brightness: Math.max(10, brightness - 10) })}>− 10</Key>
+            <Key center aria-label="Aumentar brilho" disabled={disabled || brightness >= 100} onClick={() => command({ brightness: Math.min(100, brightness + 10) })}>+ 10</Key>
+          </div>
+          <span className="lbl">Cor · liga se estiver apagada</span>
+          <Segmented label="Branco ou cor" value={color ? white ? 'white' : 'color' : null} disabled={disabled} options={[['white', 'Branco'], ['color', 'Cor']]}
+            onChange={(value) => chooseColor(value === 'white' ? '#FFD6A0' : '#FF3B30')} />
+          <div className="hue" role="group" aria-label="Cor da luz: 16 opções">
+            {COLORS.map(([hex, label]) => <button type="button" key={hex} aria-label={label} title={label} aria-pressed={color === hex} disabled={disabled} style={{ background: hex }} onClick={() => chooseColor(hex)} />)}
+          </div>
+          <p className="mut" style={{ fontSize: 12 }}>Atual: {COLORS.find(([hex]) => hex === color)?.[1] || color || 'desconhecida'}. Branco quente e frio usam o modo branco da lâmpada.</p>
         </div>
       </div>
-      <span className="lbl">Atalhos · aplicam ao tocar</span>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>{[20, 40, 60, 80, 100].map(shortcut)}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <Key center aria-label="Diminuir brilho" disabled={disabled || brightness <= 10} onClick={() => command({ brightness: Math.max(10, brightness - 10) })}>− 10</Key>
-        <Key center aria-label="Aumentar brilho" disabled={disabled || brightness >= 100} onClick={() => command({ brightness: Math.min(100, brightness + 10) })}>+ 10</Key>
-      </div>
-      <span className="lbl">Cor · liga se estiver apagada</span>
-      <Segmented label="Branco ou cor" value={color ? white ? 'white' : 'color' : null} disabled={disabled} options={[['white', 'Branco'], ['color', 'Cor']]}
-        onChange={(value) => chooseColor(value === 'white' ? '#FFD6A0' : '#FF3B30')} />
-      <div className="swatch" role="group" aria-label="Cor da luz: 16 opções">
-        {COLORS.map(([hex, label]) => <button type="button" key={hex} aria-label={label} title={label} aria-pressed={color === hex} disabled={disabled} style={{ background: hex }} onClick={() => chooseColor(hex)} />)}
-      </div>
-      <p className="mut" style={{ fontSize: 11 }}>Atual: {COLORS.find(([hex]) => hex === color)?.[1] || color || 'desconhecida'}. Branco quente e frio usam o modo branco da lâmpada.</p>
       {!!snapshot.scenes?.length && (
         <Card title="Modos">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>

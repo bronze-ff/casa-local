@@ -56,12 +56,14 @@ export default function Lab() {
           <span>A máquina Linux (WSL) está desligada, por isso os serviços aparecem parados.</span>
         </div>
       )}
-      <div className="grid">
-        <GameCard s={s} disabled={disabled} send={send} />
-      </div>
       <MachineCard s={s} />
-      <ServicesCard s={s} disabled={disabled} send={send} />
-      <NetworkCard disabled={offline} />
+      <div className="stage two">
+        <NetworkCard disabled={offline} />
+        <div className="stack" style={{ gap: 14 }}>
+          <GameCard s={s} disabled={disabled} send={send} />
+          <ServicesCard s={s} disabled={disabled} send={send} />
+        </div>
+      </div>
     </>
   );
 }

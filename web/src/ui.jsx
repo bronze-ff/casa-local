@@ -1,60 +1,47 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { homeStore, useHomeStore } from './api.js';
 import { resultNotice } from './homeStore.js';
 
-/* Ícones de pixel 12x12 (pixel de 2 px, '#' = aceso), herdam a cor do texto. Os 18 primeiros vêm do hub;
-   o resto foi desenhado no mesmo grid (a Aquarela revisa). */
+/* Ícones de traço 24x24 (2 px, pontas redondas), herdam a cor do texto. Nomes e aliases antigos preservados (os de modo ficam gravados no servidor). */
 const GLYPHS = {
-  home: ['.....##.....', '....####....', '...######...', '..########..', '.##########.', '..#......#..', '..#.##...#..', '..#.##...#..', '..#......#..', '..#..##..#..', '..#..##..#..', '..########..'],
-  luz: ['....####....', '...#....#...', '..#......#..', '..#......#..', '..#..##..#..', '...#.##.#...', '....#..#....', '....####....', '....#..#....', '....####....', '.....##.....', '............'],
-  ar: ['.....##.....', '..#..##..#..', '...#.##.#...', '....####....', '####.##.####', '####.##.####', '....####....', '...#.##.#...', '..#..##..#..', '.....##.....', '............', '............'],
-  tv: ['............', '############', '#..........#', '#..........#', '#..........#', '#..........#', '#..........#', '############', '.....##.....', '...######...', '............', '............'],
-  cam: ['............', '............', '########....', '#......#..##', '#......#.###', '#......#####', '#......#####', '#......#.###', '#......#..##', '########....', '............', '............'],
-  pin: ['....####....', '...#....#...', '..#..##..#..', '..#.#..#.#..', '..#..##..#..', '...#....#...', '...#....#...', '....#..#....', '....#..#....', '.....##.....', '............', '............'],
-  lab: ['############', '#..........#', '#.#........#', '#..#.......#', '#.#..###...#', '#..........#', '############', '.....##.....', '...######...', '............', '............', '............'],
-  central: ['#####..#####', '#...#..#...#', '#...#..#...#', '#####..#####', '............', '............', '#####..#####', '#...#..#.#.#', '#...#..##.##', '#####..#####', '............', '............'],
-  film: ['............', '############', '#.#......#.#', '############', '#.#......#.#', '#.#......#.#', '############', '#.#......#.#', '############', '............', '............', '............'],
-  moon: ['....####....', '..###.......', '.###........', '.##.........', '###.........', '###.........', '###.........', '###........#', '.###......##', '.#####..###.', '...######...', '............'],
-  book: ['............', '.####..####.', '#....##....#', '#.##.##.##.#', '#....##....#', '#.##.##.##.#', '#....##....#', '#....##....#', '.####..####.', '............', '............', '............'],
-  sun: ['.....##.....', '.#...##...#.', '..#......#..', '....####....', '...######...', '##.######.##', '##.######.##', '...######...', '....####....', '..#......#..', '.#...##...#.', '.....##.....'],
-  sofa: ['............', '..########..', '..#......#..', '###......###', '#.#......#.#', '#.########.#', '#..........#', '############', '.#........#.', '............', '............', '............'],
-  coffee: ['..#..#..#...', '...#..#..#..', '..#..#..#...', '............', '#########...', '#.......####', '#.......#..#', '#.......####', '.#.....#....', '..#####.....', '############', '............'],
-  bed: ['............', '#...........', '#...........', '#.##........', '#.##.#######', '############', '#..........#', '############', '#..........#', '............', '............', '............'],
-  power: ['.....##.....', '..#..##..#..', '.#...##...#.', '#....##....#', '#..........#', '#..........#', '#..........#', '.#........#.', '..#......#..', '...######...', '............', '............'],
-  bell: ['.....##.....', '....####....', '...#....#...', '...#....#...', '...#....#...', '..#......#..', '..#......#..', '.##########.', '............', '.....##.....', '............', '............'],
-  alert: ['.....##.....', '.....##.....', '....#..#....', '....#..#....', '...#.##.#...', '...#.##.#...', '..#..##..#..', '..#......#..', '.#...##...#.', '.#........#.', '############', '............'],
-  ext: ['......######', '..........##', '.........#.#', '####....#..#', '#......#...#', '#.....#.....', '#....#......', '#..........#', '#..........#', '#..........#', '#..........#', '############'],
-  plus: ['............', '............', '.....##.....', '.....##.....', '.....##.....', '..########..', '..########..', '.....##.....', '.....##.....', '.....##.....', '............', '............'],
-  minus: ['............', '............', '............', '............', '............', '..########..', '..########..', '............', '............', '............', '............', '............'],
-  close: ['............', '.##......##.', '..##....##..', '...##..##...', '....####....', '.....##.....', '.....##.....', '....####....', '...##..##...', '..##....##..', '.##......##.', '............'],
-  back: ['............', '......##....', '.....##.....', '....##......', '...##.......', '..##........', '..##........', '...##.......', '....##......', '.....##.....', '......##....', '............'],
-  up: ['............', '............', '............', '.....##.....', '....####....', '...##..##...', '..##....##..', '.##......##.', '##........##', '............', '............', '............'],
-  refresh: ['....####....', '..##....##.#', '.#........##', '.#.......###', '.#..........', '.#..........', '.#........#.', '.#........#.', '..##....##..', '....####....', '............', '............'],
-  radio: ['............', '..#......#..', '.#..#..#..#.', '#..#.##.#..#', '#..#.##.#..#', '.#..#..#..#.', '..#......#..', '......##....', '......##....', '......##....', '............', '............'],
-  door: ['..########..', '..#......#..', '..#......#..', '..#......#..', '..#......#..', '..#.....##..', '..#......#..', '..#......#..', '..#......#..', '..#......#..', '############', '............'],
-  fan: ['....##......', '...####..##.', '...###..####', '....##..####', '.....#.##...', '......##....', '....##.#....', '####..##....', '####..###...', '.##..####...', '......##....', '............'],
-  game: ['............', '............', '.##########.', '#..#....#..#', '#.###..#.#.#', '#..#....#..#', '#....##....#', '.##......##.', '............', '............', '............', '............'],
+  home: 'M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10',
+  luz: 'M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.200 1 2.100h5c0-.9.4-1.600 1-2.100A6 6 0 0012 3z',
+  ar: 'M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5L12 7l2.5-2.5M9.5 19.5L12 17l2.5 2.5',
+  tv: 'M4 5h16a1 1 0 011 1v11a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zM8 21h8',
+  cam: 'M3 7h11a2 2 0 012 2v6a2 2 0 01-2 2H3zM16 11l5-3v8l-5-3',
+  pin: 'M12 21s7-6.200 7-11a7 7 0 00-14 0c0 4.800 7 11 7 11zM12 12.500a2.500 2.500 0 100-5 2.500 2.500 0 000 5z',
+  lab: 'M4 5h16v5H4zM4 14h16v5H4zM8 7.500h.01M8 16.500h.01',
+  central: 'M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4',
+  film: 'M4 4h16v16H4zM8 4v16M16 4v16M4 9h4M16 9h4M4 15h4M16 15h4',
+  moon: 'M20 14.500A8.500 8.500 0 119.500 4a7 7 0 0010.500 10.500z',
+  book: 'M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2zM4 19a2 2 0 012-2h13',
+  sun: 'M12 16a4 4 0 100-8 4 4 0 000 8zM12 2v2M12 20v2M4.900 4.900l1.400 1.400M17.700 17.700l1.400 1.400M2 12h2M20 12h2M4.900 19.100l1.400-1.400M17.700 6.300l1.400-1.400',
+  sofa: 'M5 11V8a3 3 0 013-3h8a3 3 0 013 3v3M3 14a2 2 0 014 0v2h10v-2a2 2 0 014 0v4H3zM6 18v2M18 18v2',
+  coffee: 'M4 9h13v6a4 4 0 01-4 4H8a4 4 0 01-4-4zM17 10h1.500a2.500 2.500 0 010 5H17M8 3v3M12 3v3',
+  bed: 'M3 19V6M3 15h18v4M21 15v-3a3 3 0 00-3-3h-8v6M7 11.500a1.500 1.500 0 100-3',
+  power: 'M12 3v9M6.400 6.600a8 8 0 1011.200 0',
+  bell: 'M6 17V11a6 6 0 0112 0v6l2 2H4zM10 21a2 2 0 004 0',
+  alert: 'M12 3l10 18H2zM12 10v5M12 18h.01',
+  ext: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5',
+  plus: 'M12 5v14M5 12h14',
+  minus: 'M5 12h14',
+  close: 'M6 6l12 12M18 6L6 18',
+  back: 'M15 5l-7 7 7 7',
+  up: 'M5 15l7-7 7 7',
+  refresh: 'M20 11a8 8 0 10-2.300 5.700M20 4v7h-7',
+  radio: 'M5 12a7 7 0 0114 0M8 12a4 4 0 018 0M12 13v8M12 12h.01',
+  door: 'M6 21V4a1 1 0 011-1h10a1 1 0 011 1v17M3 21h18M14 12h.01',
+  fan: 'M12 12c0-4 1-8 4-8s3 4-4 8zM12 12c4 0 8 1 8 4s-4 3-8-4zM12 12c0 4-1 8-4 8s-3-4 4-8zM12 12c-4 0-8-1-8-4s4-3 8 4z',
+  game: 'M7 8h10a5 5 0 015 5v1a3 3 0 01-5.200 2l-1.300-1.500h-5L8.200 16A3 3 0 013 14v-1a5 5 0 014-5zM8 11v3M6.500 12.500h3M16 12h.01M18 13.500h.01',
 };
-// Nomes antigos do painel e do backend (os 9 de modo ficam gravados no servidor: nomes exatos).
 const ALIASES = { bulb: 'luz', camera: 'cam', server: 'lab', snow: 'ar', external: 'ext', warn: 'alert', next: 'back', left: 'back', right: 'back', down: 'up' };
-const FLIP = { next: 'x', right: 'x', down: 'y' };
-const mirrored = (rows, axis) => (axis === 'x' ? rows.map((row) => [...row].reverse().join('')) : [...rows].reverse());
-
-const pathOf = (name) => {
-  const key = GLYPHS[name] ? name : ALIASES[name] || 'home';
-  let rows = GLYPHS[key];
-  if (FLIP[name]) rows = mirrored(rows, FLIP[name]);
-  let d = '';
-  rows.forEach((row, y) => { for (let x = 0; x < 12; x++) if (row[x] === '#') d += `M${x * 2} ${y * 2}h2v2h-2z`; });
-  return d;
-};
-const pathCache = {};
+const FLIP = { next: 'scaleX(-1)', right: 'scaleX(-1)', down: 'scaleY(-1)' };
 
 export function Icon({ name, size = 20, label, style }) {
-  const d = pathCache[name] || (pathCache[name] = pathOf(name));
+  const d = GLYPHS[name] || GLYPHS[ALIASES[name]] || GLYPHS.home;
   return (
     <span className="ic" style={{ '--icw': `${size}px`, ...style }} {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}>
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d={d} /></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={FLIP[name] ? { transform: FLIP[name] } : undefined}><path d={d} /></svg>
     </span>
   );
 }
@@ -142,6 +129,111 @@ export function PixelSlider({ value, min = 0, max = 100, step = 1, onChange, lab
   );
 }
 
+/* ===== Controles expressivos: dial (arco) e controle vertical =====
+   O arrasto altera só o rascunho (a tela); o comando sai UMA vez, ao soltar (ou ao soltar a tecla). Nunca por quadro. */
+const SWEEP = 270; const START = 135;
+export const progressToAngle = (progress) => START + SWEEP * Math.max(0, Math.min(1, progress));
+/** Ângulo (graus, horário a partir de +x) -> progresso 0..1; a zona morta embaixo cai na extremidade mais próxima. */
+export function angleToProgress(angle) {
+  const rel = (((angle - START) % 360) + 360) % 360;
+  if (rel <= SWEEP) return rel / SWEEP;
+  return rel - SWEEP < (360 - SWEEP) / 2 ? 1 : 0;
+}
+/** Controlador puro do dial: `values` limita ao que existe (cobertura IR esparsa nunca vira temperatura sem sinal). */
+export function dialController({ min, max, values, onCommit }) {
+  const list = values?.length ? [...values].sort((a, b) => a - b) : Array.from({ length: max - min + 1 }, (_, i) => min + i);
+  const nearest = (raw) => list.reduce((best, v) => (Math.abs(v - raw) < Math.abs(best - raw) ? v : best), list[0]);
+  let first = null; let current = null;
+  return {
+    start(value) { first = value; current = value; },
+    move(progress) { current = nearest(min + Math.max(0, Math.min(1, progress)) * (max - min)); return current; },
+    key(direction) {
+      if (direction === 'home') current = list[0];
+      else if (direction === 'end') current = list[list.length - 1];
+      else current = list[Math.max(0, Math.min(list.length - 1, list.indexOf(nearest(current ?? list[0])) + direction))];
+      return current;
+    },
+    draft: () => current,
+    release() {
+      if (current == null || current === first) return null;
+      const value = current;
+      first = value;
+      onCommit(value);
+      return value;
+    },
+  };
+}
+
+/** Dial: arco SVG de 270°, polegar arrastável e teclado. render(valor) desenha o número central. */
+export function Dial({ value, min, max, values, label, disabled, onCommit, render, unit = '' }) {
+  const [drag, setDrag] = useState(null);
+  const box = useRef(null);
+  const commit = useRef(null);
+  commit.current = (v) => { Promise.resolve(onCommit(v)).finally(() => setDrag(null)); };
+  const ctl = useMemo(() => dialController({ min, max, values, onCommit: (v) => commit.current(v) }), [min, max, values ? values.join(',') : '']); // estável durante o arrasto
+  const known = value != null && Number.isFinite(Number(value));
+  const shown = drag ?? (known ? Number(value) : min);
+  const progress = (shown - min) / (max - min);
+  const angle = (progressToAngle(progress) * Math.PI) / 180;
+  const tx = 100 + 80 * Math.cos(angle); const ty = 100 + 80 * Math.sin(angle);
+  const fromPointer = (event) => {
+    const rect = box.current.getBoundingClientRect();
+    const dx = event.clientX - (rect.left + rect.width / 2); const dy = event.clientY - (rect.top + rect.height / 2);
+    return angleToProgress((Math.atan2(dy, dx) * 180) / Math.PI);
+  };
+  const begin = () => { if (drag == null) ctl.start(known ? Number(value) : min); };
+  const onKeyDown = (event) => {
+    const map = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1, Home: 'home', End: 'end' };
+    if (disabled || !(event.key in map)) return;
+    event.preventDefault();
+    begin();
+    setDrag(ctl.key(map[event.key]));
+  };
+  const finish = () => { if (ctl.release() == null) setDrag(null); };
+  return (
+    <div ref={box} className="dial" role="slider" tabIndex={disabled ? -1 : 0} aria-label={label} aria-valuemin={min} aria-valuemax={max} aria-valuenow={known ? shown : undefined} aria-valuetext={known ? `${shown}${unit}` : 'desconhecido'} aria-disabled={!!disabled}
+      onKeyDown={onKeyDown} onKeyUp={(event) => { if (!disabled && (event.key.startsWith('Arrow') || event.key === 'Home' || event.key === 'End')) finish(); }}
+      onPointerDown={(event) => { if (disabled) return; event.currentTarget.setPointerCapture(event.pointerId); ctl.start(known ? Number(value) : min); setDrag(ctl.move(fromPointer(event))); }}
+      onPointerMove={(event) => { if (!disabled && event.buttons) setDrag(ctl.move(fromPointer(event))); }}
+      onPointerUp={() => { if (!disabled) finish(); }} onPointerCancel={() => setDrag(null)}>
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <defs><linearGradient id="dialgrad" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stopColor="var(--cool)" /><stop offset="1" stopColor="var(--warm)" /></linearGradient></defs>
+        <path className="trk" d="M43.43 156.57 A80 80 0 1 1 156.57 156.57" pathLength="100" />
+        {known && <path className="val" d="M43.43 156.57 A80 80 0 1 1 156.57 156.57" pathLength="100" strokeDasharray={`${Math.round(progress * 1000) / 10} 100`} />}
+        <circle className="thumb-d" r="13" cx="0" cy="0" style={{ transform: `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px)` }} />
+      </svg>
+      <div className="dial-read">{render(known || drag != null ? shown : null)}</div>
+    </div>
+  );
+}
+
+/** Controle vertical (brilho): arrasto altera só o rascunho do pai (onChange); quem aplica é o botão Aplicar. */
+export function VSlider({ value, min = 10, max = 100, step = 10, label, disabled, onChange }) {
+  const ref = useRef(null);
+  const clamp = (raw) => Math.max(min, Math.min(max, Math.round(raw / step) * step));
+  const at = (event) => {
+    const rect = ref.current.getBoundingClientRect();
+    return clamp(min + (1 - (event.clientY - rect.top) / rect.height) * (max - min));
+  };
+  const onKey = (event) => {
+    const keys = { ArrowUp: step, ArrowRight: step, ArrowDown: -step, ArrowLeft: -step };
+    if (disabled) return;
+    if (event.key in keys) onChange(clamp((Number(value) || min) + keys[event.key]));
+    else if (event.key === 'Home') onChange(min);
+    else if (event.key === 'End') onChange(max);
+    else return;
+    event.preventDefault();
+  };
+  const k = (((Number(value) || min) - min) / (max - min));
+  return (
+    <div ref={ref} className="vslider" role="slider" tabIndex={disabled ? -1 : 0} aria-orientation="vertical" aria-label={label} aria-valuemin={min} aria-valuemax={max} aria-valuenow={Number(value) || min} aria-disabled={!!disabled}
+      onPointerDown={(event) => { if (disabled) return; event.currentTarget.setPointerCapture(event.pointerId); onChange(at(event)); }}
+      onPointerMove={(event) => { if (!disabled && event.buttons) onChange(at(event)); }} onKeyDown={onKey}>
+      <div className="fillv" style={{ '--k': k }} />
+    </div>
+  );
+}
+
 export function Spark({ values = [], hi = Infinity, className = '' }) {
   const top = Math.max(...values, Number.isFinite(hi) ? hi : 0, 1);
   return (
@@ -169,7 +261,7 @@ export function Lcd({ children, className = '', ...rest }) {
 }
 
 const DOT_SIZES = [20, 34, 64, 150];
-/** Número ou palavra curta em Doto (só em 20, 34, 64 ou 150 px). */
+/** Número ou palavra curta em sans de números grandes (só em 20, 34, 64 ou 150 px; a Doto de pixel foi superada). */
 export function Dot({ children, size = 34, style, className = '' }) {
   const px = DOT_SIZES.includes(size) ? size : 34;
   const timed = typeof children === 'string' && children.includes(':');

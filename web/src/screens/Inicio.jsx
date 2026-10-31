@@ -38,12 +38,13 @@ function Hero({ location, size, led }) {
         {led}
       </div>
       {people.length > 0 && (
-        <div className="row" style={{ fontSize: 12, flexWrap: 'wrap', justifyContent: 'flex-start', columnGap: 18 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }} role="list" aria-label="Pessoas">
           {people.map((p) => {
             const where = !p.last ? 'sem posição' : p.place ? `em ${places[p.place] || p.place}` : 'fora dos lugares';
             return (
-              <a key={p.id} href={href('local')} style={{ ...LINK, textDecoration: 'none' }}>
-                <b>{p.name}</b>&nbsp;<span className="dim">· {where}{p.stale ? ' · posição antiga' : p.last ? ` · ${fmtAgo(p.last.tst)}` : ''}</span>
+              <a key={p.id} role="listitem" className="chip" href={href('local')}>
+                <span className="avatar" aria-hidden="true">{(p.name || '?').slice(0, 1).toUpperCase()}</span>
+                <span><b>{p.name}</b><small className="dim"> {where}{p.stale ? ' · posição antiga' : p.last ? ` · ${fmtAgo(p.last.tst)}` : ''}</small></span>
               </a>
             );
           })}

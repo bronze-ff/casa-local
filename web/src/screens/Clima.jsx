@@ -1,7 +1,7 @@
 ﻿import { useRef, useState } from 'react';
 import { useHome } from '../App.jsx';
 import { fmtAgo, fmtTime, usePoll } from '../api.js';
-import { Card, Confidence, Dot, Icon, Key, Lcd, PixelBar, Segmented, Stale, useAction, useConfidence } from '../ui.jsx';
+import { Card, Confidence, Dial, Dot, Icon, Key, Lcd, Segmented, Stale, useAction, useConfidence } from '../ui.jsx';
 import { FANS, MODES, supportedState, temperatures } from './Clima/coverage.js';
 
 const EXTRAS = [['turbo', 'Turbo'], ['eco', 'Eco'], ['brisa', 'Brisa'], ['display', 'Display']];
@@ -91,23 +91,22 @@ export default function Clima() {
       <Stale poll={poll} what="estados do ar" />
       {reason && !poll.error && <Notice err>{reason}</Notice>}
       {learning && <Notice>Escolha o estado abaixo, toque em Gravar e, em até 25 s, aperte Ligar no controle do ar já nesse estado, apontado para a central. Para funções extras, toque aqui e aperte o mesmo botão no controle original.</Notice>}
-      <Lcd className="stack">
+      <div className="hero" style={{ '--hero': `linear-gradient(165deg, color-mix(in srgb, var(--cool) ${temp == null ? 10 : Math.round((30 - temp) / 13 * 26)}%, var(--modulo)), color-mix(in srgb, var(--warm) ${temp == null ? 10 : Math.round((temp - 17) / 13 * 26)}%, var(--modulo)))` }}>
         <div className="row">
           <span className="lbl">{learning ? 'estado a gravar' : `ar do quarto · ${label(MODES, state.mode)?.toLowerCase() || '– –'} · ${label(FANS, state.fan)?.toLowerCase() || '– –'}`}</span>
           <Confidence kind={kind} />
         </div>
-        <div style={{ textAlign: 'center' }} aria-live="polite">
-          <Dot size={templess ? 64 : 150}>{templess ? 'Auto' : temp == null ? '– –' : `${temp}°`}</Dot>
+        <Dial label="Temperatura do ar" unit=" graus" min={17} max={30} values={learning ? undefined : available} value={templess || temp == null ? null : temp}
+          disabled={busy || locked || templess}
+          onCommit={(value) => (learning ? setDraft((old) => ({ ...old, temperature: value })) : command({ temperature: value }))}
+          render={(shown) => (<><span className="big" aria-live="polite">{templess ? 'Auto' : shown == null ? '– –' : <>{shown}<sup>°</sup></>}</span><span className="small mut">{learning ? 'gravando' : templess ? 'o ar decide' : 'estimado'}</span></>)} />
+        <div className="row" style={{ justifyContent: 'center', gap: 20 }}>
+          <Key big center aria-label="Diminuir temperatura" style={{ width: 72, borderRadius: 36 }} disabled={busy || locked || (learning ? draft.temperature <= 17 : !available.some((t) => t < state.temperature))} onClick={down}>−</Key>
+          <Key big center aria-label="Aumentar temperatura" style={{ width: 72, borderRadius: 36 }} disabled={busy || locked || (learning ? draft.temperature >= 30 : !available.some((t) => t > state.temperature))} onClick={up}>+</Key>
         </div>
-        <PixelBar small value={temp == null || templess ? 0 : temp - 16} max={14} steps={14} />
-        <div className="scale"><span>17</span><span>20</span><span>23</span><span>26</span><span>30</span></div>
-        <div className="dim" style={{ fontSize: 11 }}>{learning ? 'Gravando: o ar não recebe nada até você tocar em Gravar.' : unknown ? 'Estado estimado desconhecido' : state.power ? 'Ligado · estimado' : 'Desligado · estimado'} · {device.updatedAt ? fmtAgo(device.updatedAt) : 'sem leitura recente'}</div>
-      </Lcd>
-      {templess && <Notice>Neste modo o controle não envia temperatura; o próprio ar decide. Para escolher, use Resfriar ou Aquecer.</Notice>}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <Key big center aria-label="Diminuir temperatura" disabled={busy || locked || (learning ? draft.temperature <= 17 : !available.some((t) => t < state.temperature))} onClick={down}>−</Key>
-        <Key big center aria-label="Aumentar temperatura" disabled={busy || locked || (learning ? draft.temperature >= 30 : !available.some((t) => t > state.temperature))} onClick={up}>+</Key>
+        <div className="mut" style={{ fontSize: 11 }}>{learning ? 'Gravando: o ar não recebe nada até você tocar em Gravar.' : unknown ? 'Estado estimado desconhecido' : state.power ? 'Ligado · estimado' : 'Desligado · estimado'} · {device.updatedAt ? fmtAgo(device.updatedAt) : 'sem leitura recente'}</div>
       </div>
+      {templess && <Notice>Neste modo o controle não envia temperatura; o próprio ar decide. Para escolher, use Resfriar ou Aquecer.</Notice>}
       <p className="mut" style={{ fontSize: 11 }}>Estado estimado: o ar não confirma o que recebeu por infravermelho. Usar o controle original pode deixar o painel diferente do aparelho.</p>
       {!learning && (unknown
         ? <Key signal disabled={disabled || !initial || initial.fan !== 'auto' || initial.temperature !== 24} onClick={() => command({ power: true, temperature: 24, mode: 'cool', fan: 'auto' })}>Ligar em 24 °C · resfriar · auto</Key>

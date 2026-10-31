@@ -58,13 +58,12 @@ function useFrames(ids, paused, tick) {
 
 function Tile({ camera, frame, moving, bell, onOpen }) {
   return (
-    <button type="button" onClick={onOpen} aria-label={`Abrir ${camera.name} ao vivo`} className="thumb"
-      style={{ padding: 0, border: 0, aspectRatio: '16 / 10', minHeight: 44, display: 'block', width: '100%', color: 'inherit', cursor: 'pointer' }}>
-      {frame?.url && <img src={frame.url} alt="" style={{ display: 'block' }} />}
-      {!frame?.url && <span className="t" style={{ top: 8, bottom: 'auto' }}><span>{frame?.failed ? 'sem imagem' : 'carregando…'}</span></span>}
+    <button type="button" onClick={onOpen} aria-label={`Abrir ${camera.name} ao vivo`} className="frame">
+      {frame?.url && <img src={frame.url} alt="" style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }} />}
+      {!frame?.url && <span className="age" style={{ top: 10, bottom: 'auto' }}>{frame?.failed ? 'sem imagem' : 'carregando…'}</span>}
       {bell && <span className="ic" style={{ position: 'absolute', top: 6, right: 6, color: '#f1ead7', filter: 'drop-shadow(0 1px 2px #000)' }}><Icon name="bell" size={16} label="Avisa movimento" /></span>}
       {moving && <span className="badge">Movimento</span>}
-      <span className="t"><span>{camera.name}</span><span>{frame?.at ? fmtAgo(frame.at) : ''}</span></span>
+      <span className="age">{camera.name}{frame?.at ? ` · ${fmtAgo(frame.at)}` : ''}</span>
     </button>
   );
 }
@@ -170,7 +169,7 @@ export default function Cameras({ param }) {
           <Motion cameras={all} motion={motion} onOpen={openEvent} openAlerts={alertsOpen} />
         ) : cams.data && available ? (
           <>
-            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 150px), 1fr))' }}>
+            <div className="mosaic">
               {shown.map((c) => <Tile key={c.id} camera={c} frame={frames[c.id]} moving={movingNow.has(c.id)} bell={(motion.data?.notify ?? []).includes(c.id)} onOpen={() => setLiveId(c.id)} />)}
             </div>
             <p className="small muted" role="status">{shown.length} de {all.length} · {newest ? `Automático · ${fmtAgo(newest)}` : 'Atualização automática'}</p>

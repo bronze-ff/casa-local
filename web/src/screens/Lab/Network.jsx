@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { fmtAgo, usePoll } from '../../api.js';
-import { Badge, Card, Icon, Key, Stale, Status, Switch, useAction } from '../../ui.jsx';
+import { Badge, Card, Icon, Key, Modal, Stale, Status, Switch, useAction } from '../../ui.jsx';
+import Topology from './Topology.jsx';
 
 function Device({ d, act, busy }) {
   const [renaming, setRenaming] = useState(false);
@@ -61,6 +62,7 @@ function Device({ d, act, busy }) {
 export default function NetworkCard({ disabled }) {
   const poll = usePoll('/api/network', 30000);
   const [run, busy] = useAction();
+  const [open, setOpen] = useState(null);
   const n = poll.data;
 
   // body === null remove o aparelho; senão atualiza (nome, known, watch).
@@ -90,6 +92,10 @@ export default function NetworkCard({ disabled }) {
       <p className="muted small">
         {n.scanned ? `${n.online} conectados · varrida ${fmtAgo(n.scanned)}${missing ? ` · ${missing} vigiado${missing > 1 ? 's' : ''} sem resposta` : ''}` : 'A primeira varredura sai alguns minutos depois de o painel ligar.'}
       </p>
+      {n.devices.length > 0 && <Topology devices={n.devices} onSelect={setOpen} />}
+      <Modal open={!!open} onClose={() => setOpen(null)} title={n.devices.find((d) => d.id === open)?.label || 'Aparelho'}>
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>{n.devices.filter((d) => d.id === open).map((d) => <Device key={d.id} d={d} act={act} busy={busy} />)}</ul>
+      </Modal>
       {n.learningUntil && (
         <div className="aviso" role="status">
           <Icon name="alert" size={20} /><span>Aprendendo a rede até {new Date(n.learningUntil * 1000).toLocaleString('pt-BR', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}: o que aparecer até lá entra como conhecido, sem aviso. Depois, todo aparelho novo avisa no celular.</span>

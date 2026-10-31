@@ -17,10 +17,13 @@ export function attachMse(video, path, onPlaying, onFail, opts = {}) {
   let ready = 0;
   let playing = false;
   let closed = false;
+  let failed = false;
+  let objectUrl = null;
+  const fail = () => { if (!failed && !closed) { failed = true; onFail(); } }; // um único fallback, mesmo com erro + fechamento
 
   // Pede o stream quando o socket abriu E o MediaSource está pronto (o que vier por último).
   const hello = () => {
-    if (++ready === 2) ws.send(JSON.stringify({ type: 'mse', value: CODECS.filter((c) => MS.isTypeSupported(`video/mp4; codecs="${c}"`)).join() }));
+    if (!closed && ++ready === 2) ws.send(JSON.stringify({ type: 'mse', value: CODECS.filter((c) => MS.isTypeSupported(`video/mp4; codecs="${c}"`)).join() }));
   };
   const pump = () => {
     if (!buffer || buffer.updating) return;
@@ -43,30 +46,34 @@ export function attachMse(video, path, onPlaying, onFail, opts = {}) {
   };
 
   source.addEventListener('sourceopen', hello, { once: true });
-  if (managed) { video.disableRemotePlayback = true; video.srcObject = source; } else video.src = URL.createObjectURL(source);
+  if (managed) { video.disableRemotePlayback = true; video.srcObject = source; } else { objectUrl = URL.createObjectURL(source); video.src = objectUrl; }
 
   ws.onopen = hello;
   ws.onmessage = (event) => {
+    if (closed) return;
     if (typeof event.data === 'string') {
       const msg = JSON.parse(event.data);
       if (msg.type === 'mse' && !buffer) {
         buffer = source.addSourceBuffer(msg.value);
         buffer.mode = 'segments';
         buffer.addEventListener('updateend', pump);
-      } else if (msg.type === 'error' && !playing) onFail();
+      } else if (msg.type === 'error' && !playing) fail();
     } else {
       queue.push(event.data);
       pump();
       if (video.paused && !opts.held?.()) video.play().catch(() => {});
     }
   };
-  ws.onclose = () => { if (!closed) { if (playing) opts.onEnd?.(); else onFail(); } };
+  ws.onclose = () => { if (!closed) { if (playing) opts.onEnd?.(); else fail(); } };
 
   const onPlay = () => { if (!playing) { playing = true; onPlaying(); } };
   video.addEventListener('playing', onPlay);
   return () => {
+    if (closed) return; // idempotente: fechar duas vezes não repete efeito
     closed = true;
+    ws.onopen = null; ws.onmessage = null; ws.onclose = null;
     ws.close();
+    if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
     video.removeEventListener('playing', onPlay);
     video.pause();
     video.removeAttribute('src');

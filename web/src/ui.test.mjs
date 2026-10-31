@@ -96,4 +96,4 @@ assert.equal(ui.confidenceOf({ ...lamp, updatedAt: '2026-10-25T10:00:05Z' }, { p
 assert.equal(render(h(ui.Status, { kind: 'ok' }, 'rodando')), '<span class="st ok">rodando</span>');
 assert.match(render(h(ui.Status, {}, 'parado')), /class="st off"/); // sem kind = vazado
 assert.equal(render(h(ui.Badge, null, 'Novo')), '<span class="tag">Novo</span>');
-console.log('OK: ui (ícones, teclas, barras, slider, Doto e confiança por comando).');
+console.log('OK: ui (ícones, teclas, barras, slider, números e confiança por comando).');

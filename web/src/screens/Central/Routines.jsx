@@ -26,6 +26,27 @@ const when = (sec) => {
   return `${t.toLocaleDateString('pt-BR', { weekday: 'short' })} ${hm}`;
 };
 
+/** Marcas da linha do dia: só rotinas por horário, com posição em % das 24 h. */
+export function dayMarks(routines = []) {
+  return routines
+    .filter((r) => r.trigger === 'time' && /^\d{2}:\d{2}$/.test(r.time || ''))
+    .map((r) => { const [hh, mm] = r.time.split(':').map(Number); return { id: r.id, name: r.name, time: r.time, enabled: r.enabled, pct: Math.round(((hh * 60 + mm) / 1440) * 1000) / 10 }; })
+    .sort((a, b) => a.pct - b.pct);
+}
+
+function DayLine({ routines }) {
+  const marks = dayMarks(routines);
+  if (!marks.length) return null;
+  return (
+    <div className="stack" style={{ gap: 4 }}>
+      <div className="dayline" role="img" aria-label={`Rotinas por horário: ${marks.map((m) => `${m.time} ${m.name}${m.enabled ? '' : ' (pausada)'}`).join(', ')}`}>
+        {marks.map((m) => <span key={m.id} className="span" style={{ left: `${m.pct}%`, width: 8, opacity: m.enabled ? 1 : 0.35 }} />)}
+      </div>
+      <div className="row small muted" aria-hidden="true"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>24h</span></div>
+    </div>
+  );
+}
+
 function placeText(r, places, people) {
   const place = places.find((p) => p.id === r.place)?.name ?? 'lugar apagado';
   const who = r.person ? people.find((p) => p.id === r.person)?.name ?? 'pessoa removida' : 'alguém';
@@ -156,6 +177,7 @@ export default function Routines() {
             </div>
           </div>
 
+          <DayLine routines={d.routines} />
           {!d.routines.length && <p className="muted small" style={{ padding: '12px 0' }}>Nenhuma rotina ainda. Exemplos: o modo Boa noite às 23h, ou o modo Cheguei ao sair da academia.</p>}
           {d.routines.map((r) => (
             <div key={r.id} className="row" style={{ flexWrap: 'wrap', opacity: r.enabled ? 1 : 0.6 }}>
