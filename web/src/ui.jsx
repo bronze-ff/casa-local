@@ -1,80 +1,247 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { post } from './api.js';
 
-/* Ícones de traço (sem emoji), herdam a cor do texto. */
-const PATHS = {
-  home: 'M3 11 12 4l9 7v9H3z',
-  bulb: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z',
-  camera: 'M3 8a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM16 10l5-3v10l-5-3',
-  server: 'M4 4h16v7H4zM4 13h16v7H4zM8 7.5h.01M8 16.5h.01',
-  bell: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0',
-  snow: 'M12 2v20M4.9 6.5l14.2 11M4.9 17.5l14.2-11M9 4l3 2 3-2M9 20l3-2 3 2',
-  tv: 'M3 6h18v12H3zM8 21h8',
-  pin: 'M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12zM12 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
-  power: 'M12 3v9M6.3 7.3a8 8 0 1 0 11.4 0',
-  plus: 'M12 5v14M5 12h14',
-  minus: 'M5 12h14',
-  back: 'M15 5l-7 7 7 7',
-  next: 'm9 6 6 6-6 6',
-  up: 'm6 15 6-6 6 6',
-  down: 'm6 9 6 6 6-6',
-  left: 'm15 6-6 6 6 6',
-  right: 'm9 6 6 6-6 6',
-  close: 'M6 6l12 12M18 6 6 18',
-  external: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
-  warn: 'M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
-  refresh: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7',
-  radio: 'M5 12a7 7 0 0 1 14 0M8.5 12a3.5 3.5 0 0 1 7 0M12 12h.01',
-  film: 'M4 4h16v16H4zM8 4v16M16 4v16M4 9h4M4 15h4M16 9h4M16 15h4',
-  moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
-  door: 'M5 21V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v17M3 21h18M15 12h.01',
-  book: 'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 21V5M8 7h7',
-  sofa: 'M5 11V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3M3 13a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v5H3zM6 18v2M18 18v2',
-  coffee: 'M4 9h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM16 10h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M12 3v3',
-  bed: 'M3 19V6M3 15h18v4M21 15v-3a3 3 0 0 0-3-3h-7v6M7 12h.01',
-  sun: 'M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M5.6 18.4l-1.4 1.4M19.8 4.2l-1.4 1.4M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10z',
-  fan: 'M12 12c0-4 2-8 5-8 2 0 3 2 1 4l-6 4zm0 0c4 0 8 2 8 5 0 2-2 3-4 1l-4-6zm0 0c0 4-2 8-5 8-2 0-3-2-1-4l6-4zm0 0c-4 0-8-2-8-5 0-2 2-3 4-1l4 6z',
-  game: 'M6 10h4M8 8v4M15 11h.01M18 9h.01M7 5h10a4 4 0 0 1 4 4v6a3 3 0 0 1-5.5 1.7L14 15h-4l-1.5 1.7A3 3 0 0 1 3 15V9a4 4 0 0 1 4-4z',
+/* Ícones de pixel 12x12 (pixel de 2 px, '#' = aceso), herdam a cor do texto. Os 18 primeiros vêm do hub;
+   o resto foi desenhado no mesmo grid (a Aquarela revisa). */
+const GLYPHS = {
+  home: ['.....##.....', '....####....', '...######...', '..########..', '.##########.', '..#......#..', '..#.##...#..', '..#.##...#..', '..#......#..', '..#..##..#..', '..#..##..#..', '..########..'],
+  luz: ['....####....', '...#....#...', '..#......#..', '..#......#..', '..#..##..#..', '...#.##.#...', '....#..#....', '....####....', '....#..#....', '....####....', '.....##.....', '............'],
+  ar: ['.....##.....', '..#..##..#..', '...#.##.#...', '....####....', '####.##.####', '####.##.####', '....####....', '...#.##.#...', '..#..##..#..', '.....##.....', '............', '............'],
+  tv: ['............', '############', '#..........#', '#..........#', '#..........#', '#..........#', '#..........#', '############', '.....##.....', '...######...', '............', '............'],
+  cam: ['............', '............', '########....', '#......#..##', '#......#.###', '#......#####', '#......#####', '#......#.###', '#......#..##', '########....', '............', '............'],
+  pin: ['....####....', '...#....#...', '..#..##..#..', '..#.#..#.#..', '..#..##..#..', '...#....#...', '...#....#...', '....#..#....', '....#..#....', '.....##.....', '............', '............'],
+  lab: ['############', '#..........#', '#.#........#', '#..#.......#', '#.#..###...#', '#..........#', '############', '.....##.....', '...######...', '............', '............', '............'],
+  central: ['#####..#####', '#...#..#...#', '#...#..#...#', '#####..#####', '............', '............', '#####..#####', '#...#..#.#.#', '#...#..##.##', '#####..#####', '............', '............'],
+  film: ['............', '############', '#.#......#.#', '############', '#.#......#.#', '#.#......#.#', '############', '#.#......#.#', '############', '............', '............', '............'],
+  moon: ['....####....', '..###.......', '.###........', '.##.........', '###.........', '###.........', '###.........', '###........#', '.###......##', '.#####..###.', '...######...', '............'],
+  book: ['............', '.####..####.', '#....##....#', '#.##.##.##.#', '#....##....#', '#.##.##.##.#', '#....##....#', '#....##....#', '.####..####.', '............', '............', '............'],
+  sun: ['.....##.....', '.#...##...#.', '..#......#..', '....####....', '...######...', '##.######.##', '##.######.##', '...######...', '....####....', '..#......#..', '.#...##...#.', '.....##.....'],
+  sofa: ['............', '..########..', '..#......#..', '###......###', '#.#......#.#', '#.########.#', '#..........#', '############', '.#........#.', '............', '............', '............'],
+  coffee: ['..#..#..#...', '...#..#..#..', '..#..#..#...', '............', '#########...', '#.......####', '#.......#..#', '#.......####', '.#.....#....', '..#####.....', '############', '............'],
+  bed: ['............', '#...........', '#...........', '#.##........', '#.##.#######', '############', '#..........#', '############', '#..........#', '............', '............', '............'],
+  power: ['.....##.....', '..#..##..#..', '.#...##...#.', '#....##....#', '#..........#', '#..........#', '#..........#', '.#........#.', '..#......#..', '...######...', '............', '............'],
+  bell: ['.....##.....', '....####....', '...#....#...', '...#....#...', '...#....#...', '..#......#..', '..#......#..', '.##########.', '............', '.....##.....', '............', '............'],
+  alert: ['.....##.....', '.....##.....', '....#..#....', '....#..#....', '...#.##.#...', '...#.##.#...', '..#..##..#..', '..#......#..', '.#...##...#.', '.#........#.', '############', '............'],
+  ext: ['......######', '..........##', '.........#.#', '####....#..#', '#......#...#', '#.....#.....', '#....#......', '#..........#', '#..........#', '#..........#', '#..........#', '############'],
+  plus: ['............', '............', '.....##.....', '.....##.....', '.....##.....', '..########..', '..########..', '.....##.....', '.....##.....', '.....##.....', '............', '............'],
+  minus: ['............', '............', '............', '............', '............', '..########..', '..########..', '............', '............', '............', '............', '............'],
+  close: ['............', '.##......##.', '..##....##..', '...##..##...', '....####....', '.....##.....', '.....##.....', '....####....', '...##..##...', '..##....##..', '.##......##.', '............'],
+  back: ['............', '......##....', '.....##.....', '....##......', '...##.......', '..##........', '..##........', '...##.......', '....##......', '.....##.....', '......##....', '............'],
+  up: ['............', '............', '............', '.....##.....', '....####....', '...##..##...', '..##....##..', '.##......##.', '##........##', '............', '............', '............'],
+  refresh: ['....####....', '..##....##.#', '.#........##', '.#.......###', '.#..........', '.#..........', '.#........#.', '.#........#.', '..##....##..', '....####....', '............', '............'],
+  radio: ['............', '..#......#..', '.#..#..#..#.', '#..#.##.#..#', '#..#.##.#..#', '.#..#..#..#.', '..#......#..', '......##....', '......##....', '......##....', '............', '............'],
+  door: ['..########..', '..#......#..', '..#......#..', '..#......#..', '..#......#..', '..#.....##..', '..#......#..', '..#......#..', '..#......#..', '..#......#..', '############', '............'],
+  fan: ['....##......', '...####..##.', '...###..####', '....##..####', '.....#.##...', '......##....', '....##.#....', '####..##....', '####..###...', '.##..####...', '......##....', '............'],
+  game: ['............', '............', '.##########.', '#..#....#..#', '#.###..#.#.#', '#..#....#..#', '#....##....#', '.##......##.', '............', '............', '............', '............'],
 };
+// Nomes antigos do painel e do backend (os 9 de modo ficam gravados no servidor: nomes exatos).
+const ALIASES = { bulb: 'luz', camera: 'cam', server: 'lab', snow: 'ar', external: 'ext', warn: 'alert', next: 'back', left: 'back', right: 'back', down: 'up' };
+const FLIP = { next: 'x', right: 'x', down: 'y' };
+const mirrored = (rows, axis) => (axis === 'x' ? rows.map((row) => [...row].reverse().join('')) : [...rows].reverse());
+
+const pathOf = (name) => {
+  const key = GLYPHS[name] ? name : ALIASES[name] || 'home';
+  let rows = GLYPHS[key];
+  if (FLIP[name]) rows = mirrored(rows, FLIP[name]);
+  let d = '';
+  rows.forEach((row, y) => { for (let x = 0; x < 12; x++) if (row[x] === '#') d += `M${x * 2} ${y * 2}h2v2h-2z`; });
+  return d;
+};
+const pathCache = {};
 
 export function Icon({ name, size = 20, label, style }) {
-  const d = PATHS[name] || PATHS.home;
+  const d = pathCache[name] || (pathCache[name] = pathOf(name));
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={style}
-      {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}>
-      {d.split(/(?=M)/).map((part, i) => <path key={i} d={part} />)}
-    </svg>
+    <span className="ic" style={{ '--icw': `${size}px`, ...style }} {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}>
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d={d} /></svg>
+    </span>
   );
 }
 
+/** Gancho global opcional do clique sonoro (E5): Key e Switch chamam clickHook.fn?.() a cada acionamento aceito. */
+export const clickHook = { fn: null };
+
+/** Chave liga/desliga: input switch nativo (háptico no iOS 18). */
 export function Switch({ on, onChange, label, disabled }) {
   return (
-    <button type="button" className="switch" role="switch" aria-checked={!!on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)}>
-      <span />
-    </button>
+    <label className="hit">
+      <input type="checkbox" className="sw" role="switch" switch="" aria-label={label} checked={!!on} disabled={disabled} onChange={(event) => { clickHook.fn?.(); onChange(event.target.checked); }} />
+    </label>
   );
 }
 
-/** Grupo de escolha única. options: [[value, label], ...] */
+/** Grupo de escolha única. options: [[value, label, indisponível?], ...] */
 export function Segmented({ value, options, onChange, label, disabled }) {
+  const usable = options.filter(([, , unavailable]) => !unavailable);
+  const stop = usable.some(([v]) => v === value) ? value : usable[0]?.[0]; // só uma opção entra na ordem do Tab
+  // Setas movem a escolha entre as opções disponíveis (padrão ARIA de radiogroup).
+  const onKeyDown = (event) => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+    if (!step || disabled || !usable.length) return;
+    const next = usable[(Math.max(0, usable.findIndex(([v]) => v === stop)) + step + usable.length) % usable.length][0];
+    if (next !== value) { clickHook.fn?.(); onChange(next); }
+    event.currentTarget.querySelectorAll('button:not(:disabled)')[usable.findIndex(([v]) => v === next)]?.focus();
+    event.preventDefault();
+  };
   return (
-    <div className="seg" role="radiogroup" aria-label={label}>
-      {options.map(([v, text]) => (
-        <button key={String(v)} type="button" role="radio" aria-checked={value === v} disabled={disabled} onClick={() => onChange(v)}>{text}</button>
+    <div className="seg" role="radiogroup" aria-label={label} onKeyDown={onKeyDown}>
+      {options.map(([v, text, unavailable]) => (
+        <button key={String(v)} type="button" role="radio" aria-checked={value === v} tabIndex={v === stop ? 0 : -1} className={unavailable ? 'x' : ''} disabled={disabled || unavailable} onClick={() => { if (v !== value) { clickHook.fn?.(); onChange(v); } }}>{text}</button>
       ))}
     </div>
   );
 }
 
+/** Barra de pixels. signal: true pinta todo o preenchido de sinal; número pinta só aquele pixel (1 = primeiro). */
+export function PixelBar({ value, max = 100, steps = 10, current, signal, small, onBody, className = '' }) {
+  const filled = Math.max(0, Math.min(steps, Math.round(((Number(value) || 0) / max) * steps)));
+  return (
+    <div className={`px ${small ? 'sm' : ''} ${onBody ? 'on-body' : ''} ${className}`} aria-hidden="true">
+      {Array.from({ length: steps }, (_, index) => {
+        const n = index + 1;
+        const kind = signal === true && n <= filled ? 's' : signal && n === signal ? 's' : current && n === current && n <= filled ? 'd' : n <= filled ? 'f' : '';
+        return <i key={n} className={kind} />;
+      })}
+    </div>
+  );
+}
+
+/** Medidor simples sobre o corpo (0-100 %). */
 export function Bar({ pct, warn }) {
-  const width = Math.max(0, Math.min(100, Number(pct) || 0));
-  return <div className="bar"><span className={warn ? 'warn' : ''} style={{ width: `${width}%` }} /></div>;
+  return <PixelBar value={pct} max={100} steps={20} small onBody signal={warn ? true : undefined} />;
+}
+
+/** Controle deslizante de pixels: arrastar ou setas; Home/End vão aos extremos. */
+export function PixelSlider({ value, min = 0, max = 100, step = 1, onChange, label, disabled, onBody }) {
+  const ref = useRef();
+  const cells = Math.max(2, Math.min(20, Math.round((max - min) / step) + 1));
+  const unit = (max - min) / (cells - 1);
+  const snap = (raw) => Math.max(min, Math.min(max, Math.round(min + Math.round((raw - min) / unit) * unit)));
+  const at = (event) => {
+    const box = ref.current.getBoundingClientRect();
+    return snap(min + ((event.clientX - box.left) / box.width) * (max - min));
+  };
+  const index = Math.round(((Number(value) || min) - min) / unit);
+  const move = (event) => { if (!disabled) onChange(at(event)); };
+  const onKey = (event) => {
+    const keys = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1 };
+    if (disabled) return;
+    if (event.key in keys) onChange(Math.max(min, Math.min(max, (Number(value) || min) + keys[event.key] * step)));
+    else if (event.key === 'Home') onChange(min);
+    else if (event.key === 'End') onChange(max);
+    else return;
+    event.preventDefault();
+  };
+  return (
+    <div ref={ref} className="pxs" role="slider" tabIndex={disabled ? -1 : 0} aria-label={label} aria-valuemin={min} aria-valuemax={max} aria-valuenow={Number(value) || min} aria-disabled={!!disabled}
+      onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); move(event); }}
+      onPointerMove={(event) => { if (event.buttons) move(event); }} onKeyDown={onKey}>
+      <PixelBar value={index + 1} max={cells} steps={cells} onBody={onBody} />
+    </div>
+  );
+}
+
+export function Spark({ values = [], hi = Infinity, className = '' }) {
+  const top = Math.max(...values, Number.isFinite(hi) ? hi : 0, 1);
+  return (
+    <div className={`spark ${className}`} aria-hidden="true">
+      {values.map((v, index) => <i key={index} className={v >= hi ? 'hi' : ''} style={{ height: `${Math.round(((Number(v) || 0) / top) * 100)}%` }} />)}
+    </div>
+  );
+}
+
+/** Teclas físicas. disabled mostra o motivo (reason) em texto; loading troca o texto pela barra marchando. */
+export function Key({ children, sub, on, big, signal, loading, center, disabled, reason, className = '', onClick, ...button }) {
+  const cls = ['key', big && 'big', signal && 'sig', center && 'c', on && 'is-on', loading && 'is-load', className].filter(Boolean).join(' ');
+  return (
+    <button type="button" className={cls} disabled={disabled} aria-busy={loading || undefined} aria-pressed={on === undefined ? undefined : !!on}
+      onClick={loading ? undefined : (event) => { clickHook.fn?.(); onClick?.(event); }} {...button}>
+      {children}
+      {sub && <small>{sub}</small>}
+      {disabled && reason && <span className="why">{reason}</span>}
+    </button>
+  );
+}
+
+export function Lcd({ children, className = '', ...rest }) {
+  return <div className={`lcd ${className}`} {...rest}>{children}</div>;
+}
+
+const DOT_SIZES = [20, 34, 64, 150];
+/** Número ou palavra curta em Doto (só em 20, 34, 64 ou 150 px). */
+export function Dot({ children, size = 34, style, className = '' }) {
+  const px = DOT_SIZES.includes(size) ? size : 34;
+  const timed = typeof children === 'string' && children.includes(':');
+  return (
+    <span className={`dot ${className}`} style={{ fontSize: px, lineHeight: px >= 64 ? 0.85 : 1, ...style }} role={timed ? 'img' : undefined} aria-label={timed ? children : undefined}>
+      {timed ? children.split(':').flatMap((part, index) => (index ? [<i key={`c${index}`} className="dc" aria-hidden="true" />, part] : [part])) : children}
+    </span>
+  );
+}
+
+/* Confiança no estado: o "Enviado" nasce no front (comando aceito, sem retorno do aparelho). */
+const SENT_MS = 6000;
+const sent = new Map();
+const watchers = new Set();
+const notify = () => watchers.forEach((fn) => fn());
+
+/** Marca o aparelho como "enviado" por 6 s; base = updatedAt do aparelho na resposta do comando. */
+export function markSent(deviceId, base) {
+  const entry = { at: Date.now(), base: base || null };
+  sent.set(deviceId, entry);
+  notify();
+  setTimeout(() => { if (sent.get(deviceId) === entry) { sent.delete(deviceId); notify(); } }, SENT_MS);
+}
+
+const KINDS = { reported: 'reported', estimated: 'estimated', preview: 'preview' };
+/** 'sent' enquanto o comando é recente e o /api/state não trouxe leitura nova; senão a confiança do backend. */
+export function useConfidence(device) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const fn = () => tick((n) => n + 1);
+    watchers.add(fn);
+    return () => { watchers.delete(fn); };
+  }, []);
+  if (!device) return 'unknown';
+  const entry = sent.get(device.id);
+  if (entry && Date.now() - entry.at < SENT_MS && !(entry.base && device.updatedAt && device.updatedAt > entry.base)) return 'sent';
+  return KINDS[device.confidence] || 'unknown';
+}
+
+const CONFIDENCE = {
+  reported: ['rep', 'Confirmado'], sent: ['env', 'Enviado · sem retorno'], estimated: ['est', 'Estimado'], preview: ['sim', 'Simulado'], unknown: ['unk', 'Desconhecido'],
+};
+/** Estado de serviço ou conexão: quadrado + texto (a cor nunca é o único sinal). */
+export function Status({ kind = 'off', children }) {
+  return <span className={`st ${kind}`}>{children}</span>;
+}
+
+/** Selo "Novo" / "Movimento". */
+export function Badge({ children }) {
+  return <span className="tag">{children}</span>;
+}
+
+export function Confidence({ kind, children }) {
+  const [cls, text] = CONFIDENCE[kind] || CONFIDENCE.unknown;
+  return <span className={`cf ${cls}`}>{text}{children ? <> {children}</> : null}</span>;
+}
+
+/** Cartão de aparelho: nome, valor em Doto, confiança. sim = hachura azul (prévia). */
+export function Tile({ name, value, off, sim, confidence, aside, children }) {
+  return (
+    <div className={`tile ${sim ? 'sim' : ''}`}>
+      <div className="row"><span className="n">{name}</span>{aside}</div>
+      <span className={`v dot ${off ? 'off' : ''}`}>{value}</span>
+      {children}
+      {confidence && <Confidence kind={confidence} />}
+    </div>
+  );
 }
 
 export function Card({ title, aside, children, className = '', ...rest }) {
   return (
-    <section className={`card entra ${className}`} {...rest}>
-      {(title || aside) && <div className="card-head">{title && <h2>{title}</h2>}{aside}</div>}
+    <section className={`mod ${className}`} {...rest}>
+      {(title || aside) && <div className="mod-head">{title && <h2>{title}</h2>}{aside}</div>}
       {children}
     </section>
   );
@@ -82,11 +249,12 @@ export function Card({ title, aside, children, className = '', ...rest }) {
 
 export function Stale({ poll, what = 'dados' }) {
   if (!poll.error) return null;
+  const when = poll.at ? new Date(poll.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
   return (
-    <div className="notice" role="status">
-      <Icon name="warn" size={18} style={{ color: 'var(--accent)', flex: 'none', marginTop: 2 }} />
-      <span style={{ flex: 1 }}>{poll.data ? `Mostrando ${what} de ${new Date(poll.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}: ${poll.error.message}` : poll.error.message}</span>
-      <button type="button" className="btn ghost" style={{ minHeight: 32 }} onClick={poll.reload}>Tentar de novo</button>
+    <div className="aviso err" role="status">
+      <Icon name="alert" size={20} />
+      <span>{poll.data ? `Mostrando ${what} de ${when}: ${poll.error.message}` : poll.error.message}</span>
+      <button type="button" className="act" onClick={poll.reload}>Tentar de novo</button>
     </div>
   );
 }
@@ -111,7 +279,8 @@ export function ToastProvider({ children }) {
   );
 }
 
-/** Ação com POST: mostra erro no toast e devolve o resultado (ou null). */
+const COMMAND = /^\/api\/devices\/([a-z-]+)\/commands$/;
+/** Ação com POST: mostra erro no toast e devolve o resultado (ou null). Comando aceito marca o aparelho como "enviado". */
 export function useAction() {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -119,6 +288,8 @@ export function useAction() {
     setBusy(true);
     try {
       const result = await post(path, body);
+      const device = COMMAND.exec(path);
+      if (device) markSent(device[1], result?.device?.updatedAt);
       if (okText) toast(okText);
       return result;
     } catch (error) {
@@ -142,9 +313,9 @@ export function Modal({ open, onClose, title, children }) {
   }, [open]);
   return (
     <dialog ref={ref} onClose={onClose} aria-label={title}>
-      <div className="card-head" style={{ marginBottom: 14 }}>
-        <h2 style={{ fontSize: 20 }}>{title}</h2>
-        <button type="button" className="btn ghost" aria-label="Fechar" onClick={onClose} style={{ minWidth: 44 }}><Icon name="close" /></button>
+      <div className="mod-head" style={{ marginBottom: 14 }}>
+        <h2>{title}</h2>
+        <Key center aria-label="Fechar" onClick={onClose} style={{ minWidth: 44 }}><Icon name="close" /></Key>
       </div>
       {open && children}
     </dialog>

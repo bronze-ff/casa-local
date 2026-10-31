@@ -1,19 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { post, usePoll } from '../../api.js';
-import { Icon } from '../../ui.jsx';
+import { Icon, Key, Status } from '../../ui.jsx';
 import { attachMse, mseSupported } from './mse.js';
 import { Overlay, VideoDialog, mediaStyle, stageStyle } from './VideoDialog.jsx';
 
 const clock = (t) => new Date(t * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const stamp = (t) => new Date(t * 1000).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-/** Janela de replay em volta de um evento (horários no relógio do DVR; `offset` = DVR − PC). */
-export function replayWindow(camera, event, offset) {
-  const now = Date.now() / 1000 + offset;
-  const from = event.start - 30;
-  const to = Math.min(now - 5, Math.max((event.end ?? now) + 60, from + 180));
-  return { camera, start: event.start - 10, from, to, offset };
-}
 
 function Timeline({ from, to, now, hits, seek }) {
   const track = useRef();
@@ -38,26 +30,31 @@ function Timeline({ from, to, now, hits, seek }) {
         aria-valuemax={Math.round(to)}
         aria-valuenow={Math.round(now)}
         aria-valuetext={clock(now)}
-        onKeyDown={(e) => { if (e.key === 'ArrowLeft') seek(now - 10); if (e.key === 'ArrowRight') seek(now + 10); }}
+        onKeyDown={(e) => {
+          const to_ = { ArrowLeft: now - 10, ArrowRight: now + 10, Home: from, End: to }[e.key];
+          if (to_ === undefined) return;
+          e.preventDefault();
+          seek(to_);
+        }}
         onPointerDown={(e) => { try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* sem captura */ } dragging.current = true; setPreview(at(e.clientX)); }}
         onPointerMove={(e) => { if (dragging.current) setPreview(at(e.clientX)); }}
         onPointerUp={(e) => { if (dragging.current) { dragging.current = false; seek(at(e.clientX)); setPreview(null); } }}
         onPointerCancel={() => { dragging.current = false; setPreview(null); }}
         style={{ position: 'relative', height: 44, touchAction: 'none', cursor: 'pointer' }}
       >
-        <span style={{ position: 'absolute', left: 0, right: 0, top: 18, height: 8, borderRadius: 4, background: 'var(--line)' }} />
+        <span style={{ position: 'absolute', left: 0, right: 0, top: 18, height: 8, borderRadius: 4, background: 'color-mix(in srgb, var(--ink) 18%, transparent)' }} />
         {hits.map(([s, e], i) => (
-          <i key={i} style={{ position: 'absolute', top: 18, height: 8, borderRadius: 4, background: 'var(--accent)', left: pct(s), width: `max(4px, calc(${pct(e)} - ${pct(s)}))` }} />
+          <i key={i} style={{ position: 'absolute', top: 18, height: 8, borderRadius: 2, background: 'var(--sinal)', left: pct(s), width: `max(4px, calc(${pct(e)} - ${pct(s)}))` }} />
         ))}
-        <b style={{ position: 'absolute', top: 8, width: 4, height: 28, marginLeft: -2, borderRadius: 2, background: 'var(--text)', left: pct(preview ?? now) }}>
+        <b style={{ position: 'absolute', top: 8, width: 4, height: 28, marginLeft: -2, borderRadius: 2, background: 'var(--ink)', left: pct(preview ?? now) }}>
           {preview !== null && <em className="mono small" style={{ position: 'absolute', bottom: 32, left: -30, width: 64, textAlign: 'center', fontStyle: 'normal' }}>{clock(preview)}</em>}
         </b>
       </div>
       <div className="row mono small muted" style={{ padding: 0, border: 0, flexWrap: 'wrap' }}>
         <span>{clock(from)}</span>
-        <button type="button" className="btn ghost" disabled={next === undefined} onClick={() => next !== undefined && seek(next - 3)}>
+        <Key center disabled={next === undefined} onClick={() => next !== undefined && seek(next - 3)}>
           <Icon name="next" size={16} />{next === undefined ? 'Sem outro movimento' : `Próximo movimento ${clock(next)}`}
-        </button>
+        </Key>
         <span>{clock(to)}</span>
       </div>
     </div>
@@ -147,7 +144,7 @@ export default function Replay({ camera, start, from, to, offset, close, goLive 
       title={camera.name}
       sub={`Gravação do DVR · ${stamp(position)}`}
       onClose={close}
-      actions={<button type="button" className="btn" onClick={goLive}><Icon name="radio" />Ao vivo</button>}
+      actions={<Key center onClick={goLive}><Icon name="radio" />Ao vivo</Key>}
     >
       <div style={stageStyle}>
         <video
@@ -168,21 +165,19 @@ export default function Replay({ camera, start, from, to, offset, close, goLive 
         {status === 'ended' && (
           <Overlay icon="refresh">
             <span>{atNow ? 'Você chegou ao momento atual da gravação.' : 'Fim deste trecho da gravação. Avance ou volte para continuar.'}</span>
-            {atNow && <button type="button" className="btn primary" onClick={goLive}><Icon name="radio" />Ver ao vivo</button>}
+            {atNow && <Key center signal onClick={goLive}><Icon name="radio" />Ver ao vivo</Key>}
           </Overlay>
         )}
         {status === 'unsupported' && <Overlay icon="warn"><span>Este navegador não toca a gravação. Use o Chrome, o Edge ou o Safari atualizado.</span></Overlay>}
       </div>
       {ongoing && status !== 'ended' && (
-        <button type="button" className="notice" onClick={goLive} style={{ textAlign: 'left', color: 'inherit' }}>
-          <span className="dot warn" style={{ marginTop: 6 }} />Movimento ainda acontecendo · ver ao vivo
-        </button>
+        <Key onClick={goLive}><Status kind="warn">Movimento ainda acontecendo</Status>Ver ao vivo</Key>
       )}
       <Timeline from={from} to={upper} now={position} hits={visible} seek={seek} />
       <div className="row" style={{ border: 0, padding: 0, justifyContent: 'center' }} role="group" aria-label="Controle da gravação">
-        <button type="button" className="btn" aria-label="Voltar 30 segundos" onClick={() => seek(position - 30)}><Icon name="refresh" size={18} />30 s</button>
-        <button type="button" className="btn primary" aria-label={paused ? 'Continuar' : 'Pausar'} disabled={status !== 'live'} onClick={toggle} style={{ minWidth: 72 }}>{paused ? 'Continuar' : 'Pausar'}</button>
-        <button type="button" className="btn" aria-label="Avançar 30 segundos" onClick={() => seek(position + 30)}>30 s<Icon name="next" size={18} /></button>
+        <Key center aria-label="Voltar 30 segundos" onClick={() => seek(position - 30)}><Icon name="left" size={18} />30 s</Key>
+        <Key center signal={status === 'live'} aria-label={paused ? 'Continuar' : 'Pausar'} disabled={status !== 'live'} onClick={toggle} style={{ minWidth: 96 }}>{paused ? 'Continuar' : 'Pausar'}</Key>
+        <Key center aria-label="Avançar 30 segundos" onClick={() => seek(position + 30)}>30 s<Icon name="right" size={18} /></Key>
       </div>
     </VideoDialog>
   );

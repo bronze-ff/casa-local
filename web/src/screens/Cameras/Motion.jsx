@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fmtTime, usePoll } from '../../api.js';
-import { Icon, Stale, useAction } from '../../ui.jsx';
+import { Badge, Icon, Key, Stale, Status, clickHook, useAction } from '../../ui.jsx';
 import AlertDevices from './AlertDevices.jsx';
 
 const dayLabel = (t) => {
@@ -47,40 +47,37 @@ export default function Motion({ cameras, motion, onOpen, openAlerts }) {
     <div className="stack" style={{ gap: 14 }}>
       <Stale poll={motion} what="movimentos" />
       <div className="row" style={{ padding: 0, border: 0 }}>
-        <span className="pill"><span className={`dot ${data.connected ? '' : 'warn'}`} />{data.connected ? 'Recebendo eventos do DVR' : data.error ?? 'Conectando ao DVR…'}</span>
+        <Status kind={data.connected ? 'ok' : data.error ? 'fail' : 'warn'}>{data.connected ? 'Recebendo eventos do DVR' : data.error ?? 'Conectando ao DVR…'}</Status>
         <span className="small muted">últimas 24 h</span>
       </div>
 
       <div role="group" aria-label="Filtrar por câmera" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        <button type="button" className="btn" aria-pressed={cam === 'todas'} onClick={() => setCam('todas')} style={cam === 'todas' ? { borderColor: 'var(--accent-line)', background: 'var(--accent-bg)' } : undefined}>Todas</button>
+        <Key center on={cam === 'todas'} onClick={() => setCam('todas')}>Todas</Key>
         {sorted.map((c) => (
-          <button key={c.id} type="button" className="btn" aria-pressed={cam === c.id} onClick={() => setCam(c.id)} style={cam === c.id ? { borderColor: 'var(--accent-line)', background: 'var(--accent-bg)' } : undefined}>
+          <Key key={c.id} center on={cam === c.id} onClick={() => setCam(c.id)}>
             {watched.includes(c.id) && <Icon name="bell" size={14} />}{c.name}
-            {data.unseenBy?.[c.id] ? <span className="chip hot">{data.unseenBy[c.id]}</span> : null}
-          </button>
+            {data.unseenBy?.[c.id] ? <Badge>{data.unseenBy[c.id]}</Badge> : null}
+          </Key>
         ))}
       </div>
 
       {cam === 'todas' && data.unseen > 0 && (
-        <div className="notice">
-          <Icon name="bell" size={18} style={{ color: 'var(--accent)', flex: 'none', marginTop: 2 }} />
-          <span style={{ flex: 1 }}>{data.unseen} {data.unseen === 1 ? 'movimento novo' : 'movimentos novos'} em {unseenNames}</span>
-          <button type="button" className="btn ghost" style={{ minHeight: 32 }} disabled={busy} onClick={markAll}>Marcar tudo como visto</button>
+        <div className="row">
+          <span className="lbl">{data.unseen} {data.unseen === 1 ? 'movimento novo' : 'movimentos novos'} em {unseenNames}</span>
+          <Key center disabled={busy} onClick={markAll}>Marcar tudo visto</Key>
         </div>
       )}
 
       {cam === 'todas' ? <AlertDevices cameras={cameras} open={openAlerts} /> : (
-        <button type="button" className="btn" aria-pressed={watched.includes(cam)} disabled={busy} onClick={toggleBell}
-          style={watched.includes(cam) ? { borderColor: 'var(--accent-line)', background: 'var(--accent-bg)' } : undefined}>
-          <Icon name="bell" size={16} />
-          {watched.includes(cam) ? `Avisando quando houver movimento em ${names[cam]}` : `Avisar quando houver movimento em ${names[cam]}`}
-        </button>
+        <Key on={watched.includes(cam)} disabled={busy} onClick={toggleBell}>
+          <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Icon name="bell" size={16} />{watched.includes(cam) ? `Avisando quando houver movimento em ${names[cam]}` : `Avisar quando houver movimento em ${names[cam]}`}</span>
+        </Key>
       )}
 
       {events === null ? <p className="muted" role="status">Carregando…</p> : events.length === 0 ? (
         <p className="muted small">Nenhum movimento {cam === 'todas' ? 'nas câmeras' : 'nesta câmera'} nas últimas 24 h.</p>
       ) : (
-        <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        <ol className="list" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {events.map((event) => {
             const day = dayLabel(event.start);
             const header = day === lastDay ? null : (lastDay = day);
@@ -88,19 +85,17 @@ export default function Motion({ cameras, motion, onOpen, openAlerts }) {
             const fresh = watched.includes(event.camera) && event.start > (seenAtOpen?.[event.camera] ?? Infinity);
             return (
               <li key={event.id}>
-                {header && <h3 className="label" style={{ margin: '14px 0 4px' }}>{header}</h3>}
-                <button type="button" className="row" onClick={() => onOpen(event)} aria-label={`Ver a gravação de ${names[event.camera] ?? event.camera} às ${fmtTime(event.start)}`}
-                  style={{ width: '100%', textAlign: 'left', background: 'transparent', color: 'inherit', border: 0, borderTop: '1px solid var(--line)', minHeight: 64, justifyContent: 'flex-start' }}>
-                  {event.photo ? (
-                    <img src={`/api/motion/${event.id}.jpg`} alt="" loading="lazy" width="96" height="54" style={{ width: 96, height: 54, objectFit: 'cover', borderRadius: 8, flex: 'none' }} />
-                  ) : (
-                    <span className="placeholder" style={{ width: 96, height: 54, borderRadius: 8, flex: 'none' }}><Icon name="camera" size={16} /></span>
-                  )}
-                  <span className="stack" style={{ flex: 1 }}>
-                    <strong>{names[event.camera] ?? event.camera}</strong>
-                    <span className="small muted mono">{fmtTime(event.start)}{event.end ? ` · ${minutes} min` : ' · agora'}{event.count > 1 ? ` · ${event.count} disparos` : ''}</span>
+                {header && <h3 className="lbl" style={{ margin: '14px 0 4px' }}>{header}</h3>}
+                <button type="button" className="row" onClick={() => { clickHook.fn?.(); onOpen(event); }} aria-label={`Ver a gravação de ${names[event.camera] ?? event.camera} às ${fmtTime(event.start)}`}
+                  style={{ width: '100%', textAlign: 'left', background: 'transparent', color: 'inherit', border: 0, borderBottom: '1px solid color-mix(in srgb, var(--borda) 35%, transparent)', minHeight: 56, justifyContent: 'flex-start', font: 'inherit', cursor: 'pointer' }}>
+                  <span className="thumb" style={{ width: 64, height: 40, flex: 'none' }}>
+                    {event.photo && <img src={`/api/motion/${event.id}.jpg`} alt="" loading="lazy" />}
                   </span>
-                  {fresh ? <span className="chip hot">Novo</span> : watched.includes(event.camera) ? <Icon name="bell" size={14} /> : null}
+                  <span className="stack" style={{ flex: 1, gap: 2 }}>
+                    <strong>{names[event.camera] ?? event.camera}</strong>
+                    <small>{fmtTime(event.start)}{event.end ? ` · ${minutes} min` : ' · agora'}{event.count > 1 ? ` · ${event.count} disparos` : ''}</small>
+                  </span>
+                  {fresh ? <Badge>Novo</Badge> : watched.includes(event.camera) ? <Icon name="bell" size={14} /> : <span className="lbl">visto</span>}
                 </button>
               </li>
             );

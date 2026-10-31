@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useHome } from '../../App.jsx';
 import { fmtAgo, usePoll } from '../../api.js';
-import { Card, Icon, Modal, Segmented, Stale, Switch, useAction } from '../../ui.jsx';
+import { Card, Icon, Modal, Segmented, Stale, Switch, useAction , Key } from '../../ui.jsx';
 
 const DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 // Ações avulsas aceitas pelo backend (luz e ar); o resto é modo.
@@ -102,13 +102,13 @@ function RoutineForm({ initial, modes, places, people, busy, onSave, onCancel })
       <div role="group" aria-label="Dias da semana" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {DAYS.map((d, i) => {
           const on = days.includes(i);
-          return <button key={d} type="button" aria-pressed={on} className={`chip ${on ? 'hot' : ''}`} style={{ minHeight: 44, minWidth: 48, fontSize: 14 }}
-            onClick={() => setDays((old) => (on ? old.filter((x) => x !== i) : [...old, i].sort()))}>{d}</button>;
+          return <Key key={d} center on={on} style={{ minWidth: 56 }}
+            onClick={() => setDays((old) => (on ? old.filter((x) => x !== i) : [...old, i].sort()))}>{d}</Key>;
         })}
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-        <button type="button" className="btn ghost" onClick={onCancel}>Cancelar</button>
-        <button type="submit" className="btn primary" disabled={!valid || busy}>Salvar rotina</button>
+        <Key center onClick={onCancel}>Cancelar</Key>
+        <Key center signal type="submit" disabled={!valid || busy}>Salvar rotina</Key>
       </div>
     </form>
   );
@@ -133,12 +133,12 @@ export default function Routines() {
   const setTimer = (minutes) => post('/api/routines/timer', { device: 'ar-quarto', minutes }, minutes ? 'Timer do ar ligado' : 'Timer cancelado');
 
   return (
-    <Card title="Rotinas" aside={<button type="button" className="btn" onClick={() => setEditing('new')}><Icon name="plus" size={18} />Nova</button>}>
+    <Card title="Rotinas" aside={<Key center onClick={() => setEditing('new')}><Icon name="plus" size={18} />Nova</Key>}>
       <Stale poll={poll} what="as rotinas" />
       {!d && !poll.error && <p className="muted" role="status">Lendo…</p>}
       {d?.lastError && (
-        <div className="notice" role="status">
-          <Icon name="warn" size={18} style={{ color: 'var(--accent)', flex: 'none', marginTop: 2 }} />
+        <div className="aviso err" role="status">
+          <Icon name="alert" size={20} />
           <span>Última falha do agendador {d.lastErrorAt ? fmtAgo(d.lastErrorAt) : ''}: {d.lastError}</span>
         </div>
       )}
@@ -151,8 +151,8 @@ export default function Routines() {
               <span className="muted small">{timer ? `Desliga ${when(timer.at)}` : 'Nenhum timer ligado.'}</span>
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {[30, 60, 120, 240].map((m) => <button key={m} type="button" className="btn" disabled={busy} onClick={() => setTimer(m)}>{m < 60 ? `${m} min` : `${m / 60} h`}</button>)}
-              {timer && <button type="button" className="btn ghost" disabled={busy} onClick={() => setTimer(0)}>Cancelar</button>}
+              {[30, 60, 120, 240].map((m) => <Key center key={m} disabled={busy} onClick={() => setTimer(m)}>{m < 60 ? `${m} min` : `${m / 60} h`}</Key>)}
+              {timer && <Key center disabled={busy} onClick={() => setTimer(0)}>Cancelar</Key>}
             </div>
           </div>
 
@@ -167,15 +167,15 @@ export default function Routines() {
                   {r.days.length === 7 ? 'todo dia' : r.days.map((x) => DAYS[x]).join(' ')}{r.next ? ` · próxima ${when(r.next)}` : ''}
                 </span>
               </div>
-              <button type="button" className="btn ghost" aria-label={`Editar ${r.name}`} onClick={() => setEditing(r)}>Editar</button>
+              <Key center aria-label={`Editar ${r.name}`} onClick={() => setEditing(r)}>Editar</Key>
               {removing === r.id ? (
                 <>
-                  <button type="button" className="btn" style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }} disabled={busy}
-                    onClick={() => { setRemoving(null); post(`/api/routines/${r.id}/remove`, {}, 'Rotina removida'); }}>Remover mesmo</button>
-                  <button type="button" className="btn ghost" onClick={() => setRemoving(null)}>Não</button>
+                  <Key center signal disabled={busy}
+                    onClick={() => { setRemoving(null); post(`/api/routines/${r.id}/remove`, {}, 'Rotina removida'); }}>Remover mesmo</Key>
+                  <Key center onClick={() => setRemoving(null)}>Não</Key>
                 </>
               ) : (
-                <button type="button" className="btn ghost" style={{ minWidth: 44, padding: 0 }} aria-label={`Remover ${r.name}`} onClick={() => setRemoving(r.id)}><Icon name="close" size={18} /></button>
+                <Key center aria-label={`Remover ${r.name}`} onClick={() => setRemoving(r.id)}><Icon name="close" size={18} /></Key>
               )}
             </div>
           ))}
@@ -187,7 +187,7 @@ export default function Routines() {
                 {d.log.map((l, i) => (
                   <li key={i} className="row small">
                     <span className="mono num muted" style={{ flex: 'none' }}>{when(l.at)}</span>
-                    <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', color: l.ok ? undefined : 'var(--danger)' }}>{l.name} · {l.message}</span>
+                    <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', color: l.ok ? undefined : 'var(--sinal-tx)' }}>{l.name} · {l.message}</span>
                   </li>
                 ))}
               </ul>

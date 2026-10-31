@@ -1,13 +1,16 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import '@fontsource/schibsted-grotesk/400.css';
-import '@fontsource/schibsted-grotesk/500.css';
-import '@fontsource/schibsted-grotesk/600.css';
-import '@fontsource/schibsted-grotesk/700.css';
-import '@fontsource/ibm-plex-mono/400.css';
-import '@fontsource/ibm-plex-mono/500.css';
-import './theme.css';
+import '@fontsource/doto/latin-900.css';
+import '@fontsource/jetbrains-mono/latin-400.css';
+import '@fontsource/jetbrains-mono/latin-500.css';
+import '@fontsource/jetbrains-mono/latin-700.css';
+import './tokens.css';
 import App from './App.jsx';
+import { readTray } from './mode.js';
+import './screens/Central/Sound.js';
+
+// A bandeja é sempre Noite (antes da primeira pintura, para não piscar o tema do sistema).
+if (readTray(window.location.search)) document.documentElement.dataset.theme = 'noite';
 
 createRoot(document.getElementById('root')).render(<StrictMode><App /></StrictMode>);
 

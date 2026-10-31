@@ -1,0 +1,24 @@
+# Casa Local no Linux: substitui a bandeja/vigia do Windows (o systemd religa se cair).
+# Instalado por scripts/instalar-linux.sh em /etc/systemd/system.
+[Unit]
+Description=Casa Local (painel da casa)
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+User=filippe
+WorkingDirectory=/home/filippe/CasaLocal
+# Hostname exato do Tailscale Serve; confira com `tailscale status` se o PC ganhar outro nome no Linux.
+Environment=CASA_ALLOWED_HOSTS=desktop-daa9sqh.tail634fb2.ts.net
+# Ajuste se o go2rtc ou os backups do home lab ficarem em outro lugar no Linux.
+#Environment=CASA_GO2RTC_CONFIG=/home/filippe/.config/go2rtc/go2rtc.yaml
+Environment=CASA_HOMELAB_BACKUPS=/mnt/d/Homelab/backups
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/filippe/CasaLocal/.venv/bin/python -m backend.server --mode local --port 8787
+# Segredos em JSON puro (sem DPAPI): tudo que o serviço cria nasce só para o filippe.
+UMask=0077
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

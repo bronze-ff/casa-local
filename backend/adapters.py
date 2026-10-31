@@ -4,10 +4,12 @@ import json
 import logging
 import multiprocessing
 import socket
+import time
 
 from . import ac_frames, tuya_light
 from .ir_codes import code_of, origin_of
-from .models import AC_STATE_FIELDS, AppError
+from .models import (AC_STATE_FIELDS, AppError, command_context, command_receipt,
+                     ensure_command_time, now)
 
 
 MODE_PT = {"cool": "resfriar", "heat": "aquecer", "dry": "desumidificar", "fan": "ventilar", "auto": "automático"}
@@ -178,7 +180,14 @@ def read(config):
         device.close()
 
 
-def send(config, command, current):
+def send(config, command, current, *, context=None):
+    context = context or command_context()
+    requested = command.get("values", {})
+    expected = requested
+    emitted = False
+    delivery = "not_sent"
+    reported = {}
+    observed_at = None
     # Disable library diagnostics: they can include encrypted payloads and local keys.
     logging.getLogger("tinytuya").disabled = True
     try:
@@ -186,27 +195,42 @@ def send(config, command, current):
     except ImportError:
         raise AppError("TinyTuya não está instalado no ambiente local.", 503, "adapter_unavailable") from None
     common = dict(dev_id=config["providerId"], address=config["ip"], local_key=config["localKey"], version=config["protocol"], connection_timeout=2, connection_retry_limit=0, connection_retry_delay=0, persist=False)
+    def remaining_timeout(device):
+        ensure_command_time(context)
+        device.set_socketTimeout(min(2.0, context.deadline - time.monotonic()))
+
     class SingleAttempt:
         def detect_available_dps(self):
             if config["adapter"] in {"dp", "light"}:
                 self.dps_to_request = _requested_dps(config)
             else:
-                # Explicit controlType is a validated firmware selection.
                 self.dps_to_request = {"201" if config["controlType"] == 1 else "1": None}
             return self.dps_to_request
 
         def _get_socket(self, renew):
-            # TinyTuya uses the same counter for opening sockets and resending
-            # commands. Allow exactly one connection, but zero command resends.
+            remaining_timeout(self)
             previous = self.socketRetryLimit
             self.socketRetryLimit = 1
             try:
-                return super()._get_socket(renew)
+                result = super()._get_socket(renew)
             finally:
                 self.socketRetryLimit = previous
+            # Connecting/negotiating may consume the budget before the SDK sends.
+            remaining_timeout(self)
+            return result
+
+    def receipt():
+        value = command_receipt(context, requested, delivery=delivery, reported=reported, expected=expected)
+        value["observedAt"] = observed_at
+        return value
+
+    def uncertain():
+        return AppError("Resultado físico incerto; confira o estado antes de repetir.", 502,
+                        "command_result_unknown", receipt=receipt())
 
     device = None
     try:
+        ensure_command_time(context)
         if config["adapter"] == "ir":
             from tinytuya.Contrib.IRRemoteControlDevice import IRRemoteControlDevice
 
@@ -260,56 +284,88 @@ def send(config, command, current):
                     code = ac_frames.adjust(code, config["frameFix"])
                 except ValueError:
                     pass
+            remaining_timeout(device)
+            emitted, delivery = True, "unknown"
             device.send_button(code)
-            if isinstance(device.send_result, dict) and ("Error" in device.send_result or "Err" in device.send_result):
-                raise AppError("A central não confirmou o envio. Confira antes de repetir.", 502, "device_unavailable")
-            return {"status": "sent", "confidence": "estimated" if estimated or "temperature" in current else "unknown", "state": estimated, "message": "IR enviado uma vez; o estado físico não é confirmado."}
+            reply = device.send_result
+            if isinstance(reply, dict) and ("Error" in reply or "Err" in reply):
+                raise uncertain()
+            if isinstance(reply, dict):
+                delivery = "sent"
+            return {"status": "sent", "confidence": "estimated" if command["action"] == "set" else "unknown",
+                    "state": estimated, "receipt": receipt(),
+                    "message": "Sinal/tentativa aceita; estado físico não confirmado."}
         schema = config["schema"]
         values = command["values"]
-        if config["adapter"] == "light":
-            class CheckedLight(SingleAttempt, tinytuya.Device):
-                pass
-
-            device = CheckedLight(**common)
-            device.disabledetect = True
-            device.set_retry(False)
-            before = device.status()
-            if not isinstance(before, dict) or not isinstance(before.get("dps"), dict):
-                raise AppError("Lâmpada indisponível. Nada foi enviado.", 502, "device_unavailable")
-            payload = tuya_light.encode(values, before["dps"], schema)
-            reply = device.set_multiple_values(payload, nowait=False)
-            if not isinstance(reply, dict) or "Error" in reply or "Err" in reply:
-                raise AppError("A lâmpada não confirmou o comando. Confira antes de repetir.", 502, "device_unavailable")
-            after = device.status()
-            reported = tuya_light.decode(after["dps"], schema) if isinstance(after, dict) and isinstance(after.get("dps"), dict) else {}
-            return {"status": "acknowledged", "confidence": "reported" if reported else "unknown", "state": reported, "message": "Comando reconhecido pela lâmpada."}
-        if not set(values).issubset(schema):
+        if config["adapter"] != "light" and not set(values).issubset(schema):
             raise AppError("Este ajuste não possui DP configurado.", 409, "unsupported_command")
-        payload = {schema[field]["dp"]: encode_dp(field, value, schema[field]) for field, value in values.items()}
+
         class CheckedDP(SingleAttempt, tinytuya.Device):
-            pass
+            def set_multiple_values(self, values, nowait=False):
+                # Device.set_multiple_values retries/splits multi-DP errors even
+                # when transport retries are disabled. Emit one SDK frame only.
+                payload = self.generate_payload(tinytuya.CONTROL, {str(key): value for key, value in values.items()})
+                return self._send_receive(payload, getresponse=not nowait)
 
         device = CheckedDP(**common)
         device.disabledetect = True
         device.set_retry(False)
+        before_dps = {}
+        if config["adapter"] == "light":
+            if set(values) != {"power"}:
+                remaining_timeout(device)
+                before = device.status()
+                if not isinstance(before, dict) or not isinstance(before.get("dps"), dict) or "Error" in before or "Err" in before:
+                    raise AppError("Lâmpada indisponível. Nenhum comando enviado.", 502, "device_unavailable")
+                before_dps = before["dps"]
+            payload = tuya_light.encode(values, before_dps, schema)
+            expected = tuya_light.normalized_values(values, before_dps, schema)
+        else:
+            payload = {schema[field]["dp"]: encode_dp(field, value, schema[field]) for field, value in values.items()}
+            expected = {field: decode_dp(field, payload[schema[field]["dp"]], schema[field]) for field in values}
+
+        remaining_timeout(device)
+        # Conservative boundary: entering the SDK may already have emitted bytes.
+        emitted, delivery = True, "unknown"
         reply = device.set_multiple_values(payload, nowait=False)
-        if not isinstance(reply, dict) or "Error" in reply or "Err" in reply:
-            raise AppError("Aparelho não confirmou o comando. Confira antes de repetir.", 502, "device_unavailable")
-        # Only reported DPs become physical state. ACK alone never confirms a setting.
-        reported = {}
+        if isinstance(reply, dict) and ("Error" in reply or "Err" in reply):
+            raise uncertain()
+        if isinstance(reply, dict):
+            delivery = "sent"
+        remaining_timeout(device)
         status = device.status()
         if isinstance(status, dict) and isinstance(status.get("dps"), dict):
-            for field, spec in schema.items():
-                if spec["dp"] in status["dps"]:
-                    try:
-                        reported[field] = decode_dp(field, status["dps"][spec["dp"]], spec)
-                    except (ValueError, TypeError, StopIteration):
-                        pass
-        return {"status": "acknowledged", "confidence": "reported" if reported else "unknown", "state": reported, "message": "Comando reconhecido pelo aparelho."}
-    except AppError:
+            if config["adapter"] == "light":
+                reported = tuya_light.decode(status["dps"], schema)
+            else:
+                for field, spec in schema.items():
+                    if spec["dp"] in status["dps"]:
+                        try:
+                            reported[field] = decode_dp(field, status["dps"][spec["dp"]], spec)
+                        except (ValueError, TypeError, StopIteration):
+                            pass
+            if reported:
+                observed_at = now()
+        if not isinstance(status, dict) or not isinstance(status.get("dps"), dict) or "Error" in status or "Err" in status:
+            raise uncertain()
+        value = receipt()
+        return {"status": "acknowledged" if delivery == "sent" else "sent",
+                "confidence": "reported" if reported else "unknown", "state": reported,
+                "receipt": value,
+                "message": "Estado observado após a tentativa; confira a evidência por campo."}
+    except AppError as error:
+        if emitted:
+            if error.code == "command_result_unknown":
+                raise
+            raise uncertain() from None
+        if error.receipt is None:
+            error.receipt = receipt()
         raise
     except Exception:
-        raise AppError("Falha na conexão local. Confira o aparelho antes de repetir.", 502, "device_unavailable") from None
+        if emitted:
+            raise uncertain() from None
+        raise AppError("Falha na conexão local. Nenhum comando enviado.", 502,
+                       "device_unavailable", receipt=receipt()) from None
     finally:
         if device is not None:
             device.close()

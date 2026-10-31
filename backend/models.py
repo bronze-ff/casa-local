@@ -1,7 +1,11 @@
 """Public inventory and strict command validation; no provider secrets here."""
 from copy import deepcopy
 from datetime import datetime, timezone
+from dataclasses import dataclass, field
+import math
 import re
+import secrets
+import time
 
 VERSION = "0.1.0"
 TV_KEYS = {"power", "volume_up", "volume_down", "mute", "up", "down", "left", "right", "ok", "home", "back", "source"}
@@ -35,9 +39,67 @@ def now():
 
 
 class AppError(Exception):
-    def __init__(self, message, status=400, code="invalid_request"):
+    def __init__(self, message, status=400, code="invalid_request", *, receipt=None):
         super().__init__(message)
         self.status, self.code = status, code
+        self.receipt = receipt
+
+
+COMMAND_BUDGET_SECONDS = 6.0
+
+
+@dataclass(frozen=True)
+class CommandContext:
+    """One request, one monotonic soft deadline; never a deduplication key."""
+    request_id: str
+    deadline: float
+    _started_at: float = field(default_factory=time.monotonic, init=False, repr=False, compare=False)
+
+
+def command_context(*, now=None, budget=COMMAND_BUDGET_SECONDS, request_id=None):
+    if isinstance(budget, bool) or not isinstance(budget, (int, float)) or not math.isfinite(budget) or budget <= 0:
+        raise ValueError("O orçamento deve ser finito e positivo.")
+    started = time.monotonic() if now is None else now
+    if isinstance(started, bool) or not isinstance(started, (int, float)) or not math.isfinite(started):
+        raise ValueError("Relógio monotônico inválido.")
+    context = CommandContext(request_id or secrets.token_urlsafe(18), started + budget)
+    object.__setattr__(context, "_started_at", started)
+    return context
+
+
+def ensure_command_time(context):
+    if time.monotonic() >= context.deadline:
+        raise AppError("Prazo encerrado; nenhum comando enviado", 504, "command_deadline_exceeded")
+
+
+def command_timing(context):
+    budget = max(0.0, (context.deadline - context._started_at) * 1000)
+    elapsed = max(0.0, (time.monotonic() - context._started_at) * 1000)
+    return {"budgetMs": budget, "elapsedMs": elapsed, "overrunMs": max(0.0, elapsed - budget)}
+
+
+def command_receipt(context, requested, *, delivery="not_sent", reported=None, expected=None, preview=False):
+    """Evidence belongs to fields read after emission, independently of transport."""
+    requested, reported = deepcopy(requested), deepcopy(reported or {})
+    expected = requested if expected is None else expected
+    confirmed, diverged = [], []
+    for key in requested:
+        if key not in reported:
+            continue
+        actual, wanted = reported[key], expected.get(key, requested[key])
+        same = type(actual) is type(wanted) and actual == wanted
+        # One percentage point covers integer DP quantization after encoder normalization.
+        if key == "brightness" and type(actual) is int and type(wanted) is int:
+            same = abs(actual - wanted) <= 1
+        elif key == "colorHex" and isinstance(actual, str) and isinstance(wanted, str):
+            # Encoder rounds HSV hue/saturation; at most two RGB levels per channel.
+            same = all(abs(int(actual[i:i+2], 16) - int(wanted[i:i+2], 16)) <= 2 for i in (1, 3, 5))
+        (confirmed if same else diverged).append(key)
+    outcome = "preview" if preview else "diverged" if diverged else "confirmed" if requested and len(confirmed) == len(requested) else "unconfirmed"
+    return {"requestId": context.request_id, "delivery": delivery, "stateVersion": None,
+            "outcome": outcome, "requested": requested, "reported": reported,
+            "confirmedFields": sorted(confirmed), "divergedFields": sorted(diverged),
+            "observedAt": now() if reported else None, "timing": command_timing(context)}
 
 
 def validate_command(kind, body):

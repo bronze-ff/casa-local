@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useHome } from '../../App.jsx';
 import { get, usePoll } from '../../api.js';
-import { Card, Icon, useAction, useToast } from '../../ui.jsx';
+import { Card, Icon, useAction, useToast , Key } from '../../ui.jsx';
 import CopyText from './CopyText.jsx';
 
 /* A chave só é lida do servidor quando você abre o painel e só aparece depois de "Mostrar chave". */
@@ -30,7 +30,7 @@ export default function Shortcuts() {
   };
 
   return (
-    <Card title="Atalhos da Siri" aside={<button type="button" className="btn" onClick={toggle} aria-expanded={open}><Icon name={open ? 'up' : 'down'} size={18} />{open ? 'Fechar' : 'Configurar'}</button>}>
+    <Card title="Atalhos da Siri" aside={<Key center onClick={toggle} aria-expanded={open}><Icon name={open ? 'up' : 'down'} size={18} />{open ? 'Fechar' : 'Configurar'}</Key>}>
       <p className="muted small">&quot;E aí Siri, cheguei&quot; roda o modo sem abrir o painel. Funciona com o Tailscale ligado no iPhone.</p>
       {open && !key && <p className="muted" role="status">Lendo a chave…</p>}
       {open && key && (
@@ -44,7 +44,7 @@ export default function Shortcuts() {
           <li className="stack" style={{ gap: 6 }}>
             Cabeçalhos: <code className="mono">Content-Type: application/json</code> e <code className="mono">Authorization: Bearer</code> + a chave:
             {shown ? <CopyText text={key} label="a chave" /> : (
-              <button type="button" className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => setShown(true)}>Mostrar chave</button>
+              <Key center style={{ alignSelf: 'flex-start' }} onClick={() => setShown(true)}>Mostrar chave</Key>
             )}
           </li>
           <li>Corpo da solicitação: JSON vazio. Dê ao atalho o nome que vai falar para a Siri (&quot;Cheguei&quot;, &quot;Filme&quot;...).</li>
@@ -53,13 +53,14 @@ export default function Shortcuts() {
       {open && key && (
         <div className="stack" style={{ gap: 8 }}>
           {confirm ? (
-            <div className="notice" role="alert">
-              <span style={{ flex: 1 }}>Trocar a chave? Os atalhos atuais param de funcionar até você colar a nova.</span>
-              <button type="button" className="btn primary" disabled={busy} onClick={rotate}>Trocar</button>
-              <button type="button" className="btn ghost" onClick={() => setConfirm(false)}>Cancelar</button>
+            <div className="aviso err" role="alert">
+              <Icon name="alert" size={20} />
+              <span>Trocar a chave? Os atalhos atuais param de funcionar até você colar a nova.</span>
+              <Key center signal disabled={busy} onClick={rotate}>Trocar</Key>
+              <Key center onClick={() => setConfirm(false)}>Cancelar</Key>
             </div>
           ) : (
-            <button type="button" className="btn" style={{ alignSelf: 'flex-start' }} disabled={busy} onClick={() => setConfirm(true)}><Icon name="refresh" size={18} />Trocar a chave</button>
+            <Key center style={{ alignSelf: 'flex-start' }} disabled={busy} onClick={() => setConfirm(true)}><Icon name="refresh" size={18} />Trocar a chave</Key>
           )}
         </div>
       )}

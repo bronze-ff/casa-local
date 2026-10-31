@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePoll, fmtAgo } from '../api.js';
 import { useHome, href } from '../App.jsx';
-import { Card, Icon, Segmented, Stale } from '../ui.jsx';
-import Live from './Cameras/Live.jsx';
+import { Card, Icon, Key, Segmented, Stale } from '../ui.jsx';
+import Live, { FrameView } from './Cameras/Live.jsx';
 import Motion from './Cameras/Motion.jsx';
-import Replay, { replayWindow } from './Cameras/Replay.jsx';
+import Replay from './Cameras/Replay.jsx';
+import { replayWindow } from './Cameras/replayWindow.js';
 
 const FRAME_EVERY = 4000; // o backend atualiza o cache a cada ~4 s com alguém olhando: não adianta pedir mais
 const FRAME_PARALLEL = 3; // igual ao limite do backend (cameras.py: BoundedSemaphore(3)); acima disso responde 429
@@ -55,24 +56,21 @@ function useFrames(ids, paused, tick) {
   return frames;
 }
 
-function Tile({ camera, frame, moving, onOpen }) {
+function Tile({ camera, frame, moving, bell, onOpen }) {
   return (
-    <button type="button" onClick={onOpen} aria-label={`Abrir ${camera.name} ao vivo`}
-      style={{ position: 'relative', padding: 0, border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden', aspectRatio: '16 / 9', background: 'var(--raised)', color: 'inherit', minHeight: 44, display: 'block', width: '100%' }}>
-      {frame?.url ? (
-        <img src={frame.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-      ) : (
-        <span className="placeholder" style={{ position: 'absolute', inset: 0 }}>{frame?.failed ? 'sem imagem' : 'carregando…'}</span>
-      )}
-      <span className="chip mono" style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(0,0,0,.6)' }}>{camera.id.replace('cam', '')}</span>
-      {moving && <span className="chip hot" style={{ position: 'absolute', top: 6, right: 6 }}>Movimento</span>}
-      <span className="small" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '14px 8px 6px', textAlign: 'left', background: 'rgba(0,0,0,.6)', color: '#fff' }}>{camera.name}</span>
+    <button type="button" onClick={onOpen} aria-label={`Abrir ${camera.name} ao vivo`} className="thumb"
+      style={{ padding: 0, border: 0, aspectRatio: '16 / 10', minHeight: 44, display: 'block', width: '100%', color: 'inherit', cursor: 'pointer' }}>
+      {frame?.url && <img src={frame.url} alt="" style={{ display: 'block' }} />}
+      {!frame?.url && <span className="t" style={{ top: 8, bottom: 'auto' }}><span>{frame?.failed ? 'sem imagem' : 'carregando…'}</span></span>}
+      {bell && <span className="ic" style={{ position: 'absolute', top: 6, right: 6, color: '#f1ead7', filter: 'drop-shadow(0 1px 2px #000)' }}><Icon name="bell" size={16} label="Avisa movimento" /></span>}
+      {moving && <span className="badge">Movimento</span>}
+      <span className="t"><span>{camera.name}</span><span>{frame?.at ? fmtAgo(frame.at) : ''}</span></span>
     </button>
   );
 }
 
 export default function Cameras({ param }) {
-  const { mode } = useHome();
+  const { mode, tray } = useHome();
   const preview = mode === 'preview';
   const cams = usePoll(preview ? null : '/api/cameras', 30000);
   const motion = usePoll('/api/motion', 15000);
@@ -80,6 +78,7 @@ export default function Cameras({ param }) {
   const [liveId, setLiveId] = useState(null);
   const [replay, setReplay] = useState(null);
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const [snap, setSnap] = useState(null);
   const [tick, setTick] = useState(0);
   const [, setNow] = useState(0);
   const handled = useRef('');
@@ -104,6 +103,7 @@ export default function Cameras({ param }) {
     if (parts[0] === 'cameras') parts.shift();
     const [first, id, start] = parts;
     if (first === 'replay') {
+      if (tray) return; // a bandeja não toca gravação
       const camera = all.find((c) => c.id === id);
       if (camera && Number(start)) {
         setLiveId(null);
@@ -114,7 +114,7 @@ export default function Cameras({ param }) {
     } else if (all.some((c) => c.id === first)) {
       setFilter('todas'); setLiveId(first);
     }
-  }, [param, cams.data, motion.data, motion.error, all, offset]);
+  }, [param, cams.data, motion.data, motion.error, all, offset, tray]);
 
   const leave = () => { if (param) window.location.hash = href('cameras'); };
   const closeLive = () => { setLiveId(null); leave(); };
@@ -131,33 +131,35 @@ export default function Cameras({ param }) {
   };
   const openEvent = (event) => {
     const camera = all.find((c) => c.id === event.camera);
-    if (camera) setReplay(replayWindow(camera, event, offset));
+    if (!camera) return;
+    if (tray) { if (event.photo) setSnap({ camera, src: `/api/motion/${event.id}.jpg` }); } // bandeja: sem WebSocket, só a foto do evento
+    else setReplay(replayWindow(camera, event, offset));
   };
   const newest = Math.max(0, ...shown.map((c) => frames[c.id]?.at ?? 0));
 
   return (
     <>
       <Card
-        title="Câmeras"
+        title={`Câmeras · ${all.length || ''}`.replace(/ · $/, '')}
         aside={!preview && available && filter !== 'movimento' ? (
-          <button type="button" className="btn ghost" aria-label="Atualizar imagens agora" onClick={() => setTick((n) => n + 1)} style={{ minWidth: 44, padding: 0 }}><Icon name="refresh" /></button>
+          <Key center aria-label="Atualizar imagens agora" onClick={() => setTick((n) => n + 1)} style={{ minHeight: 44, width: 44, padding: 0 }}><Icon name="refresh" /></Key>
         ) : null}
       >
         <Segmented label="Filtrar câmeras" value={filter} options={FILTERS.map(([v, t]) => [v, v === 'movimento' && motion.data?.unseen ? `${t} (${motion.data.unseen})` : t])} onChange={setFilter} />
 
         {preview ? (
-          <div className="notice info" role="status">
-            <Icon name="warn" size={18} style={{ flex: 'none', marginTop: 2 }} />
+          <div className="aviso" role="status">
+            <Icon name="alert" size={20} />
             <span>As câmeras só funcionam no modo local, no PC de casa. Aqui você vê só os avisos de movimento.</span>
           </div>
         ) : (
           <>
             <Stale poll={cams} what="câmeras" />
             {cams.data && !available && (
-              <div className="notice" role="alert">
-                <Icon name="warn" size={18} style={{ color: 'var(--accent)', flex: 'none', marginTop: 2 }} />
-                <span style={{ flex: 1 }}>Câmeras indisponíveis: o serviço de câmeras (go2rtc) não está rodando no PC de casa.</span>
-                <button type="button" className="btn ghost" style={{ minHeight: 32 }} onClick={cams.reload}>Verificar</button>
+              <div className="aviso err" role="alert">
+                <Icon name="alert" size={20} />
+                <span>Câmeras indisponíveis: o serviço de câmeras (go2rtc) não está rodando no PC de casa.</span>
+                <button type="button" className="act" onClick={cams.reload}>Verificar</button>
               </div>
             )}
             {!cams.data && !cams.error && <p className="muted" role="status">Abrindo câmeras…</p>}
@@ -168,16 +170,18 @@ export default function Cameras({ param }) {
           <Motion cameras={all} motion={motion} onOpen={openEvent} openAlerts={alertsOpen} />
         ) : cams.data && available ? (
           <>
-            <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 160px), 1fr))' }}>
-              {shown.map((c) => <Tile key={c.id} camera={c} frame={frames[c.id]} moving={movingNow.has(c.id)} onOpen={() => setLiveId(c.id)} />)}
+            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 150px), 1fr))' }}>
+              {shown.map((c) => <Tile key={c.id} camera={c} frame={frames[c.id]} moving={movingNow.has(c.id)} bell={(motion.data?.notify ?? []).includes(c.id)} onOpen={() => setLiveId(c.id)} />)}
             </div>
-            <p className="small muted">{shown.length} de {all.length} · {newest ? `Automático · ${fmtAgo(newest)}` : 'Atualização automática'}</p>
+            <p className="small muted" role="status">{shown.length} de {all.length} · {newest ? `Automático · ${fmtAgo(newest)}` : 'Atualização automática'}</p>
           </>
         ) : null}
       </Card>
 
-      {index >= 0 && <Live cameras={shown} index={index} poster={frames[liveId]?.url} move={move} close={closeLive} rewind={rewind} />}
-      {replay && (
+      {index >= 0 && tray && <FrameView title={shown[index].name} sub={`Canal ${shown[index].id.replace('cam', '')}`} src={frames[liveId]?.url} close={closeLive} />}
+      {snap && <FrameView title={snap.camera.name} sub="Foto do movimento" src={snap.src} close={() => setSnap(null)} />}
+      {index >= 0 && !tray && <Live cameras={shown} index={index} poster={frames[liveId]?.url} move={move} close={closeLive} rewind={rewind} />}
+      {replay && !tray && (
         <Replay
           key={`${replay.camera.id}-${replay.start}`}
           {...replay}

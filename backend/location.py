@@ -7,7 +7,7 @@ sem GPS contínuo. Tudo fica neste PC, protegido por DPAPI: a configuração (se
 histórico das últimas 48 h de cada pessoa.
 
 Presença da casa: alguém está num lugar chamado "Casa" → em casa; todos com posição e fora → vazia;
-sem dado de alguém → não se sabe. Usada pelo modo ausente e pelo Frigate "fora de casa".
+sem dado de alguém → não se sabe. Usada pelo modo ausente.
 """
 import base64
 from copy import deepcopy

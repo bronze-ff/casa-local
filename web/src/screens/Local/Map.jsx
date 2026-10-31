@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Icon } from '../../ui.jsx';
+import { Icon, Key } from '../../ui.jsx';
 
 export function project(lat, lon, zoom) {
   const sine = Math.sin(Math.max(-85.05112878, Math.min(85.05112878, lat)) * Math.PI / 180);
@@ -34,14 +34,14 @@ export default function LocationMap({ people, places, selected, draft, onPick })
     const [x, y] = point(place.lat, place.lon);
     return <g key={isDraft ? 'draft' : place.id}>
       <circle cx={x} cy={y} r={radius(place.radius, place.lat)} fill={isDraft ? 'var(--accent)' : 'var(--info)'} fillOpacity=".12" stroke={isDraft ? 'var(--accent)' : 'var(--info)'} strokeDasharray="5 4" />
-      <text x={x} y={y - 8} textAnchor="middle" fill="#101114" stroke="#fff" strokeWidth="3" paintOrder="stroke" fontSize="15">{place.name || 'Novo lugar'}</text>
+      <text x={x} y={y - 8} textAnchor="middle" fill="#101114" stroke="#fff" strokeWidth="5" paintOrder="stroke" fontSize="24">{place.name || 'Novo lugar'}</text>
     </g>;
   };
   const pan = (x, y) => setView(unproject(cx + x, cy + y, zoom));
   return <div className="stack" style={{ gap: 10 }}>
-    <div style={{ position: 'relative', width: '100%', aspectRatio: '5 / 3', overflow: 'hidden', borderRadius: 12, background: 'var(--raised)', border: '1px solid var(--line)' }}>
+    <div style={{ position: 'relative', width: '100%', aspectRatio: '5 / 3', overflow: 'hidden', borderRadius: 'var(--r-lcd)', background: 'var(--lcd)', boxShadow: 'inset 0 0 0 1px var(--lcd-off)' }}>
       {tiles.map(tile => <img alt="" draggable="false" key={`${zoom}-${tile.x}-${tile.y}`} src={`https://tile.openstreetmap.org/${zoom}/${tile.wrapped}/${tile.y}.png`} referrerPolicy="origin" onError={() => setFailed(true)}
-        style={{ position: 'absolute', width: `${256 / 6}%`, maxWidth: 'none', height: 'auto', left: `${(tile.x * 256 - left) / 6}%`, top: `${(tile.y * 256 - top) / 3.6}%` }} />)}
+        style={{ position: 'absolute', width: `${256 / 6}%`, maxWidth: 'none', height: 'auto', filter: 'grayscale(.85) sepia(.25) brightness(.9)', left: `${(tile.x * 256 - left) / 6}%`, top: `${(tile.y * 256 - top) / 3.6}%` }} />)}
       <svg viewBox="0 0 600 360" role="img" aria-label={`Mapa de localização${onPick ? '. Toque para escolher o lugar ou use os campos de coordenadas.' : ''}`} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: onPick ? 'crosshair' : 'grab', touchAction: 'none' }}
       onPointerDown={event => {
         if (!event.isPrimary || event.button !== 0) return;
@@ -70,18 +70,18 @@ export default function LocationMap({ people, places, selected, draft, onPick })
           return <g key={person.id} opacity={person.stale ? .55 : 1}>
             {person.id === selected && person.last.acc > 0 && <circle cx={x} cy={y} r={radius(person.last.acc, person.last.lat)} fill="var(--info)" fillOpacity=".15" />}
             <circle cx={x} cy={y} r={person.id === selected ? 9 : 6} fill={person.stale ? '#6e7176' : '#15729e'} stroke="white" strokeWidth="3" />
-            <text x={x + 13} y={y + 5} fontSize="16" fill="#101114" stroke="white" strokeWidth="3" paintOrder="stroke">{person.name}</text>
+            <text x={x + 13} y={y + 5} fontSize="24" fill="#101114" stroke="white" strokeWidth="5" paintOrder="stroke">{person.name}</text>
           </g>;
         })}
         {draft && Number.isFinite(Number(draft.lat)) && Number.isFinite(Number(draft.lon)) && draft.lat !== '' && draft.lon !== '' && circle({ ...draft, lat: Number(draft.lat), lon: Number(draft.lon), radius: Number(draft.radius) }, true)}
       </svg>
-      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" style={{ position: 'absolute', bottom: 0, right: 0, background: 'var(--bg)', padding: '4px 8px', minHeight: 44, display: 'flex', alignItems: 'center', fontSize: 11 }}>© OpenStreetMap</a>
+      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" style={{ position: 'absolute', bottom: 0, right: 0, background: 'var(--corpo)', color: 'var(--ink)', padding: '4px 8px', minHeight: 44, display: 'flex', alignItems: 'center', fontSize: 11 }}>© OpenStreetMap</a>
     </div>
     <div className="row" style={{ flexWrap: 'wrap', justifyContent: 'flex-start', gap: 6 }}>
-      <button type="button" className="btn" aria-label="Ampliar mapa" disabled={zoom >= 19} onClick={() => setZoom(zoom + 1)}><Icon name="plus" /></button>
-      <button type="button" className="btn" aria-label="Reduzir mapa" disabled={zoom <= 2} onClick={() => setZoom(zoom - 1)}><Icon name="minus" /></button>
-      {[['left', -150, 0, 'oeste'], ['up', 0, -90, 'norte'], ['down', 0, 90, 'sul'], ['right', 150, 0, 'leste']].map(([icon, x, y, name]) => <button type="button" className="btn" key={icon} aria-label={`Mover mapa para ${name}`} onClick={() => pan(x, y)}><Icon name={icon} /></button>)}
-      <button type="button" className="btn" disabled={!focus} onClick={() => { setView(null); setZoom(15); }}>Centralizar</button>
+      <Key center aria-label="Ampliar mapa" disabled={zoom >= 19} onClick={() => setZoom(zoom + 1)}><Icon name="plus" /></Key>
+      <Key center aria-label="Reduzir mapa" disabled={zoom <= 2} onClick={() => setZoom(zoom - 1)}><Icon name="minus" /></Key>
+      {[['left', -150, 0, 'oeste'], ['up', 0, -90, 'norte'], ['down', 0, 90, 'sul'], ['right', 150, 0, 'leste']].map(([icon, x, y, name]) => <Key center key={icon} aria-label={`Mover mapa para ${name}`} onClick={() => pan(x, y)}><Icon name={icon} /></Key>)}
+      <Key center disabled={!focus} onClick={() => { setView(null); setZoom(15); }}>Centralizar</Key>
     </div>
     {onPick && <p className="small" style={{ color: 'var(--accent)' }}>Toque no mapa para posicionar o lugar. Ajuste o raio no formulário.</p>}
     {!focus && <p className="small muted">Sem posição recebida. O mapa começa em São Paulo como referência; navegue até o lugar ou informe as coordenadas.</p>}

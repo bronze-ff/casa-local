@@ -2,16 +2,16 @@
 
 - Lab: a tarefa CasaLocal-homelab mantém a distro ligada (sem cliente o WSL a desliga) e os
   containers sobem com `docker compose up -d` em ~/homelab.
-- Jogo: para os serviços pesados (downloads, Radarr/Sonarr, Frigate) e esvazia o cache do Linux para o
+- Jogo: para os serviços pesados (downloads, Radarr/Sonarr) e esvazia o cache do Linux para o
   Windows retomar a memória. O Jellyfin e os leves de aviso continuam (ntfy, Uptime Kuma, Dozzle...): o
   celular segue recebendo os avisos de câmera durante a partida. Pode entrar sozinho quando um jogo
   da lista abre (ex.: cs2.exe) e sair 2 min depois que fecha; o modo jogo ligado à mão só sai à mão.
-- Frigate (câmeras inteligentes) pesa ~2 GB e meia CPU: por padrão só liga com você fora de casa
-  (localização do celular, lugar chamado "Casa"); em casa ou sem localização, os avisos de movimento
-  vêm do DVR. Dá para deixar sempre ou nunca.
 - Monitor: CPU, memória, GPU (nvidia-smi), discos e memória da VM do WSL, com 24 h de histórico.
 
 O status dos containers é lido só com a distro já ligada (`wsl -d` a ligaria se estivesse parada).
+
+No Linux nativo (CachyOS) o Docker roda direto na máquina: `docker` sem wsl.exe, sem tarefa agendada
+e sem devolver memória da VM (não há VM); "WSL ligado" passa a significar "Docker respondendo".
 """
 from collections import deque
 from copy import deepcopy
@@ -30,6 +30,9 @@ import time
 from .models import AppError
 
 DISTRO, TASK, STACK = "homelab", "CasaLocal-homelab", "/home/filippe/homelab"
+# Runners do GitHub Actions da empresa: stack própria, parada no modo jogo. Job em andamento falha
+# e precisa de re-run; os novos ficam na fila do GitHub até o home lab voltar.
+RUNNERS = "/home/filippe/homelab/github-runner"
 GAMES = ("cs2.exe",)
 AUTO_EXIT_SECONDS = 120
 POLL_SECONDS = 15
@@ -39,7 +42,6 @@ NO_WINDOW = 0x08000000
 SERVICES = [
     {"id": "jellyfin", "name": "Jellyfin", "purpose": "Filmes e séries", "link": ("path", "/jellyfin")},
     {"id": "seerr", "name": "Seerr", "purpose": "Pedir filmes e séries", "link": ("https", 8446)},
-    {"id": "frigate", "name": "Frigate", "purpose": "Pessoas, carros e rostos nas câmeras", "link": ("tls", 8971)},
     {"id": "opengym-web", "name": "openGym", "purpose": "Treinos e peso", "link": ("https", 8443)},
     {"id": "actual", "name": "Actual", "purpose": "Finanças da casa", "link": ("https", 8445)},
     {"id": "ntfy", "name": "ntfy", "purpose": "Avisos no celular", "link": ("https", 10000)},
@@ -59,21 +61,24 @@ SERVICES = [
 # Lorena assistir enquanto você joga.
 KEEP_IN_GAME = {"ntfy", "uptime-kuma", "diun", "dozzle", "opengym-api", "opengym-web", "jellyfin"}
 HISTORY_EVERY, HISTORY_POINTS = 300, 288  # um ponto a cada 5 min, 24 h
-FRIGATE_MODES = {"fora", "sempre", "nunca"}
 # Backup noturno do home lab (timer homelab-backup no WSL): configs dos serviços e o .env no HD.
 BACKUP_DIR = Path(os.environ.get("CASA_HOMELAB_BACKUPS", r"D:\Homelab\backups"))
 DROP_CACHE_EVERY = 600  # o WSL demora a devolver o cache de disco ao Windows (após um reinício, ~4 GB)
 # O WSL só devolve ao Windows blocos de memória livres e contíguos: sem compactar, o modo jogo ficava
 # com ~4 GB presos na VM; compactando, cai para ~2 GB (medido em 24/10/2026).
 RECLAIM = "sync; echo 3 > /proc/sys/vm/drop_caches; echo 1 > /proc/sys/vm/compact_memory"
+NATIVE = os.name != "nt"  # Linux nativo: Docker local, sem WSL
 WSL = shutil.which("wsl.exe") or r"C:\Windows\System32\wsl.exe"
-NVIDIA_SMI = shutil.which("nvidia-smi.exe") or r"C:\Windows\System32\nvidia-smi.exe"
+# Sem extensão: no Windows o which acha o .exe pelo PATHEXT; no Linux, o binário.
+NVIDIA_SMI = shutil.which("nvidia-smi") or r"C:\Windows\System32\nvidia-smi.exe"
+TAILSCALE = shutil.which("tailscale") or r"C:\Program Files\Tailscale\tailscale.exe"
+DOCKER = ["docker"] if NATIVE else [WSL, "-d", DISTRO, "-u", "filippe", "--", "docker"]
 
 
-def run(args, timeout=60):
+def run(args, timeout=60, cwd=None):
     """Comando do Windows sem janela; devolve (código, saída). wsl.exe às vezes responde em UTF-16."""
     try:
-        done = subprocess.run(args, capture_output=True, timeout=timeout, creationflags=NO_WINDOW if os.name == "nt" else 0)
+        done = subprocess.run(args, capture_output=True, timeout=timeout, cwd=cwd, creationflags=NO_WINDOW if os.name == "nt" else 0)
     except (OSError, subprocess.TimeoutExpired) as error:
         return -1, str(error)
     raw = done.stdout + done.stderr
@@ -92,13 +97,22 @@ class Machine:
         self.last = None
 
     def cpu(self):
+        if NATIVE:
+            try:  # 1ª linha do /proc/stat: user nice system idle iowait irq softirq steal (em ticks)
+                ticks = [int(v) for v in Path("/proc/stat").read_text().split("\n", 1)[0].split()[1:9]]
+            except (OSError, ValueError):
+                return None
+            return self._usage((ticks[3] + ticks[4], sum(ticks)))
         try:
             idle, kernel, user = _Times(), _Times(), _Times()
             ctypes.windll.kernel32.GetSystemTimes(ctypes.byref(idle), ctypes.byref(kernel), ctypes.byref(user))
         except (AttributeError, OSError):
             return None
         value = lambda t: (t.high << 32) | t.low
-        now = (value(idle), value(kernel) + value(user))
+        return self._usage((value(idle), value(kernel) + value(user)))
+
+    def _usage(self, now):
+        """now = (ocioso, total) acumulados; o uso é a diferença desde a leitura anterior."""
         before, self.last = self.last, now
         if not before or now[1] == before[1]:
             return None
@@ -117,9 +131,10 @@ class Machine:
     @staticmethod
     def disks():
         result = []
-        for letter, label in (("C", "Windows"), ("E", "SSD dados"), ("D", "HD mídia")):
+        # shortcut: no Linux só a raiz; incluir os pontos de montagem dos discos de dados quando existirem.
+        for letter, label in ((("/", "Linux"),) if NATIVE else (("C", "Windows"), ("E", "SSD dados"), ("D", "HD mídia"))):
             try:
-                usage = shutil.disk_usage(f"{letter}:\\")
+                usage = shutil.disk_usage(letter if NATIVE else f"{letter}:\\")
             except OSError:
                 continue
             result.append({"drive": letter, "label": label, "freeGb": round(usage.free / 2**30), "totalGb": round(usage.total / 2**30),
@@ -128,6 +143,8 @@ class Machine:
 
     @staticmethod
     def wsl_memory():
+        if NATIVE:
+            return None  # sem VM do WSL: o painel mostra "—"
         code, out = run(["tasklist", "/fi", "imagename eq vmmemWSL", "/fo", "csv", "/nh"], timeout=10)
         rows = list(csv.reader(io.StringIO(out))) if code == 0 else []
         for row in rows:
@@ -138,8 +155,8 @@ class Machine:
 
 
 class Homelab:
-    def __init__(self, data_dir, enabled=True, clock=time.time, runner=run, machine=None, presence=lambda: None):
-        self.enabled, self.clock, self.run, self.presence = enabled, clock, runner, presence
+    def __init__(self, data_dir, enabled=True, clock=time.time, runner=run, machine=None):
+        self.enabled, self.clock, self.run = enabled, clock, runner
         self.path = Path(data_dir) / "homelab.json"
         self.lock = threading.Lock()
         self.busy = threading.Lock()  # uma troca de modo por vez
@@ -149,7 +166,6 @@ class Homelab:
         except (OSError, ValueError):
             saved = {}
         self.auto = saved.get("auto", True) is True
-        self.frigate_mode = saved.get("frigate", "fora") if saved.get("frigate") in FRIGATE_MODES else "fora"
         self.games = [g for g in saved.get("games", GAMES) if isinstance(g, str) and re.fullmatch(r"[\w .()-]{1,40}\.exe", g, re.I)] or list(GAMES)
         # O modo jogo não sobrevive a um reinício: ao subir, o home lab volta (a tarefa sobe no login).
         self.mode, self.reason, self.changed, self.step = "lab", None, clock(), None
@@ -163,19 +179,23 @@ class Homelab:
     def _save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(".tmp")
-        temporary.write_text(json.dumps({"auto": self.auto, "games": self.games, "frigate": self.frigate_mode}), encoding="utf-8")
+        temporary.write_text(json.dumps({"auto": self.auto, "games": self.games}), encoding="utf-8")
         temporary.replace(self.path)
 
     # ---- WSL ----
     def distro_running(self):
+        if NATIVE:
+            return self.run([*DOCKER, "info", "--format", "{{.ServerVersion}}"], timeout=20)[0] == 0
         code, out = self.run([WSL, "-l", "--running", "-q"], timeout=20)
         return code == 0 and DISTRO in [line.strip() for line in out.splitlines()]
 
     def compose(self, *args, timeout=180):
+        if NATIVE:  # o cwd faz valer o COMPOSE_FILE do .env da stack, como o --cd do wsl
+            return self.run([*DOCKER, "compose", *args], timeout=timeout, cwd=STACK)
         return self.run([WSL, "-d", DISTRO, "-u", "filippe", "--cd", STACK, "--", "docker", "compose", *args], timeout=timeout)
 
     def read_containers(self):
-        code, out = self.run([WSL, "-d", DISTRO, "-u", "filippe", "--", "docker", "ps", "-a", "--format", "{{json .}}"], timeout=30)
+        code, out = self.run([*DOCKER, "ps", "-a", "--format", "{{json .}}"], timeout=30)
         if code != 0:
             return None
         found = {}
@@ -187,19 +207,21 @@ class Homelab:
             found[item.get("Names", "")] = {"state": item.get("State"), "status": item.get("Status")}
         return found
 
+    def runners(self, action):
+        if NATIVE and os.path.isdir(RUNNERS):
+            self.run([*DOCKER, "compose", *action], timeout=120, cwd=RUNNERS)
+
+    def reclaim(self):
+        """Esvazia o cache do Linux para o Windows retomar a memória da VM; no Linux nativo não há o que devolver."""
+        if not NATIVE:
+            self.run([WSL, "-d", DISTRO, "-u", "root", "--", "sh", "-c", RECLAIM], timeout=60)
+
     # ---- modos ----
     def set_mode(self, body):
         if not self.enabled:
             raise AppError("O home lab só roda no PC de casa.", 409, "preview_mode")
-        if not isinstance(body, dict) or not set(body) <= {"mode", "auto", "restart", "frigate"} or not body:
+        if not isinstance(body, dict) or not set(body) <= {"mode", "auto", "restart"} or not body:
             raise AppError("Pedido inválido.")
-        if "frigate" in body:
-            if body["frigate"] not in FRIGATE_MODES:
-                raise AppError("Escolha sempre, só fora de casa ou nunca.")
-            with self.lock:
-                self.frigate_mode = body["frigate"]
-                self._save()
-            threading.Thread(target=self.apply_frigate, daemon=True).start()
         if "restart" in body:
             if body["restart"] not in {s["id"] for s in SERVICES} | KEEP_IN_GAME:
                 raise AppError("Serviço desconhecido.")
@@ -236,12 +258,14 @@ class Homelab:
                         heavy = sorted({line.strip() for line in out.splitlines() if line.strip()} - KEEP_IN_GAME) if code == 0 else []
                         if heavy:
                             self.compose("stop", *heavy, timeout=240)
+                        self.runners(["stop"])
                         # O Linux guarda a memória liberada como cache; esvaziar devolve ao Windows já.
-                        self.run([WSL, "-d", DISTRO, "-u", "root", "--", "sh", "-c", RECLAIM], timeout=60)
+                        self.reclaim()
                 else:
                     with self.lock:
                         self.step = "Ligando o home lab…"
-                    self.run(["schtasks", "/run", "/tn", TASK], timeout=20)
+                    if not NATIVE:  # no Linux o Docker é serviço do sistema, já ligado
+                        self.run(["schtasks", "/run", "/tn", TASK], timeout=20)
                     for _ in range(30):
                         if self.distro_running():
                             break
@@ -250,33 +274,23 @@ class Homelab:
                     if self.compose("up", "-d", timeout=300)[0] != 0:
                         time.sleep(10)
                         self.compose("up", "-d", timeout=300)
-                    if not self.frigate_wanted():
-                        self.compose("stop", "frigate", timeout=120)
+                    self.runners(["up", "-d"])
             finally:
                 with self.lock:
                     self.mode, self.reason, self.changed, self.step = mode, reason, self.clock(), None
                     self.game_gone = None
                     self.checked = 0  # relê os containers já
 
-    def frigate_wanted(self):
-        if self.frigate_mode == "nunca":
-            return False
-        if self.frigate_mode == "sempre":
-            return True
-        return self.presence() is False  # só com a localização dizendo que você saiu
-
-    def apply_frigate(self):
-        """Liga ou desliga o Frigate conforme a escolha e a sua localização (nunca no modo jogo)."""
-        if self.mode != "lab" or self.busy.locked() or not self.distro_running():
-            return
-        running = self.containers.get("frigate", {}).get("state") == "running"
-        if self.frigate_wanted() and not running:
-            self.compose("up", "-d", "frigate", timeout=180)
-        elif not self.frigate_wanted() and running:
-            self.compose("stop", "frigate", timeout=120)
-            self.run([WSL, "-d", DISTRO, "-u", "root", "--", "sh", "-c", RECLAIM], timeout=60)
-
     def running_games(self):
+        if NATIVE:
+            # Nomes dos processos (comm, até 15 caracteres); jogo pelo Proton aparece como "cs2.exe", nativo como "cs2".
+            names = set()
+            for comm in Path("/proc").glob("[0-9]*/comm"):
+                try:
+                    names.add(comm.read_text().strip().lower())
+                except OSError:
+                    pass
+            return [g for g in self.games if g.lower()[:15] in names or g.lower()[:-4][:15] in names]
         code, out = self.run(["tasklist", "/fo", "csv", "/nh"], timeout=15)
         if code != 0:
             return []
@@ -310,12 +324,11 @@ class Homelab:
             awake = sorted(name for name, info in (containers or {}).items() if info.get("state") == "running" and name not in KEEP_IN_GAME)
             if awake:
                 # São nomes de container (docker ps), não de serviço do compose.
-                self.run([WSL, "-d", DISTRO, "-u", "filippe", "--", "docker", "stop", *awake], timeout=240)
-                self.run([WSL, "-d", DISTRO, "-u", "root", "--", "sh", "-c", RECLAIM], timeout=60)
-        self.apply_frigate()
+                self.run([*DOCKER, "stop", *awake], timeout=240)
+                self.reclaim()
         if running and self.clock() - self.dropped_at >= DROP_CACHE_EVERY:
             self.dropped_at = self.clock()
-            self.run([WSL, "-d", DISTRO, "-u", "root", "--", "sh", "-c", RECLAIM], timeout=60)
+            self.reclaim()
         with self.lock:
             self.games_open = games
             if self.clock() - self.history_at >= HISTORY_EVERY:
@@ -346,14 +359,13 @@ class Homelab:
                                  "keep": service["id"] in KEEP_IN_GAME, "state": state.get("state") or ("stopped" if self.running is not None else "unknown"),
                                  "status": state.get("status")})
             return {"enabled": self.enabled, "mode": self.mode, "reason": self.reason, "since": int(self.changed), "step": self.step,
-                    "auto": self.auto, "games": list(self.games), "frigate": self.frigate_mode, "frigateOn": self.frigate_wanted(), "presence": self.presence(), "gamesOpen": list(self.games_open), "host": self.host,
+                    "auto": self.auto, "games": list(self.games), "gamesOpen": list(self.games_open), "host": self.host,
                     "wsl": self.running, "services": services, "stats": deepcopy(self.stats), "checked": int(self.checked), "backups": backups,
                     "history": [list(point) for point in self.history]}
 
     def tailnet_host(self):
         """Nome do PC no Tailscale (links HTTPS do openGym e do Jellyfin funcionam de qualquer aparelho)."""
-        tailscale = shutil.which("tailscale.exe") or r"C:\Program Files\Tailscale\tailscale.exe"
-        code, out = self.run([tailscale, "status", "--json"], timeout=20)
+        code, out = self.run([TAILSCALE, "status", "--json"], timeout=20)
         try:
             # No boot o Tailscale ainda pode estar subindo e devolver o nome vazio.
             return json.loads(out)["Self"]["DNSName"].rstrip(".") or None if code == 0 else None
@@ -370,12 +382,10 @@ class Homelab:
             # Ao subir (login), garante a stack ligada: containers parados à mão não voltam sozinhos.
             if not self.running_games():
                 self.compose("up", "-d", timeout=300)
-                if not self.frigate_wanted():
-                    self.compose("stop", "frigate", timeout=120)
             while not self.stop_event.is_set():
                 try:
-                    if not self.host:
-                        self.host = self.tailnet_host()  # tenta de novo até o Tailscale responder
+                    # Relê a cada volta: o nome .ts.net pode mudar (máquina renomeada, login novo).
+                    self.host = self.tailnet_host() or self.host
                     self.tick()
                 except Exception:
                     pass

@@ -1,7 +1,8 @@
 """Aparelhos na rede de casa: varredura leve e aviso de aparelho novo.
 
 A cada 15 min o PC de casa manda um ping para cada endereço da rede local (sem varrer portas) e lê a
-tabela de vizinhos do Windows (IP, MAC e o nome que o roteador anuncia). Nas primeiras 24 h a Casa só
+tabela de vizinhos do Windows (IP, MAC e o nome que o roteador anuncia); no Linux, um datagrama UDP
+por endereço força o ARP e a tabela vem do `ip neigh`, sem root. Nas primeiras 24 h a Casa só
 aprende a rede (celulares dormindo aparecem aos poucos), sem avisos; depois, cada MAC nunca visto vira
 um aviso no celular (tópico do sistema).
 Na aba Lab dá para dar nome aos aparelhos e marcar os novos como conhecidos. Tudo fica em
@@ -13,10 +14,13 @@ avisam quando somem por duas varreduras seguidas (~30 min) e quando voltam.
 MAC "privado" (bit de endereço local ligado) é o que celulares usam por rede Wi-Fi: o mesmo celular
 mantém o mesmo endereço nesta rede, mas não dá para saber o fabricante por ele.
 """
+from concurrent.futures import ThreadPoolExecutor, wait
 from copy import deepcopy
 import json
+import os
 from pathlib import Path
 import re
+import socket
 import threading
 import time
 
@@ -65,6 +69,44 @@ def scan_windows():
         return None
 
 
+def scan_linux():
+    """Mesma varredura no Linux (iproute2 em JSON); devolve {"gateway", "devices"} ou None se falhar."""
+    try:
+        code, out = run(["ip", "-j", "-4", "route", "show", "default"], timeout=10)
+        route = json.loads(out)[0] if code == 0 else None
+        dev, gateway = route["dev"], route["gateway"]
+        code, out = run(["ip", "-j", "-4", "addr", "show", "dev", dev], timeout=10)
+        link = json.loads(out)[0]
+        ip, own_mac = link["addr_info"][0]["local"], link.get("address")
+    except (TypeError, ValueError, IndexError, KeyError):
+        return None
+    prefix = ip.rsplit(".", 1)[0]
+    # Datagrama para a porta discard de cada endereço: o kernel resolve o ARP (preenche a tabela de vizinhos).
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        for last in range(1, 255):
+            try:
+                sock.sendto(b"", (f"{prefix}.{last}", 9))
+            except OSError:
+                pass
+    time.sleep(3)
+    code, out = run(["ip", "-j", "-4", "neigh", "show", "dev", dev], timeout=10)
+    try:
+        neighbors = [n for n in json.loads(out) if n.get("dst", "").startswith(prefix + ".") and n.get("lladdr")
+                     and {"REACHABLE", "STALE", "DELAY", "PROBE", "PERMANENT"} & set(n.get("state", []))] if code == 0 else []
+    except (ValueError, AttributeError):
+        neighbors = []
+    names = {}
+    pool = ThreadPoolExecutor(16)
+    lookups = {n["dst"]: pool.submit(socket.gethostbyaddr, n["dst"]) for n in neighbors}
+    wait(lookups.values(), timeout=8)
+    pool.shutdown(wait=False, cancel_futures=True)
+    for address, task in lookups.items():
+        names[address] = task.result()[0] if task.done() and not task.cancelled() and not task.exception() else ""
+    devices = [{"ip": ip, "mac": own_mac, "host": socket.gethostname()}]
+    devices += [{"ip": n["dst"], "mac": n["lladdr"], "host": names.get(n["dst"], "")} for n in neighbors]
+    return {"gateway": gateway, "devices": devices}
+
+
 def _mac(value):
     clean = re.sub(r"[^0-9a-f]", "", str(value).lower())
     return clean if MAC.fullmatch(clean) else None
@@ -81,7 +123,7 @@ def _label(value):
 
 
 class Network:
-    def __init__(self, data_dir, scanner=scan_windows, hints=lambda: {}, notify=lambda device: None, presence=lambda device, online: None, clock=time.time):
+    def __init__(self, data_dir, scanner=scan_windows if os.name == "nt" else scan_linux, hints=lambda: {}, notify=lambda device: None, presence=lambda device, online: None, clock=time.time):
         """hints(): {ip: nome} dos aparelhos que a Casa já conhece; notify(device): aparelho novo;
         presence(device, online): aparelho vigiado sumiu (False) ou voltou (True)."""
         self.path = Path(data_dir) / "rede.json"

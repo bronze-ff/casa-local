@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useHome } from '../../App.jsx';
-import { Card, Icon, Modal, Segmented, useAction } from '../../ui.jsx';
+import { Card, Icon, Key, Modal, PixelSlider, Segmented, useAction } from '../../ui.jsx';
 
 const ICONS = [['home', 'Casa'], ['film', 'Filme'], ['moon', 'Noite'], ['book', 'Leitura'], ['sun', 'Sol'], ['sofa', 'Sofá'], ['coffee', 'Café'], ['bed', 'Cama'], ['power', 'Desligar']];
 const DEVICES = [['quarto-luz', 'Luz do quarto', 'light'], ['banheiro-luz', 'Luz do banheiro', 'light'], ['ar-quarto', 'Ar do quarto', 'ac']];
@@ -58,17 +58,17 @@ function ModeForm({ initial, busy, onSave, onCancel }) {
       {DEVICES.map(([id, label, kind]) => {
         const s = steps[id];
         return (
-          <fieldset key={id} className="stack" style={{ gap: 10, border: '1px solid var(--line)', borderRadius: 12, padding: 12, margin: 0, minWidth: 0 }}>
+          <fieldset key={id} className="stack" style={{ gap: 10, border: '1px solid color-mix(in srgb, var(--borda) 45%, transparent)', borderRadius: 12, padding: 12, margin: 0, minWidth: 0 }}>
             <legend className="small muted" style={{ padding: '0 6px' }}>{label}</legend>
             <Segmented label={label} value={s.kind} onChange={(k) => patch(id, { kind: k })}
               options={[['skip', 'Não mexer'], ['off', 'Desligar'], ['on', 'Ligar']]} />
             {s.kind === 'on' && kind === 'light' && (
               <>
-                <label className="field">Brilho: <span className="mono num">{s.brightness}%</span>
-                  <input type="range" min="10" max="100" step="5" value={s.brightness} onChange={(e) => patch(id, { brightness: e.target.value })} />
-                </label>
+                <div className="field">Brilho: <span className="mono num">{s.brightness}%</span>
+                  <PixelSlider onBody min={10} max={100} step={5} value={Number(s.brightness)} label={`Brilho de ${label}`} onChange={(v) => patch(id, { brightness: v })} />
+                </div>
                 <label className="field">Cor
-                  <input type="color" value={s.colorHex} aria-label={`Cor de ${label}`} style={{ width: 64, height: 44, padding: 2, background: 'var(--bg)', border: '1px solid var(--line-strong)', borderRadius: 12 }} onChange={(e) => patch(id, { colorHex: e.target.value })} />
+                  <input type="color" value={s.colorHex} aria-label={`Cor de ${label}`} style={{ width: 64, height: 44, padding: 2, background: 'var(--modulo)', border: '1px solid var(--borda)', borderRadius: 12 }} onChange={(e) => patch(id, { colorHex: e.target.value })} />
                 </label>
               </>
             )}
@@ -92,10 +92,10 @@ function ModeForm({ initial, busy, onSave, onCancel }) {
           </fieldset>
         );
       })}
-      {!chosen && <p className="small" style={{ color: 'var(--accent)' }}>Escolha o que o modo faz em pelo menos um aparelho.</p>}
+      {!chosen && <p className="small" style={{ color: 'var(--sinal-tx)' }}>Escolha o que o modo faz em pelo menos um aparelho.</p>}
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-        <button type="button" className="btn ghost" onClick={onCancel}>Cancelar</button>
-        <button type="submit" className="btn primary" disabled={!valid || busy}>Salvar modo</button>
+        <Key center onClick={onCancel}>Cancelar</Key>
+        <Key center signal type="submit" disabled={!valid || busy}>Salvar modo</Key>
       </div>
     </form>
   );
@@ -118,7 +118,7 @@ export default function Modes() {
   };
 
   return (
-    <Card title="Modos da casa" aside={<button type="button" className="btn" onClick={() => setEditing('new')}><Icon name="plus" size={18} />Novo</button>}>
+    <Card title={`Modos da casa · ${modes.length}`} aside={<Key center onClick={() => setEditing('new')}><Icon name="plus" size={18} />Novo</Key>}>
       {!modes.length && <p className="muted">Nenhum modo ainda. Crie um para ligar e desligar várias coisas de uma vez.</p>}
       <div className="stack">
         {modes.map((m, i) => (
@@ -129,17 +129,17 @@ export default function Modes() {
               <span className="muted small">{m.description}</span>
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-              <button type="button" className="btn primary" disabled={busy} onClick={() => play(m)}>Rodar</button>
-              <button type="button" className="btn ghost" style={{ minWidth: 44, padding: 0 }} aria-label={`Subir ${m.name}`} disabled={busy || i === 0} onClick={() => move(i, -1)}><Icon name="up" size={18} /></button>
-              <button type="button" className="btn ghost" style={{ minWidth: 44, padding: 0 }} aria-label={`Descer ${m.name}`} disabled={busy || i === modes.length - 1} onClick={() => move(i, 1)}><Icon name="down" size={18} /></button>
-              <button type="button" className="btn ghost" onClick={() => setEditing(m)} aria-label={`Editar ${m.name}`}>Editar</button>
+              <Key center signal disabled={busy} onClick={() => play(m)}>Rodar</Key>
+              <Key center aria-label={`Subir ${m.name}`} disabled={busy || i === 0} onClick={() => move(i, -1)}><Icon name="up" size={18} /></Key>
+              <Key center aria-label={`Descer ${m.name}`} disabled={busy || i === modes.length - 1} onClick={() => move(i, 1)}><Icon name="down" size={18} /></Key>
+              <Key center aria-label={`Editar ${m.name}`} onClick={() => setEditing(m)}>Editar</Key>
               {removing === m.id ? (
                 <>
-                  <button type="button" className="btn" style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }} disabled={busy} onClick={() => remove(m)}>Remover mesmo</button>
-                  <button type="button" className="btn ghost" onClick={() => setRemoving(null)}>Não</button>
+                  <Key center signal disabled={busy} onClick={() => remove(m)}>Remover mesmo</Key>
+                  <Key center onClick={() => setRemoving(null)}>Não</Key>
                 </>
               ) : (
-                <button type="button" className="btn ghost" style={{ minWidth: 44, padding: 0 }} aria-label={`Remover ${m.name}`} onClick={() => setRemoving(m.id)}><Icon name="close" size={18} /></button>
+                <Key center aria-label={`Remover ${m.name}`} onClick={() => setRemoving(m.id)}><Icon name="close" size={18} /></Key>
               )}
             </div>
           </div>

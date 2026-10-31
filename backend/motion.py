@@ -34,7 +34,8 @@ LINE = re.compile(r"Code=VideoMotion;action=(Start|Stop);index=(\d+)")
 
 
 def go2rtc_config_path():
-    return Path(os.environ.get("CASA_GO2RTC_CONFIG", Path.home() / "AppData" / "Local" / "go2rtc" / "go2rtc.yaml"))
+    default = Path.home() / ("AppData/Local" if os.name == "nt" else ".config") / "go2rtc" / "go2rtc.yaml"
+    return Path(os.environ.get("CASA_GO2RTC_CONFIG", default))
 
 
 def dvr_source(path=None):

@@ -44,7 +44,7 @@ let snapshot, pollingError = null, polls = {}, preview = false;
 const calls = [];
 const api = { fmtAgo: () => 'há 1 min', fmtTime: () => '23:40', usePoll: (route) => ({ data: route === '/api/state' ? snapshot : polls[route] || null, error: pollingError, reload: async () => {}, at: Date.now() }) };
 const uiReal = compile(path.join(root, '../ui.jsx'), (id) => id === './api.js' ? { post: async () => { throw Error('Network forbidden'); } } : mainRequire(id));
-const ui = { ...uiReal, useAction: () => [async (route, body) => { calls.push({ route, body }); return {}; }, false], useToast: () => () => {} };
+const ui = { ...uiReal, useConfidence: () => 'estimated', useAction: () => [async (route, body) => { calls.push({ route, body }); return {}; }, false], useToast: () => () => {} };
 const resolve = (id) => id === '../App.jsx' ? { useHome: () => ({ home: snapshot, refresh: async () => {}, mode: preview ? 'preview' : 'local' }) } : id === '../api.js' ? api : id === '../ui.jsx' ? ui : id === './Clima/coverage.js' ? coverage : mainRequire(id);
 const Luzes = compile(path.join(root, 'Luzes.jsx'), resolve).default;
 const Clima = compile(path.join(root, 'Clima.jsx'), resolve).default;
@@ -93,7 +93,8 @@ function textOf(tree) {
   return React.isValidElement(tree) ? textOf(tree.props.children) : tree == null ? '' : String(tree);
 }
 function button(tree, label) {
-  const found = nodes(tree).find((node) => node.type === 'button' && (node.props['aria-label'] === label || textOf(node) === label));
+  const isButton = (node) => node.type === 'button' || node.type === ui.Key;
+  const found = nodes(tree).find((node) => isButton(node) && (node.props['aria-label'] === label || textOf(node) === label || textOf(node) + (node.props.sub || '') === label));
   assert.ok(found, `Missing button: ${label}`);
   assert.ok(!found.props.disabled, `Disabled button: ${label}`);
   return found;
@@ -115,8 +116,8 @@ async function lastClick(tree, label, expectedBody, expectedPath = '/api/devices
   await lastClick(renderTree(), 'EcoAlterna no aparelho', { action: 'key', key: 'eco' });
   await lastClick(renderTree(), '30 min', { device: 'ar-quarto', minutes: 30 }, '/api/routines/timer');
   await lastClick(renderTree(), 'Cancelar timer', { device: 'ar-quarto', minutes: 0 }, '/api/routines/timer');
-  const selectMode = nodes(renderTree()).find((node) => node.type === 'select' && node.props.value === 'cool');
-  calls.length = 0; await selectMode.props.onChange({ target: { value: 'heat' } });
+  const selectMode = nodes(renderTree()).find((node) => node.type === ui.Segmented && node.props.label === 'Modo');
+  calls.length = 0; await selectMode.props.onChange('heat');
   assert.equal(JSON.stringify(calls[0].body.values), JSON.stringify({ mode: 'heat', fan: 'low', temperature: 21 }));
   await button(renderTree(), 'Aprender').props.onClick();
   assert.ok(textOf(renderTree()).includes('em até 25 s'));
@@ -128,8 +129,7 @@ async function lastClick(tree, label, expectedBody, expectedPath = '/api/devices
   await lastClick(renderTree(), 'Vermelho', { action: 'set', values: { colorHex: '#FF3B30' } }, '/api/devices/quarto-luz/commands');
   await lastClick(renderTree(), 'Diminuir brilho', { action: 'set', values: { brightness: 90 } }, '/api/devices/quarto-luz/commands');
   await lastClick(renderTree(), 'Noite', {}, '/api/scenes/noite/run');
-  const bathroomTab = nodes(renderTree()).find((node) => node.props.role === 'tab' && textOf(node).includes('Banheiro'));
-  bathroomTab.props.onClick();
+  nodes(renderTree()).find((node) => node.type === ui.Segmented && node.props.label === 'Escolher lâmpada').props.onChange('banheiro-luz');
   await lastClick(renderTree(), 'Branco quente', { action: 'set', values: { colorHex: '#FFD6A0', power: true } }, '/api/devices/banheiro-luz/commands');
   console.log('Actions OK: sparse temperature steps, power, calibrated turbo, learned extra, mode/fan fallback, timer set/cancel, learning state/off/extra, light colors/brightness/scenes. Mocked POSTs only.');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

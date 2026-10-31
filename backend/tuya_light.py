@@ -113,3 +113,14 @@ def validate_schema(schema):
         return False
     bounds = [schema[k] for k in ("brightMin", "brightMax", "tempMin", "tempMax")]
     return all(type(b) is int for b in bounds) and 0 < schema["brightMin"] < schema["brightMax"] <= 10000 and 0 <= schema["tempMin"] < schema["tempMax"] <= 10000
+
+
+def normalized_values(values, current_dps, schema=DEFAULT_SCHEMA):
+    """Compare observations with the encoder/decoder roundtrip, including clamping.
+
+    Requested values remain unchanged in the receipt. E.g. brightness 0 encodes
+    the firmware minimum and is compared against decoded 1%, not a fabricated 0%.
+    """
+    encoded = encode(values, current_dps, schema)
+    decoded = decode({**current_dps, **encoded}, schema)
+    return {field: decoded[field] for field in values if field in decoded}

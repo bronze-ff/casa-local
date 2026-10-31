@@ -1,6 +1,7 @@
-import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { bootstrap, get, usePoll } from './api.js';
-import { Icon, ToastProvider } from './ui.jsx';
+import { layoutFor, parseHash, readTray } from './mode.js';
+import { Icon, Key, Lcd, ToastProvider } from './ui.jsx';
 import Inicio from './screens/Inicio.jsx';
 
 const Luzes = lazy(() => import('./screens/Luzes.jsx'));
@@ -10,33 +11,31 @@ const Cameras = lazy(() => import('./screens/Cameras.jsx'));
 const Local = lazy(() => import('./screens/Local.jsx'));
 const Lab = lazy(() => import('./screens/Lab.jsx'));
 const Central = lazy(() => import('./screens/Central.jsx'));
+const AlertCard = lazy(() => import('./AlertCard.jsx'));
 
 // Rotas por hash: funciona offline e com o servidor servindo só index.html.
 export const ROUTES = {
-  '': { title: 'Início', Screen: Inicio },
-  luzes: { title: 'Luzes', Screen: Luzes, casa: true },
-  clima: { title: 'Clima', Screen: Clima, casa: true },
-  tv: { title: 'TV', Screen: TV, casa: true },
-  local: { title: 'Local', Screen: Local, casa: true },
-  cameras: { title: 'Câmeras', Screen: Cameras },
-  lab: { title: 'Lab', Screen: Lab },
-  central: { title: 'Central', Screen: Central },
+  '': { title: 'Início', Screen: Inicio, icon: 'home' },
+  luzes: { title: 'Luzes', Screen: Luzes, casa: true, icon: 'luz' },
+  clima: { title: 'Clima', Screen: Clima, casa: true, icon: 'ar' },
+  tv: { title: 'TV', Screen: TV, casa: true, icon: 'tv' },
+  local: { title: 'Local', Screen: Local, casa: true, icon: 'pin' },
+  cameras: { title: 'Câmeras', Screen: Cameras, icon: 'cam' },
+  lab: { title: 'Lab', Screen: Lab, icon: 'lab' },
+  central: { title: 'Central', Screen: Central, icon: 'central' },
 };
+const NAMES = Object.keys(ROUTES);
 const DESKTOP_TABS = ['', 'luzes', 'clima', 'tv', 'cameras', 'local', 'lab', 'central'];
-const MOBILE_TABS = [['', 'Início', 'home'], ['luzes', 'Casa', 'bulb'], ['cameras', 'Câmeras', 'camera'], ['lab', 'Lab', 'server'], ['central', 'Central', 'bell']];
+const MOBILE_TABS = [['', 'Início', 'home'], ['luzes', 'Casa', 'luz'], ['cameras', 'Câmeras', 'cam'], ['lab', 'Lab', 'lab'], ['central', 'Central', 'central']];
 
-const readRoute = () => {
-  // Aceita também o formato das notificações antigas: #cameras:replay:cam2:1730000000.
-  const raw = decodeURIComponent(window.location.hash.replace(/^#\/?/, ''));
-  const cut = raw.search(/[/:]/);
-  const name = cut < 0 ? raw : raw.slice(0, cut);
-  return { name: ROUTES[name] ? name : '', param: cut < 0 ? '' : raw.slice(cut + 1) };
-};
 export const href = (name, param) => `#/${name}${param ? `/${param}` : ''}`;
 
 /* A casa: aparelhos, modos e últimas ações, compartilhados por todas as telas. */
 const HomeContext = createContext(null);
 export const useHome = () => useContext(HomeContext);
+
+// Última casa conhecida: ao reabrir o popup da bandeja (#oculto desmonta tudo) a tela já nasce preenchida.
+let lastHome = null;
 
 function useBuildWatch() {
   // O backend informa o script publicado; se mudou desde que abrimos, recarrega uma vez.
@@ -49,25 +48,64 @@ function useBuildWatch() {
   return status;
 }
 
-export default function App() {
-  const [route, setRoute] = useState(readRoute);
-  const [home, setHome] = useState(null);
-  const [bootError, setBootError] = useState(null);
-  const status = useBuildWatch();
-  const state = usePoll(home ? '/api/state' : null, 5000);
-
+function useHash() {
+  const [route, setRoute] = useState(() => parseHash(window.location.hash, NAMES));
   useEffect(() => {
-    const onHash = () => { setRoute(readRoute()); window.scrollTo(0, 0); };
+    const onHash = () => { setRoute(parseHash(window.location.hash, NAMES)); window.scrollTo(0, 0); };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
+  return route;
+}
+
+function useLayout(tray) {
+  const [width, setWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return layoutFor(width, tray);
+}
+
+/** A bandeja só oferece "Abrir no navegador" quando a janela expõe essa API (evento pywebviewready). */
+function useBrowserApi() {
+  const [available, setAvailable] = useState(() => !!window.pywebview?.api?.open_browser);
+  useEffect(() => {
+    const check = () => setAvailable(!!window.pywebview?.api?.open_browser);
+    window.addEventListener('pywebviewready', check);
+    return () => window.removeEventListener('pywebviewready', check);
+  }, []);
+  return available;
+}
+
+export default function App() {
+  const tray = useMemo(() => readTray(window.location.search), []);
+  const route = useHash();
+  const layout = useLayout(tray);
+  // Página "dormente" da bandeja: nada montado, nenhum poll, nenhuma câmera.
+  if (route.name === 'oculto') return <div aria-hidden="true" />;
+  if (tray === 'alerta') {
+    return route.name === 'alerta' ? <Suspense fallback={null}><AlertCard key={route.param} param={route.param} /></Suspense> : <div aria-hidden="true" />;
+  }
+  // #alerta:... só vale na janela de alerta; no painel normal cai no Início.
+  const safe = route.name === 'alerta' ? { name: '', param: '' } : route;
+  return <Shell route={safe} layout={layout} tray={tray} />;
+}
+
+function Shell({ route, layout, tray }) {
+  const [home, setHome] = useState(lastHome);
+  const [bootError, setBootError] = useState(null);
+  const status = useBuildWatch();
+  const state = usePoll(home ? '/api/state' : null, 5000);
+  const browser = useBrowserApi();
 
   useEffect(() => {
     let stop = false;
     const tryBoot = async () => {
       try {
         const data = await bootstrap();
-        if (!stop) { setHome(data); setBootError(null); }
+        if (!stop) { lastHome = data; setHome(data); setBootError(null); }
       } catch (error) {
         if (!stop) { setBootError(error); setTimeout(tryBoot, 4000); }
       }
@@ -76,65 +114,99 @@ export default function App() {
     return () => { stop = true; };
   }, []);
 
-  useEffect(() => { if (state.data) setHome((old) => ({ ...old, ...state.data })); }, [state.data]);
+  useEffect(() => { if (state.data) setHome((old) => { lastHome = { ...old, ...state.data }; return lastHome; }); }, [state.data]);
 
   const refresh = useCallback(async () => {
-    try { const data = await get('/api/state'); setHome((old) => ({ ...old, ...data })); } catch { /* o próximo ciclo tenta de novo */ }
+    try { const data = await get('/api/state'); setHome((old) => { lastHome = { ...old, ...data }; return lastHome; }); } catch { /* o próximo ciclo tenta de novo */ }
   }, []);
 
   const current = ROUTES[route.name];
   const Screen = current.Screen;
   const mode = status.data?.mode || home?.mode;
   const online = !state.error && !bootError;
-  const mobileActive = current.casa ? 'luzes' : route.name;
+  const rail = layout === 'wide' && route.name === '';
+  const link = (name) => ({ href: href(name), 'aria-current': route.name === name ? 'page' : undefined });
+  const led = (
+    <span className="lcd" style={{ padding: '6px 10px', borderRadius: 'var(--r-seg)' }} role="status">
+      <span className={`led ${!online ? 'off' : mode === 'preview' ? 'env' : ''}`}>{!online ? 'sem conexão' : mode === 'preview' ? 'prévia' : 'rede local'}</span>
+    </span>
+  );
+
+  const content = !home ? (
+    <div className="page">
+      <Lcd role="status">
+        <span className="lbl">casa local</span>
+        <div style={{ fontSize: 20 }}>{bootError ? bootError.message : 'Abrindo sua casa…'}</div>
+        {bootError && <div className="dim">Tentando de novo a cada 4 s.</div>}
+      </Lcd>
+    </div>
+  ) : (
+    <Suspense fallback={<div className="page"><Lcd role="status">Carregando…</Lcd></div>}>
+      <main className="page">
+        <Screen param={route.param} />
+      </main>
+    </Suspense>
+  );
 
   return (
     <ToastProvider>
-      <HomeContext.Provider value={{ home, refresh, mode, route }}>
-        <div className="shell">
-          <div className="wrap">
-            <header className="topbar">
-              <a href={href('')} className="brand" style={{ color: 'var(--text)' }}>
-                <Icon name="home" size={26} />
-                <span>Casa Local</span>
-              </a>
-              <span className="pill" role="status">
-                <span className={`dot ${online ? 'vivo' : 'warn'}`} />
-                {!online ? 'sem conexão' : mode === 'preview' ? 'prévia' : 'rede local'}
-              </span>
-              <nav className="tabs" aria-label="Seções">
+      <HomeContext.Provider value={{ home, refresh, mode, route, layout, tray }}>
+        <div className={`app ${layout} ${rail ? 'rail' : ''}`}>
+          {mode === 'preview' && <div className="faixa-sim" aria-hidden="true" />}
+          {(layout === 'desktop' || layout === 'wide') && (
+            <aside className="side">
+              {!rail && <div className="brand"><span>Casa Local</span></div>}
+              <nav className="nav" aria-label="Seções">
                 {DESKTOP_TABS.map((name) => (
-                  <a key={name} href={href(name)} aria-current={route.name === name ? 'page' : undefined}>{ROUTES[name].title}</a>
+                  <a key={name} {...link(name)} aria-label={rail ? ROUTES[name].title : undefined} title={rail ? ROUTES[name].title : undefined}>
+                    <Icon name={ROUTES[name].icon} size={rail ? 24 : 20} />{!rail && ROUTES[name].title}
+                  </a>
                 ))}
               </nav>
-            </header>
-
-            {current.casa && (
-              <nav className="subtabs" aria-label="Casa">
-                {['luzes', 'clima', 'tv', 'local'].map((name) => (
-                  <a key={name} href={href(name)} aria-current={route.name === name ? 'page' : undefined}>{ROUTES[name].title}</a>
-                ))}
-              </nav>
+              <div className="foot">{!rail && led}</div>
+            </aside>
+          )}
+          <div style={{ minWidth: 0 }}>
+            {layout === 'mobile' && (
+              <div className="page" style={{ paddingBottom: 0 }}>
+                <header className="hdr">
+                  <a className="crumb" href={href('')}>Casa Local · {current.title}</a>
+                  {led}
+                </header>
+                {current.casa && (
+                  <nav className="casa-tabs" aria-label="Casa">
+                    {['luzes', 'clima', 'tv', 'local'].map((name) => <a key={name} {...link(name)}>{ROUTES[name].title}</a>)}
+                  </nav>
+                )}
+              </div>
             )}
-
-            {!home ? (
-              <p className="muted" role="status">{bootError ? `${bootError.message} Tentando de novo…` : 'Abrindo sua casa…'}</p>
-            ) : (
-              <Suspense fallback={<p className="muted" role="status">Carregando…</p>}>
-                <main style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                  <Screen param={route.param} />
-                </main>
-              </Suspense>
+            {layout === 'tray' && (
+              <div className="page" style={{ paddingBottom: 0 }}>
+                <nav className="trayicons" aria-label="Seções">
+                  {DESKTOP_TABS.map((name) => <a key={name} {...link(name)} aria-label={ROUTES[name].title}><Icon name={ROUTES[name].icon} size={20} /></a>)}
+                </nav>
+                {browser && (
+                  <Key className="out" style={{ width: '100%' }} sub="painel completo no navegador padrão"
+                    onClick={() => window.pywebview.api.open_browser(window.location.hash.replace(/^#\/?/, ''))}>
+                    <span className="row" style={{ justifyContent: 'flex-start', gap: 10 }}><Icon name="ext" size={20} />Abrir no navegador</span>
+                  </Key>
+                )}
+              </div>
             )}
+            {content}
           </div>
-
-          <nav className="bottombar" aria-label="Seções">
-            {MOBILE_TABS.map(([name, label, icon]) => (
-              <a key={name} href={href(name)} aria-current={mobileActive === name ? 'page' : undefined}>
-                <Icon name={icon} size={22} />{label}
-              </a>
-            ))}
-          </nav>
+          {layout === 'mobile' && (
+            <nav className="tabbar" aria-label="Seções">
+              {MOBILE_TABS.map(([name, label, icon]) => {
+                const active = (current.casa ? 'luzes' : route.name) === name;
+                return (
+                  <a key={name} href={href(name)} aria-current={active ? 'page' : undefined}>
+                    <Icon name={icon} size={20} />{label}<i className="pip" />
+                  </a>
+                );
+              })}
+            </nav>
+          )}
         </div>
       </HomeContext.Provider>
     </ToastProvider>

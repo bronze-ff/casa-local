@@ -235,17 +235,26 @@ class Routines:
                 self.wake.set()
 
     def run(self, name, action, timer_id=None):
+        details = {}
         try:
             if action["type"] == "scene":
                 result = self.app.scene(action["id"])
                 ok = result.get("status") != "partial"
+                if "evidenceSummary" in result:
+                    details = {"evidenceSummary": deepcopy(result["evidenceSummary"]), "results": deepcopy(result.get("results", []))}
+                    details["uncertain"] = any(step.get("evidence") in {"unconfirmed", "diverged"} for step in details["results"])
             else:
-                self.app.command(action["device"], {"action": "set", "values": action["values"]}, origin=f"Rotina {name}")
+                result = self.app.command(action["device"], {"action": "set", "values": action["values"]}, origin=f"Rotina {name}")
+                receipt = result.get("command", {}).get("receipt") if isinstance(result, dict) else None
+                if receipt is not None:
+                    details = {"receipt": deepcopy(receipt), "uncertain": receipt["outcome"] in {"unconfirmed", "diverged"} or receipt["delivery"] == "unknown"}
                 ok = True
             message = "executada" if ok else "executada com falhas"
         except Exception as error:
             self._record_error(error)
             ok, message = False, str(error)
+            if getattr(error, "receipt", None) is not None:
+                details = {"receipt": deepcopy(error.receipt), "uncertain": True}
         with self.lock:
             timer = next((t for t in self.timers if t["id"] == timer_id), None) if timer_id else None
             if timer and not ok and timer.get("attempts", 0) + 1 < TIMER_RETRIES:
@@ -255,7 +264,7 @@ class Routines:
                 message += " · tentando de novo em 1 min"
             elif timer:
                 self.timers.remove(timer)
-            self.log.append({"at": int(self.clock()), "name": name, "ok": ok, "message": message})
+            self.log.append({"at": int(self.clock()), "name": name, "ok": ok, "message": message, **details})
             self._save()
         for listener in self.listeners:
             try:

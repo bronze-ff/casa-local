@@ -1,6 +1,6 @@
 """Saúde do sistema e backup diário da pasta .data.
 
-Tudo é leitura local: tempo ligado e memória do PC (API do Windows), espaço em disco, aparelhos
+Tudo é leitura local: tempo ligado e memória do PC (API do Windows ou /proc no Linux), espaço em disco, aparelhos
 online, go2rtc, eventos do DVR, TVs e o vigia (tarefa que reinicia o servidor se ele cair). O
 backup copia .data para %LOCALAPPDATA%\\CasaLocal\\backups uma vez por dia (sem as fotos de
 movimento) e guarda os 7 últimos; os arquivos DPAPI continuam cifrados para este usuário.
@@ -18,7 +18,7 @@ KEEP_BACKUPS = 7
 
 
 def backup_dir():
-    return Path(os.environ.get("CASA_BACKUP_DIR", Path(os.environ.get("LOCALAPPDATA", Path.home())) / "CasaLocal" / "backups"))
+    return Path(os.environ.get("CASA_BACKUP_DIR", Path(os.environ.get("LOCALAPPDATA", Path.home() / ".local" / "share")) / "CasaLocal" / "backups"))
 
 
 class _Memory(ctypes.Structure):
@@ -28,17 +28,22 @@ class _Memory(ctypes.Structure):
 
 
 def machine():
-    """Tempo ligado, memória e disco deste PC. Campos ausentes fora do Windows."""
+    """Tempo ligado, memória e disco deste PC. Campos ausentes se a leitura falhar."""
     result = {}
     try:
-        kernel32 = ctypes.windll.kernel32
-        kernel32.GetTickCount64.restype = ctypes.c_ulonglong  # sem isto o ctypes trunca em 32 bits (~25 dias)
-        result["uptime"] = int(kernel32.GetTickCount64() / 1000)
-        memory = _Memory()
-        memory.dwLength = ctypes.sizeof(_Memory)
-        kernel32.GlobalMemoryStatusEx(ctypes.byref(memory))
-        result["memory"] = {"used": memory.dwMemoryLoad, "totalGb": round(memory.ullTotalPhys / 2**30, 1)}
-    except (AttributeError, OSError):
+        if os.name != "nt":
+            result["uptime"] = int(float(Path("/proc/uptime").read_text().split()[0]))
+            info = {key: int(value.split()[0]) for key, value in (line.split(":", 1) for line in Path("/proc/meminfo").read_text().splitlines())}
+            result["memory"] = {"used": round(100 * (1 - info["MemAvailable"] / info["MemTotal"])), "totalGb": round(info["MemTotal"] / 2**20, 1)}
+        else:
+            kernel32 = ctypes.windll.kernel32
+            kernel32.GetTickCount64.restype = ctypes.c_ulonglong  # sem isto o ctypes trunca em 32 bits (~25 dias)
+            result["uptime"] = int(kernel32.GetTickCount64() / 1000)
+            memory = _Memory()
+            memory.dwLength = ctypes.sizeof(_Memory)
+            kernel32.GlobalMemoryStatusEx(ctypes.byref(memory))
+            result["memory"] = {"used": memory.dwMemoryLoad, "totalGb": round(memory.ullTotalPhys / 2**30, 1)}
+    except (AttributeError, OSError, ValueError, KeyError, IndexError, ZeroDivisionError):
         pass
     try:
         usage = shutil.disk_usage(Path.home().anchor or "/")
@@ -97,6 +102,8 @@ class Backups:
 
 def watchdog_status(data_dir, clock=time.time):
     log = Path(data_dir) / "vigia.log"
+    if os.name != "nt" and os.environ.get("INVOCATION_ID"):
+        return {"installed": True, "lastCheck": None, "lastRestart": None}  # Linux: o systemd (Restart=always) faz o papel do vigia
     try:
         lines = log.read_text(encoding="utf-8").strip().splitlines()
         stamp = log.stat().st_mtime

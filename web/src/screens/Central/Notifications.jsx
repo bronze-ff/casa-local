@@ -1,9 +1,8 @@
 import { usePoll } from '../../api.js';
-import { Card, Stale, Switch, useAction } from '../../ui.jsx';
+import { Card, Stale, Switch, useAction , Key } from '../../ui.jsx';
 import CopyText from './CopyText.jsx';
 
 const TOPICS = [
-  ['pessoas', 'Pessoas e rostos', 'O Frigate viu alguém ou um carro, com o nome se reconheceu o rosto.'],
   ['cameras', 'Movimento nas câmeras', 'Qualquer movimento do DVR, com foto e link para a gravação.'],
   ['sistema', 'Sistema e home lab', 'Algo caiu ou voltou, disco quase cheio, GPU quente, aparelho novo na rede.'],
   ['casa', 'Casa', 'Chegadas e saídas e as rotinas que rodaram.'],
@@ -23,7 +22,7 @@ export default function Notifications() {
   const topics = [...Object.values(n.topics || {}), ...(n.external || []).map((t) => t.topic)];
 
   return (
-    <Card title="Avisos no celular" aside={<button type="button" className="btn" disabled={busy} onClick={test}>Testar</button>}>
+    <Card title="Avisos no celular" aside={<Key center disabled={busy} onClick={test}>Testar</Key>}>
       <Stale poll={poll} what="os avisos" />
       <div className="stack">
         {TOPICS.map(([key, title, detail]) => (
@@ -41,28 +40,19 @@ export default function Notifications() {
               <strong>{t.label}</strong>
               <span className="muted small">{t.detail} Assine <span className="mono">{t.topic}</span> no app ntfy para receber.</span>
             </div>
-            <span className="chip">avulso</span>
+            <span className="lbl">avulso</span>
           </div>
         ))}
         <div className="row">
           <div className="stack">
             <strong>Avisar de todas as câmeras</strong>
-            <span className="muted small">Desligado: só as câmeras com sino em Câmeras › Movimento (vale para movimento e pessoas).</span>
+            <span className="muted small">Desligado: só as câmeras com sino em Câmeras › Movimento.</span>
           </div>
           <Switch on={n.cameraScope === 'all'} label="Avisar de todas as câmeras" disabled={busy} onChange={(on) => set({ cameraScope: on ? 'all' : 'watched' })} />
         </div>
-        <div className="row">
-          <div className="stack">
-            <strong>Pessoas: avisar também carros e animais</strong>
-            <span className="muted small">
-              Desligado: o Frigate só avisa quando é pessoa. Nas câmeras que ele vigia{n.frigateCameras?.length ? ` (${n.frigateCameras.length})` : ''}, o movimento do DVR não avisa enquanto ele estiver ligado.
-            </span>
-          </div>
-          <Switch on={n.frigateKinds === 'tudo'} label="Avisar também carros e animais" disabled={busy} onChange={(on) => set({ frigateKinds: on ? 'tudo' : 'pessoas' })} />
-        </div>
       </div>
 
-      <p className="small muted">{presence} {n.frigate === false ? 'O Frigate está parado (modo jogo ou subindo): pessoas voltam quando ele voltar; o movimento do DVR continua.' : ''}</p>
+      <p className="small muted">{presence}</p>
 
       <details>
         <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer' }}>Como receber no iPhone</summary>

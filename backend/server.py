@@ -30,7 +30,7 @@ from .homelab import Homelab
 from .notify import Notifier
 from .shortcuts import Shortcuts
 from .samsung_tv import SamsungTVs
-from .models import AppError, VERSION
+from .models import AppError, VERSION, command_context
 
 MAX_BODY = 16384
 CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tile.openstreetmap.org; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'{ws}; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
@@ -81,9 +81,9 @@ class CasaServer(ThreadingHTTPServer):
         self.routines = Routines(app, store, places=places, people=people)
         self.location.listeners.append(self.routines.on_place)
         self.alerts = AlertDevices(store, cameras=lambda: CAMERA_IDS)
-        self.homelab = Homelab(store, enabled=local, presence=self.at_home)
+        self.homelab = Homelab(store, enabled=local)
         self.shortcuts = Shortcuts(store)
-        self.notifier = Notifier(store, host=lambda: self.homelab.host, presence=self.at_home, watched=lambda: set(self.motion.notify))
+        self.notifier = Notifier(store, host=lambda: self.homelab.host, presence=self.at_home)
         self.energy = AcUsage(store)
         if local:
             app.listeners.append(lambda device_id, state: self.energy.observe(state.get("power")) if device_id == "ar-quarto" else None)
@@ -116,7 +116,7 @@ class CasaServer(ThreadingHTTPServer):
             self.homelab.start()
             self.network.start(self.background)
             self.notifier.start(health=lambda: health_report(self.app, self.cameras, self.motion, self.tvs, self.backups, self.started),
-                                lab=self.homelab.status, offset=lambda: self.motion.offset)
+                                lab=self.homelab.status)
 
     def server_close(self):
         self.background.set()
@@ -155,7 +155,18 @@ class CasaServer(ThreadingHTTPServer):
 
     def process_request(self, request, client_address):
         if not self.slots.acquire(blocking=False):
-            request.close()
+            body = b'{"error":"Servidor ocupado. Tente novamente mais tarde.","code":"server_busy"}'
+            response = (b"HTTP/1.0 503 Service Unavailable\r\n"
+                        b"Content-Type: application/json; charset=utf-8\r\n"
+                        b"Retry-After: 1\r\nConnection: close\r\n"
+                        + f"Content-Length: {len(body)}\r\n\r\n".encode("ascii") + body)
+            try:
+                request.settimeout(0.2)
+                request.sendall(response)
+            except OSError:
+                pass
+            finally:
+                request.close()
             return
         try:
             super().process_request(request, client_address)
@@ -200,6 +211,8 @@ class CasaHandler(BaseHTTPRequestHandler):
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
         self.send_header("Cache-Control", "no-store")
+        if getattr(self, "command_context", None) is not None:
+            self.send_header("X-Request-Id", self.command_context.request_id)
         super().end_headers()
 
     def json_response(self, status, data):
@@ -357,8 +370,10 @@ class CasaHandler(BaseHTTPRequestHandler):
             if app.mode != "local" and (path == "/api/cameras" or path.startswith(("/api/cameras/", "/api/replays/"))):
                 raise AppError("As câmeras só funcionam no modo local, no PC de casa.", 409, "preview_mode")
             if mutation:
-                body = self.read_json()
                 match = re.fullmatch(r"/api/devices/([a-z-]+)/commands", path)
+                if match:
+                    self.command_context = command_context(budget=app.command_budget)
+                body = self.read_json()
                 scene = re.fullmatch(r"/api/scenes/([a-z0-9-]{1,24})/run", path)
                 remove_mode = re.fullmatch(r"/api/modes/([a-z0-9-]{1,24})/remove", path)
                 alert_device = re.fullmatch(r"/api/alert-devices/([0-9a-f]{16})(/remove)?", path)
@@ -447,7 +462,7 @@ class CasaHandler(BaseHTTPRequestHandler):
                 elif remove_place and not body:
                     result = location.remove_place(remove_place[1])
                 elif match:
-                    result = app.command(match[1], body)
+                    result = app.command(match[1], body, context=self.command_context)
                 elif learn:
                     result = app.learn(learn[1], body)
                 elif scene and not body:
@@ -505,7 +520,10 @@ class CasaHandler(BaseHTTPRequestHandler):
                 self.serve_static(path)
         except AppError as error:
             self.drain_body()
-            self.json_response(error.status, {"error": str(error), "code": error.code})
+            payload = {"error": str(error), "code": error.code}
+            if error.receipt is not None:
+                payload["receipt"] = error.receipt
+            self.json_response(error.status, payload)
         except (TimeoutError, socket.timeout):
             self.json_response(408, {"error": "Tempo de envio esgotado.", "code": "request_timeout"})
         except (BrokenPipeError, ConnectionResetError):

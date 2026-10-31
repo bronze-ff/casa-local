@@ -11,6 +11,7 @@ if ($Url -notmatch '^https?://[A-Za-z0-9.-]+(:\d+)?/?$') { throw 'Use só o ende
 $target = Join-Path $env:LOCALAPPDATA 'CasaLocalBandeja'
 New-Item -ItemType Directory -Force $target | Out-Null
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'casa_tray.py') -Destination $target -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'casa_janela.py') -Destination $target -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'requirements.txt') -Destination $target -Force
 $venv = Join-Path $target 'venv'
 if (-not (Test-Path (Join-Path $venv 'Scripts\python.exe'))) { & $Python -m venv $venv }

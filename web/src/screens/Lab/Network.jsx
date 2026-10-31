@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { fmtAgo, usePoll } from '../../api.js';
-import { Card, Icon, Stale, Switch, useAction } from '../../ui.jsx';
+import { Badge, Card, Icon, Key, Stale, Status, Switch, useAction } from '../../ui.jsx';
 
 function Device({ d, act, busy }) {
   const [renaming, setRenaming] = useState(false);
@@ -18,26 +18,26 @@ function Device({ d, act, busy }) {
 
   return (
     <li className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-start' }}>
-      <span className={`dot ${d.online ? '' : 'off'}`} style={{ marginTop: 7 }} title={d.online ? 'conectado' : 'sem resposta'} />
+      <span style={{ marginTop: 4 }}><Status kind={d.online ? 'ok' : 'off'}>{d.online ? 'on' : 'off'}</Status></span>
       <div className="stack" style={{ flex: '1 1 200px', gap: 2 }}>
         {renaming ? (
           <form onSubmit={save} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input type="text" autoFocus value={name} maxLength={40} aria-label={`Nome para ${d.label}`} placeholder="Ex.: Celular da Lorena"
               style={{ flex: '1 1 160px' }} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') setRenaming(false); }} />
-            <button type="submit" className="btn primary" disabled={busy}>Salvar</button>
-            <button type="button" className="btn ghost" onClick={() => setRenaming(false)}>Cancelar</button>
+            <Key type="submit" center signal={!busy} disabled={busy}>Salvar</Key>
+            <Key center onClick={() => setRenaming(false)}>Cancelar</Key>
           </form>
         ) : (
           <>
-            <strong>{d.label} {!d.known && <span className="chip hot">novo</span>}</strong>
+            <strong>{d.label} {!d.known && <Badge>novo</Badge>}</strong>
             <span className="muted small mono" style={{ overflowWrap: 'anywhere' }}>{meta}{when}{first}</span>
           </>
         )}
       </div>
       {!renaming && (
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, flex: '1 1 100%', justifyContent: 'flex-end' }}>
-          {!d.known && <button type="button" className="btn" disabled={busy} onClick={() => act(d.id, { known: true }, `${d.label}: marcado como seu`)}>É meu</button>}
-          <button type="button" className="btn ghost" onClick={() => { setName(d.name ?? ''); setRenaming(true); }} aria-label={`Dar nome a ${d.label}`}>{d.name ? 'Renomear' : 'Dar nome'}</button>
+          {!d.known && <Key center disabled={busy} onClick={() => act(d.id, { known: true }, `${d.label}: marcado como seu`)}>É meu</Key>}
+          <Key center onClick={() => { setName(d.name ?? ''); setRenaming(true); }} aria-label={`Dar nome a ${d.label}`}>{d.name ? 'Renomear' : 'Dar nome'}</Key>
           <label className="small muted" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 44 }}>
             Avisar se sumir
             <Switch on={d.watched} disabled={busy} label={`Avisar se ${d.label} sumir da rede`}
@@ -45,12 +45,12 @@ function Device({ d, act, busy }) {
           </label>
           {confirm ? (
             <>
-              <button type="button" className="btn" style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }} disabled={busy}
-                onClick={async () => { if (await act(d.id, null, `${d.label} removido da lista`)) setConfirm(false); }}>Remover mesmo</button>
-              <button type="button" className="btn ghost" onClick={() => setConfirm(false)}>Não</button>
+              <Key center signal={!busy} disabled={busy}
+                onClick={async () => { if (await act(d.id, null, `${d.label} removido da lista`)) setConfirm(false); }}>Remover mesmo</Key>
+              <Key center onClick={() => setConfirm(false)}>Não</Key>
             </>
           ) : (
-            <button type="button" className="btn ghost" style={{ minWidth: 44, padding: 0 }} aria-label={`Remover ${d.label} da lista`} title="Remover da lista" onClick={() => setConfirm(true)}><Icon name="close" size={18} /></button>
+            <Key center style={{ minWidth: 44, padding: 0 }} aria-label={`Remover ${d.label} da lista`} title="Remover da lista" onClick={() => setConfirm(true)}><Icon name="close" size={18} /></Key>
           )}
         </div>
       )}
@@ -82,31 +82,31 @@ export default function NetworkCard({ disabled }) {
 
   return (
     <Card title="Rede de casa" aside={
-      <button type="button" className="btn" disabled={disabled || scanning} onClick={scan}>
+      <Key center disabled={disabled || scanning} onClick={scan}>
         <Icon name="radio" size={18} />{scanning ? 'Varrendo…' : 'Varrer agora'}
-      </button>
+      </Key>
     }>
       <Stale poll={poll} what="a rede" />
       <p className="muted small">
         {n.scanned ? `${n.online} conectados · varrida ${fmtAgo(n.scanned)}${missing ? ` · ${missing} vigiado${missing > 1 ? 's' : ''} sem resposta` : ''}` : 'A primeira varredura sai alguns minutos depois de o painel ligar.'}
       </p>
       {n.learningUntil && (
-        <div className="notice info" role="status">
-          <span>Aprendendo a rede até {new Date(n.learningUntil * 1000).toLocaleString('pt-BR', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}: o que aparecer até lá entra como conhecido, sem aviso. Depois, todo aparelho novo avisa no celular.</span>
+        <div className="aviso" role="status">
+          <Icon name="alert" size={20} /><span>Aprendendo a rede até {new Date(n.learningUntil * 1000).toLocaleString('pt-BR', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}: o que aparecer até lá entra como conhecido, sem aviso. Depois, todo aparelho novo avisa no celular.</span>
         </div>
       )}
-      {n.error && <div className="notice" role="status"><Icon name="warn" size={18} style={{ color: 'var(--accent)', flex: 'none', marginTop: 2 }} /><span>{n.error} Tento de novo em 15 min.</span></div>}
+      {n.error && <div className="aviso err" role="status"><Icon name="alert" size={20} /><span>{n.error} Tento de novo em 15 min.</span></div>}
 
       {fresh.length > 0 && (
         <section className="stack" aria-label="Aparelhos novos">
-          <h3 style={{ fontSize: 16 }}>{fresh.length === 1 ? 'Aparelho novo na rede' : `${fresh.length} aparelhos novos na rede`}</h3>
+          <h3 className="lbl">{fresh.length === 1 ? 'Aparelho novo na rede' : `${fresh.length} aparelhos novos na rede`}</h3>
           <p className="muted small">Se reconhecer, toque em &quot;É meu&quot;. Se não, troque a senha do Wi-Fi.</p>
           {list(fresh)}
         </section>
       )}
       {watched.length > 0 && (
         <section className="stack" aria-label="Aparelhos vigiados">
-          <h3 style={{ fontSize: 16 }}>Vigiados</h3>
+          <h3 className="lbl">Vigiados</h3>
           <p className="muted small">Aviso no celular se sumirem por ~30 min.</p>
           {list(watched)}
         </section>

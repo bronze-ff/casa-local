@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { usePoll } from '../../api.js';
-import { Icon, Segmented, Stale, Switch, useAction } from '../../ui.jsx';
+import { Icon, Key, Segmented, Stale, Status, Switch, useAction } from '../../ui.jsx';
 
 const FOREVER = 4102444800; // o backend entende 2100-01-01 como "até reativar"
 const MODES = [['watched', 'Monitoradas'], ['some', 'Só estas'], ['none', 'Nenhuma']];
@@ -30,9 +30,9 @@ export default function AlertDevices({ cameras, open }) {
   const update = (id, body) => change(`/api/alert-devices/${id}`, body);
 
   return (
-    <details open={open || undefined} style={{ border: '1px solid var(--line)', borderRadius: 12, padding: '0 14px' }}>
+    <details open={open || undefined} style={{ border: '1px solid color-mix(in srgb, var(--borda) 45%, transparent)', borderRadius: 'var(--r-tecla)', padding: '0 14px' }}>
       <summary style={{ minHeight: 48, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-        <Icon name="bell" size={16} /><strong>Onde avisar</strong>
+        <Icon name="bell" size={16} /><strong className="lbl" style={{ color: 'var(--ink)' }}>Onde avisar</strong>
         {data && <span className="small muted">{data.devices.length} {data.devices.length === 1 ? 'computador' : 'computadores'}</span>}
       </summary>
       <div className="stack" style={{ gap: 14, paddingBottom: 14 }}>
@@ -43,24 +43,24 @@ export default function AlertDevices({ cameras, open }) {
         {data?.devices.map((device) => {
           const paused = pausedText(device.pausedUntil, now);
           return (
-            <div key={device.id} className="stack" style={{ gap: 10, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+            <div key={device.id} className="stack" style={{ gap: 10, borderTop: '1px solid color-mix(in srgb, var(--borda) 35%, transparent)', paddingTop: 12 }}>
               <div className="row" style={{ padding: 0, border: 0, flexWrap: 'wrap' }}>
                 {renaming?.id === device.id ? (
                   <form style={{ display: 'flex', gap: 8, flex: 1 }} onSubmit={(e) => { e.preventDefault(); update(device.id, { name: renaming.name }).then((r) => r && setRenaming(null)); }}>
                     <label className="small muted" style={{ position: 'absolute', left: -9999 }} htmlFor={`nome-${device.id}`}>Nome do computador</label>
                     <input id={`nome-${device.id}`} className="field" autoFocus value={renaming.name} maxLength={30} onChange={(e) => setRenaming({ id: device.id, name: e.target.value })} style={{ flex: 1, minHeight: 44 }} />
-                    <button type="submit" className="btn primary" disabled={busy || !renaming.name.trim()}>Salvar</button>
-                    <button type="button" className="btn ghost" onClick={() => setRenaming(null)}>Cancelar</button>
+                    <Key type="submit" center signal={!busy && !!renaming.name.trim()} disabled={busy || !renaming.name.trim()}>Salvar</Key>
+                    <Key center onClick={() => setRenaming(null)}>Cancelar</Key>
                   </form>
                 ) : (
                   <>
                     <strong style={{ flex: 1, minWidth: 0 }}>{device.name}</strong>
-                    <span className="pill"><span className={`dot ${device.online ? '' : 'off'}`} />{device.busy ? 'em tela cheia' : device.online ? 'conectado' : 'desligado'}</span>
-                    <button type="button" className="btn ghost" aria-label={`Renomear ${device.name}`} style={{ minWidth: 44, padding: 0 }} onClick={() => setRenaming({ id: device.id, name: device.name })}>Renomear</button>
+                    <Status kind={device.busy ? 'warn' : device.online ? 'ok' : 'off'}>{device.busy ? 'em tela cheia' : device.online ? 'conectado' : 'desligado'}</Status>
+                    <Key center aria-label={`Renomear ${device.name}`} onClick={() => setRenaming({ id: device.id, name: device.name })}>Renomear</Key>
                     {removing === device.id ? (
-                      <button type="button" className="btn" disabled={busy} onClick={() => { setRemoving(null); change(`/api/alert-devices/${device.id}/remove`, {}, 'Computador removido'); }}>Remover?</button>
+                      <Key center signal={!busy} disabled={busy} onClick={() => { setRemoving(null); change(`/api/alert-devices/${device.id}/remove`, {}, 'Computador removido'); }}>Remover?</Key>
                     ) : (
-                      <button type="button" className="btn ghost" aria-label={`Remover ${device.name}`} onClick={() => setRemoving(device.id)}>Remover</button>
+                      <Key center aria-label={`Remover ${device.name}`} onClick={() => setRemoving(device.id)}>Remover</Key>
                     )}
                   </>
                 )}
@@ -73,9 +73,8 @@ export default function AlertDevices({ cameras, open }) {
                   {cameras.map((c) => {
                     const on = device.cameras.includes(c.id);
                     return (
-                      <button key={c.id} type="button" className="btn" aria-pressed={on} disabled={busy}
-                        style={on ? { borderColor: 'var(--accent-line)', background: 'var(--accent-bg)' } : undefined}
-                        onClick={() => update(device.id, { cameras: on ? device.cameras.filter((x) => x !== c.id) : [...device.cameras, c.id] })}>{c.name}</button>
+                      <Key key={c.id} center on={on} disabled={busy}
+                        onClick={() => update(device.id, { cameras: on ? device.cameras.filter((x) => x !== c.id) : [...device.cameras, c.id] })}>{c.name}</Key>
                     );
                   })}
                 </div>
@@ -94,14 +93,14 @@ export default function AlertDevices({ cameras, open }) {
                     {paused ? (
                       <>
                         <span className="small">{paused}</span>
-                        <button type="button" className="btn" disabled={busy} onClick={() => update(device.id, { pausedUntil: 0 })}>Reativar</button>
+                        <Key center disabled={busy} onClick={() => update(device.id, { pausedUntil: 0 })}>Reativar</Key>
                       </>
                     ) : (
                       <>
                         <span className="small muted">Pausar</span>
-                        <button type="button" className="btn" disabled={busy} onClick={() => update(device.id, { pausedUntil: Math.floor(now) + 3600 })}>1 h</button>
-                        <button type="button" className="btn" disabled={busy} onClick={() => update(device.id, { pausedUntil: Math.floor(now) + 14400 })}>4 h</button>
-                        <button type="button" className="btn" disabled={busy} onClick={() => update(device.id, { pausedUntil: FOREVER })}>Até reativar</button>
+                        <Key center disabled={busy} onClick={() => update(device.id, { pausedUntil: Math.floor(now) + 3600 })}>1 h</Key>
+                        <Key center disabled={busy} onClick={() => update(device.id, { pausedUntil: Math.floor(now) + 14400 })}>4 h</Key>
+                        <Key center disabled={busy} onClick={() => update(device.id, { pausedUntil: FOREVER })}>Até reativar</Key>
                       </>
                     )}
                   </div>

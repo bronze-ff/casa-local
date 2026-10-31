@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { usePoll } from '../api.js';
 import { useHome } from '../App.jsx';
 import { Icon, Stale, useAction } from '../ui.jsx';
-import { FrigateCard, GameCard } from './Lab/GameMode.jsx';
+import { GameCard } from './Lab/GameMode.jsx';
 import NetworkCard from './Lab/Network.jsx';
 import { ServicesCard } from './Lab/Services.jsx';
 import { MachineCard } from './Lab/Stats.jsx';
@@ -45,20 +45,19 @@ export default function Lab() {
     <>
       <Stale poll={poll} what="o home lab" />
       {offline && (
-        <div className="notice info" role="status">
-          <Icon name="server" size={18} style={{ flex: 'none', marginTop: 2, color: 'var(--info)' }} />
+        <div className="aviso" role="status">
+          <Icon name="server" size={20} />
           <span>O home lab roda só no PC de casa (esta é a prévia): os controles ficam desligados.</span>
         </div>
       )}
       {s.wsl === false && !offline && (
-        <div className="notice" role="status">
-          <Icon name="warn" size={18} style={{ color: 'var(--accent)', flex: 'none', marginTop: 2 }} />
+        <div className="aviso" role="status">
+          <Icon name="alert" size={20} />
           <span>A máquina Linux (WSL) está desligada, por isso os serviços aparecem parados.</span>
         </div>
       )}
       <div className="grid">
         <GameCard s={s} disabled={disabled} send={send} />
-        <FrigateCard s={s} disabled={disabled} send={send} />
       </div>
       <MachineCard s={s} />
       <ServicesCard s={s} disabled={disabled} send={send} />

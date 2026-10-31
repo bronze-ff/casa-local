@@ -1,4 +1,8 @@
-"""Per-user Windows DPAPI storage. Plaintext keys are never persisted."""
+"""Per-user Windows DPAPI storage. Plaintext keys are never persisted on Windows.
+
+No Linux não há DPAPI e o servidor roda sem sessão gráfica (systemd): os mesmos arquivos .dpapi
+guardam o JSON puro, protegidos por permissão (arquivos 0600, .data 0700).
+"""
 import base64
 import ctypes
 from ctypes import wintypes
@@ -13,6 +17,14 @@ from .models import INVENTORY, TV_KEYS, AppError
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / ".data"
 IDS = {d["id"] for d in INVENTORY}
+
+if os.name != "nt":
+    # Sem DPAPI, a proteção é a permissão: todo arquivo novo do processo nasce 0600 (pastas 0700).
+    os.umask(0o077)
+    try:
+        DATA_DIR.chmod(0o700)
+    except OSError:  # ainda não existe (nasce 0700 pela umask) ou é de outro usuário
+        pass
 
 
 def private_ip(value):
@@ -36,7 +48,7 @@ class Blob(ctypes.Structure):
 
 def dpapi(data, decrypt=False):
     if os.name != "nt":
-        raise AppError("A configuração com chaves exige Windows DPAPI. Nenhum arquivo em texto será criado.", 503, "secure_storage_unavailable")
+        return bytes(data)  # Linux: JSON puro, protegido pela umask 077 acima (sem DPAPI num serviço headless)
     buffer = ctypes.create_string_buffer(data)
     source = Blob(len(data), ctypes.cast(buffer, ctypes.POINTER(ctypes.c_ubyte)))
     result = Blob()

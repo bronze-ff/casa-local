@@ -6,3 +6,5 @@ node_modules/
 dist-antigo/
 site.json
 .alethe/
+dist-pre-frigate/
+dist-pre-redesign/

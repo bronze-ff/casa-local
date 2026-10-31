@@ -1,15 +1,21 @@
 ﻿import { useRef, useState } from 'react';
 import { useHome } from '../App.jsx';
 import { fmtAgo, fmtTime, usePoll } from '../api.js';
-import { Card, Icon, Stale, useAction } from '../ui.jsx';
+import { Card, Confidence, Dot, Icon, Key, Lcd, PixelBar, Segmented, Stale, useAction, useConfidence } from '../ui.jsx';
 import { FANS, MODES, supportedState, temperatures } from './Clima/coverage.js';
 
 const EXTRAS = [['turbo', 'Turbo'], ['eco', 'Eco'], ['brisa', 'Brisa'], ['display', 'Display']];
+const SHORT_MODES = { cool: 'Frio', heat: 'Calor', dry: 'Seco', fan: 'Vent.', auto: 'Auto' };
+const TIMERS = [30, 60, 120, 240];
 const money = (n) => n == null ? '– –' : n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const number = (n) => n == null ? '– –' : n.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
-const gridStyle = { gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))' };
+const label = (list, value) => list.find(([v]) => v === value)?.[1];
 
-export default function Clima({ param }) {
+function Notice({ children, err }) {
+  return <div className={`aviso ${err ? 'err' : ''}`} role="status"><Icon name={err ? 'alert' : 'warn'} size={20} /><span>{children}</span></div>;
+}
+
+export default function Clima() {
   const { home, refresh, mode } = useHome();
   const poll = usePoll('/api/state', 5000);
   const routines = usePoll('/api/routines', 20000);
@@ -22,11 +28,16 @@ export default function Clima({ param }) {
   const [learned, setLearned] = useState('');
   const snapshot = poll.data || home;
   const device = snapshot?.devices?.find((d) => d.id === 'ar-quarto');
+  const kind = useConfidence(device);
   const state = device?.state || {};
   const ir = device?.irClimate;
   const preview = mode === 'preview';
   const unknown = ['power', 'temperature', 'mode', 'fan'].some((field) => state[field] == null);
-  const disabled = busy || !!poll.error || !device || (!preview && (!device.configured || device.connection !== 'online'));
+  const reason = poll.error ? 'Sem conexão com o painel.'
+    : !device || preview ? null
+      : !device.configured ? 'Configure o ar e a central IR no PC de casa.'
+        : device.connection !== 'online' ? 'Sem conexão com a central IR.' : null;
+  const disabled = busy || !device || !!reason;
   const canLearn = !preview && !!device?.configured && !busy && !poll.error;
   const selected = learning ? draft : state;
   // Estado desconhecido: confere o cadastro pelo padrão de ligar (resfriar · auto), não por nada.
@@ -35,6 +46,8 @@ export default function Clima({ param }) {
   const available = temperatures(ir, baseMode, baseFan);
   const templess = !learning && !!ir?.templess?.includes(`${state.mode}/${state.fan}`);
   const timer = routines.data?.timers?.find((item) => item.device === 'ar-quarto');
+  const locked = !learning && (disabled || unknown || templess);
+  const temp = unknown && !learning ? null : selected.temperature;
 
   async function action(path, body, okText) {
     if (lock.current) return null;
@@ -51,100 +64,124 @@ export default function Clima({ param }) {
     const next = supportedState(ir, field === 'mode' ? value : state.mode, field === 'fan' ? value : state.fan, state.temperature);
     if (next) return command(next);
   }
-  async function learn(body, label) {
+  async function learn(body, text) {
     if (!canLearn || lock.current) return;
     setLearned('');
-    setLearningLabel(label);
+    setLearningLabel(text);
     try {
-      const result = await action('/api/devices/ar-quarto/learn', body, `Aprendido: ${label}. Teste olhando o aparelho.`);
-      if (result) setLearned(label);
+      const result = await action('/api/devices/ar-quarto/learn', body, `Aprendido: ${text}. Teste olhando o aparelho.`);
+      if (result) setLearned(text);
     } finally { setLearningLabel(''); }
   }
   async function setTimer(minutes) {
     if (await action('/api/routines/timer', { device: 'ar-quarto', minutes }, minutes ? 'Timer programado.' : 'Timer cancelado.')) await routines.reload();
   }
   const initial = supportedState(ir, 'cool', 'auto', 24);
+  const down = () => learning ? setDraft({ ...draft, temperature: draft.temperature - 1 }) : command({ temperature: available.filter((t) => t < state.temperature).at(-1) });
+  const up = () => learning ? setDraft({ ...draft, temperature: draft.temperature + 1 }) : command({ temperature: available.find((t) => t > state.temperature) });
+  const modeOptions = MODES.map(([value]) => [value, SHORT_MODES[value], !learning && !supportedState(ir, value, state.fan, state.temperature ?? 24)]);
+  const fanOptions = FANS.map(([value, text]) => [value, text, !learning && !temperatures(ir, baseMode, value).length]);
 
-  return <>
-    <h1 style={{ fontSize: 28, fontWeight: 600 }}>Ar do quarto</h1>
-    {preview && <p className="notice info">Prévia: comandos simulados, sem enviar IR. Aprender só funciona no modo local.</p>}
-    <Stale poll={poll} what="estados do ar" />
-    {!snapshot ? <p role="status">Carregando ar-condicionado…</p> : !device ? <Card><p className="muted">Ar do quarto indisponível.</p></Card> : <>
-      {!preview && device.connection !== 'online' && <p className="notice">{device.configured ? 'Sem conexão com a central IR.' : 'Configure o ar e a central IR no PC de casa.'}</p>}
-      <div className="grid" style={gridStyle}>
-        <Card title="Electrolux · via Geonav" aside={<button type="button" className={`btn ${learning ? 'primary' : ''}`} aria-pressed={learning} disabled={busy || (!canLearn && !learning)} onClick={() => { setLearning((old) => !old); setLearned(''); }}>Aprender</button>}>
-          {learning && <p className="notice info">Escolha o estado abaixo, toque em Gravar e, em até 25 s, aperte Ligar no controle do ar já nesse estado, apontado para a central. Para funções extras, toque aqui e aperte o mesmo botão no controle original.</p>}
-          <p className="label">{learning ? 'Estado a gravar' : unknown ? 'Estado desconhecido' : state.power ? 'Ligado · estimado' : 'Desligado · estimado'}</p>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <button type="button" className="btn" style={{ padding: '0 12px' }} aria-label="Diminuir temperatura" disabled={busy || (!learning && (disabled || unknown || templess)) || (learning ? draft.temperature <= 17 : !available.some((t) => t < state.temperature))} onClick={() => learning ? setDraft({ ...draft, temperature: draft.temperature - 1 }) : command({ temperature: available.filter((t) => t < state.temperature).at(-1) })}><Icon name="minus" /></button>
-            <output className="mono num" aria-live="polite" style={{ fontSize: 48, color: !learning && state.power ? 'var(--accent)' : 'var(--text)', whiteSpace: 'nowrap' }}>{unknown && !learning ? '– –' : templess ? 'Auto' : selected.temperature}<span className="small">{!templess && (!unknown || learning) ? ' °C' : ''}</span></output>
-            <button type="button" className="btn" style={{ padding: '0 12px' }} aria-label="Aumentar temperatura" disabled={busy || (!learning && (disabled || unknown || templess)) || (learning ? draft.temperature >= 30 : !available.some((t) => t > state.temperature))} onClick={() => learning ? setDraft({ ...draft, temperature: draft.temperature + 1 }) : command({ temperature: available.find((t) => t > state.temperature) })}><Icon name="plus" /></button>
-          </div>
-          <p className="small muted">Estado estimado: o ar não confirma o que recebeu por infravermelho. Usar o controle original pode deixar o painel diferente do aparelho.</p>
-          {templess && <p className="notice info">Neste modo o controle não envia temperatura; o próprio ar decide. Para escolher, use Resfriar ou Aquecer.</p>}
-          <label className="field">Temperatura {learning ? 'a gravar' : 'cadastrada'}
-            <select value={selected.temperature ?? ''} disabled={busy || (!learning && (disabled || unknown || templess))} onChange={(event) => learning ? setDraft({ ...draft, temperature: Number(event.target.value) }) : command({ temperature: Number(event.target.value) })}>
-              <option value="" disabled>– –</option>
-              {Array.from({ length: 14 }, (_, i) => i + 17).map((t) => <option key={t} value={t} disabled={!learning && !available.includes(t)}>{t} °C{!learning && !available.includes(t) ? ' · não aprendido' : ''}</option>)}
-            </select>
-          </label>
-          {!learning && <>
-            {unknown ? <button type="button" className="btn primary big" disabled={disabled || !initial || initial.fan !== 'auto' || initial.temperature !== 24} onClick={() => command({ power: true, temperature: 24, mode: 'cool', fan: 'auto' })}>Ligar em 24 °C · resfriar · auto</button> : <button type="button" className={`btn big ${state.power ? 'primary' : ''}`} disabled={disabled || (state.power && !!ir && !ir.off)} onClick={() => command({ power: !state.power })}><Icon name="power" />{state.power ? 'Desligar ar' : 'Ligar ar'}</button>}
-            {unknown && !!ir?.off && <button type="button" className="btn" disabled={disabled} onClick={() => command({ power: false })}>Enviar desligar</button>}
-            {!!ir && !ir.off && <p className="small muted">Desligar não aprendido. Use Aprender › Gravar desligar.</p>}
-          </>}
-          <p className="small muted">{device.confidence === 'preview' ? 'Simulado' : device.confidence === 'unknown' ? 'Sem estado conhecido' : 'Estado estimado'} · {device.updatedAt ? fmtAgo(device.updatedAt) : 'sem leitura recente'}</p>
-        </Card>
-        <Card title={learning ? 'Preparar aprendizado' : 'Modo e ventilação'}>
-          <label className="field">Modo
-            <select value={selected.mode ?? ''} disabled={busy || (!learning && (disabled || unknown))} onChange={(event) => choose('mode', event.target.value)}>
-              <option value="" disabled>– –</option>
-              {MODES.map(([value, label]) => { const supported = !!supportedState(ir, value, state.fan, state.temperature ?? 24); return <option key={value} value={value} disabled={!learning && !supported}>{label}{!learning && !supported ? ' · não aprendido' : ''}</option>; })}
-            </select>
-          </label>
-          <label className="field">Ventilação
-            <select value={selected.fan ?? ''} disabled={busy || (!learning && (disabled || unknown))} onChange={(event) => choose('fan', event.target.value)}>
-              <option value="" disabled>– –</option>
-              {FANS.map(([value, label]) => <option key={value} value={value} disabled={!learning && !temperatures(ir, baseMode, value).length}>{label}{!learning && !temperatures(ir, baseMode, value).length ? ' · não aprendido' : ''}</option>)}
-            </select>
-          </label>
-          <h3 style={{ fontSize: 16 }}>Funções do controle original</h3>
-          <div role="group" aria-label="Funções do controle original" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-            {EXTRAS.map(([key, label]) => {
-              const calibrated = key === 'turbo' && ir?.turbo && !learning;
-              const supported = calibrated || !!ir?.extras?.[key];
-              return <button type="button" className={`btn ${calibrated && state.turbo ? 'primary' : ''}`} key={key} disabled={learning ? !canLearn : disabled || !supported || (calibrated && state.power !== true)} aria-pressed={calibrated ? !!state.turbo : undefined} style={{ minHeight: 60, flexDirection: 'column', gap: 0, borderStyle: supported ? 'solid' : 'dashed' }} onClick={() => learning ? learn({ key }, label) : calibrated ? command({ turbo: !state.turbo }) : action('/api/devices/ar-quarto/commands', { action: 'key', key })}>
-                {label}{calibrated && state.turbo ? ' ligado' : ''}<span className="small muted">{learning ? ir?.extras?.[key] ? 'Regravar' : 'Gravar' : !supported ? 'Não aprendido' : calibrated ? 'Estimado' : 'Alterna no aparelho'}</span>
-              </button>;
-            })}
-          </div>
-          <p className="small muted">Eco, Brisa e Display alternam no aparelho, sem confirmação de estado. O Turbo calibrado acompanha o estado completo; sem calibração, usa o botão aprendido.</p>
-          {learning && <>
-            <button type="button" className="btn primary" disabled={!canLearn} onClick={() => learn({ state: { power: true, ...draft } }, `${draft.temperature} °C · ${MODES.find(([v]) => v === draft.mode)[1]} · ${FANS.find(([v]) => v === draft.fan)[1]}`)}>Gravar ligar neste estado</button>
-            <button type="button" className="btn" disabled={!canLearn} onClick={() => learn({ key: 'off' }, 'desligar')}>{ir?.off ? 'Regravar desligar' : 'Gravar desligar'}</button>
-          </>}
-          {learningLabel && <p role="status" className="notice info">Aguardando {learningLabel}… Aperte o botão no controle original, apontado para a central, em até 25 s. Aguarde a confirmação.</p>}
-          {learned && <p role="status" className="notice info">Aprendido: {learned}. Saia de Aprender e teste olhando o aparelho. Gravar o sinal não confirma que ele funciona no ar.</p>}
-          {ir && <p className="small muted">Cadastro: {Object.entries(ir.origins || {}).map(([origin, count]) => `${count} ${origin}`).join(' · ') || 'sem sinais'}. {ir.calibrated ? 'Quadros calibrados.' : 'Perfil ainda não confirmado olhando o ar.'}</p>}
-        </Card>
-        <Card title="Desligar em">
-          <Stale poll={routines} what="timers" />
-          {!routines.data && !routines.error && <p role="status" className="muted">Carregando timer…</p>}
-          <div role="group" aria-label="Desligar em" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {[30, 60, 120, 240].map((minutes) => <button type="button" className="btn chip" key={minutes} disabled={busy || !routines.data || !!routines.error || state.power !== true || !device.configured || preview} onClick={() => setTimer(minutes)}>{minutes < 60 ? `${minutes} min` : `${minutes / 60} h`}</button>)}
-          </div>
-          {timer ? <><p className="mono num">Desliga às {fmtTime(timer.at)}</p><button type="button" className="btn" disabled={busy || !!routines.error || preview} onClick={() => setTimer(0)}>Cancelar timer</button>{!!timer.attempts && <p className="notice">Tentando desligar novamente após uma falha.</p>}</> : routines.data && <p className="small muted">Nenhum desligamento programado.</p>}
-          {routines.data?.lastError && <p className="notice">Falha no agendador: {routines.data.lastError}</p>}
-          <p className="small muted">O PC de casa e o servidor precisam continuar ligados para executar o timer.{preview ? ' Timers indisponíveis na prévia.' : ''}</p>
-        </Card>
-        <Card title="Gasto estimado">
-          <Stale poll={energy} what="estimativas de energia" />
-          {!energy.data ? !energy.error && <p role="status" className="muted">Carregando estimativa…</p> : <>
-            {['today', 'month'].map((period) => <div className="row" key={period}><div className="stack"><span className="label">{period === 'today' ? 'Hoje' : 'Este mês'}</span><span className="small muted">{number(energy.data[period]?.hours)} h · {number(energy.data[period]?.kwh)} kWh</span></div><strong className="mono num" style={{ fontSize: 24 }}>{money(energy.data[period]?.cost)}</strong></div>)}
-            <p className="small muted">Base: {number(energy.data.config?.watts)} W · {money(energy.data.config?.tariff)}/kWh. Conta pelos comandos do painel. Usar o controle original pode alterar a estimativa; não é uma medição elétrica.</p>
-          </>}
-        </Card>
+  if (!snapshot) return <Lcd role="status">Carregando ar-condicionado…</Lcd>;
+  if (!device) return <Card><p className="mut">Ar do quarto indisponível.</p></Card>;
+  const spent = ['today', 'month'];
+  return (
+    <>
+      {preview && <Notice>Prévia: comandos simulados, sem enviar IR. Aprender só funciona no modo local.</Notice>}
+      <Stale poll={poll} what="estados do ar" />
+      {reason && !poll.error && <Notice err>{reason}</Notice>}
+      {learning && <Notice>Escolha o estado abaixo, toque em Gravar e, em até 25 s, aperte Ligar no controle do ar já nesse estado, apontado para a central. Para funções extras, toque aqui e aperte o mesmo botão no controle original.</Notice>}
+      <Lcd className="stack">
+        <div className="row">
+          <span className="lbl">{learning ? 'estado a gravar' : `ar do quarto · ${label(MODES, state.mode)?.toLowerCase() || '– –'} · ${label(FANS, state.fan)?.toLowerCase() || '– –'}`}</span>
+          <Confidence kind={kind} />
+        </div>
+        <div style={{ textAlign: 'center' }} aria-live="polite">
+          <Dot size={templess ? 64 : 150}>{templess ? 'Auto' : temp == null ? '– –' : `${temp}°`}</Dot>
+        </div>
+        <PixelBar small value={temp == null || templess ? 0 : temp - 16} max={14} steps={14} />
+        <div className="scale"><span>17</span><span>20</span><span>23</span><span>26</span><span>30</span></div>
+        <div className="dim" style={{ fontSize: 11 }}>{learning ? 'Gravando: o ar não recebe nada até você tocar em Gravar.' : unknown ? 'Estado estimado desconhecido' : state.power ? 'Ligado · estimado' : 'Desligado · estimado'} · {device.updatedAt ? fmtAgo(device.updatedAt) : 'sem leitura recente'}</div>
+      </Lcd>
+      {templess && <Notice>Neste modo o controle não envia temperatura; o próprio ar decide. Para escolher, use Resfriar ou Aquecer.</Notice>}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <Key big center aria-label="Diminuir temperatura" disabled={busy || locked || (learning ? draft.temperature <= 17 : !available.some((t) => t < state.temperature))} onClick={down}>−</Key>
+        <Key big center aria-label="Aumentar temperatura" disabled={busy || locked || (learning ? draft.temperature >= 30 : !available.some((t) => t > state.temperature))} onClick={up}>+</Key>
       </div>
-    </>}
-  </>;
+      <p className="mut" style={{ fontSize: 11 }}>Estado estimado: o ar não confirma o que recebeu por infravermelho. Usar o controle original pode deixar o painel diferente do aparelho.</p>
+      {!learning && (unknown
+        ? <Key signal disabled={disabled || !initial || initial.fan !== 'auto' || initial.temperature !== 24} onClick={() => command({ power: true, temperature: 24, mode: 'cool', fan: 'auto' })}>Ligar em 24 °C · resfriar · auto</Key>
+        : <Key signal={!state.power} disabled={disabled || (state.power && !!ir && !ir.off)} reason={state.power && !!ir && !ir.off ? 'desligar não aprendido' : undefined} onClick={() => command({ power: !state.power })}>
+          <span className="row" style={{ justifyContent: 'flex-start', gap: 10 }}><Icon name="power" size={20} />{state.power ? 'Desligar ar' : 'Ligar ar'}</span>
+        </Key>)}
+      {!learning && unknown && !!ir?.off && <Key disabled={disabled} onClick={() => command({ power: false })}>Enviar desligar</Key>}
+      {!learning && !!ir && !ir.off && <p className="mut" style={{ fontSize: 11 }}>Desligar não aprendido. Use Aprender › Gravar desligar.</p>}
+      <span className="lbl">Modo · só o que foi aprendido</span>
+      <Segmented label="Modo" value={selected.mode ?? null} options={modeOptions} disabled={busy || (!learning && (disabled || unknown))} onChange={(value) => choose('mode', value)} />
+      <span className="lbl">Ventilação</span>
+      <Segmented label="Ventilação" value={selected.fan ?? null} options={fanOptions} disabled={busy || (!learning && (disabled || unknown))} onChange={(value) => choose('fan', value)} />
+      <span className="lbl">Funções do controle original</span>
+      <div role="group" aria-label="Funções do controle original" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+        {EXTRAS.map(([key, text]) => {
+          const calibrated = key === 'turbo' && ir?.turbo && !learning;
+          const supported = calibrated || !!ir?.extras?.[key];
+          return (
+            <Key center key={key} on={calibrated ? !!state.turbo : undefined} disabled={learning ? !canLearn : disabled || !supported || (calibrated && state.power !== true)}
+              sub={learning ? ir?.extras?.[key] ? 'Regravar' : 'Gravar' : !supported ? 'Não aprendido' : calibrated ? 'Estimado' : 'Alterna no aparelho'}
+              onClick={() => learning ? learn({ key }, text) : calibrated ? command({ turbo: !state.turbo }) : action('/api/devices/ar-quarto/commands', { action: 'key', key })}>
+              {text}{calibrated && state.turbo ? ' ligado' : ''}
+            </Key>
+          );
+        })}
+      </div>
+      <p className="mut" style={{ fontSize: 11 }}>Eco, Brisa e Display alternam no aparelho, sem confirmação de estado. O Turbo calibrado acompanha o estado completo; sem calibração, usa o botão aprendido.</p>
+      {learning && (
+        <>
+          <Key signal disabled={!canLearn} onClick={() => learn({ state: { power: true, ...draft } }, `${draft.temperature} °C · ${label(MODES, draft.mode)} · ${label(FANS, draft.fan)}`)}>Gravar ligar neste estado</Key>
+          <Key disabled={!canLearn} onClick={() => learn({ key: 'off' }, 'desligar')}>{ir?.off ? 'Regravar desligar' : 'Gravar desligar'}</Key>
+        </>
+      )}
+      {learningLabel && <Notice>Aguardando {learningLabel}… Aperte o botão no controle original, apontado para a central, em até 25 s. Aguarde a confirmação.</Notice>}
+      {learned && <Notice>Aprendido: {learned}. Saia de Aprender e teste olhando o aparelho. Gravar o sinal não confirma que ele funciona no ar.</Notice>}
+      {ir && <p className="mut" style={{ fontSize: 11 }}>Cadastro: {Object.entries(ir.origins || {}).map(([origin, count]) => `${count} ${origin}`).join(' · ') || 'sem sinais'}. {ir.calibrated ? 'Quadros calibrados.' : 'Perfil ainda não confirmado olhando o ar.'}</p>}
+
+      <span className="lbl">Desligar em</span>
+      <Stale poll={routines} what="timers" />
+      {!routines.data && !routines.error && <p role="status" className="mut">Carregando timer…</p>}
+      <div role="group" aria-label="Desligar em" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
+        {TIMERS.map((minutes) => (
+          <Key center key={minutes} disabled={busy || !routines.data || !!routines.error || state.power !== true || !device.configured || preview} onClick={() => setTimer(minutes)}>{minutes < 60 ? `${minutes} min` : `${minutes / 60} h`}</Key>
+        ))}
+      </div>
+      {timer ? (
+        <>
+          <p className="mut" style={{ fontSize: 12 }}>Desliga às {fmtTime(timer.at)}</p>
+          <Key disabled={busy || !!routines.error || preview} onClick={() => setTimer(0)}>Cancelar timer</Key>
+          {!!timer.attempts && <Notice err>Tentando desligar novamente após uma falha.</Notice>}
+        </>
+      ) : routines.data && <p className="mut" style={{ fontSize: 11 }}>Nenhum desligamento programado.</p>}
+      {routines.data?.lastError && <Notice err>Falha no agendador: {routines.data.lastError}</Notice>}
+      <p className="mut" style={{ fontSize: 11 }}>O PC de casa e o servidor precisam continuar ligados para executar o timer.{preview ? ' Timers indisponíveis na prévia.' : ''}</p>
+
+      <Stale poll={energy} what="estimativas de energia" />
+      {!energy.data ? !energy.error && <p role="status" className="mut">Carregando estimativa…</p> : (
+        <Lcd className="stack">
+          <div className="row"><span className="lbl">gasto do ar</span><Confidence kind={preview ? 'preview' : 'estimated'} /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {spent.map((period) => (
+              <div key={period} className="stack" style={{ gap: 4 }}>
+                <span className="lbl">{period === 'today' ? 'Hoje' : 'Este mês'}</span>
+                <Dot size={34}>{money(energy.data[period]?.cost)}</Dot>
+                <span className="dim" style={{ fontSize: 12 }}>{number(energy.data[period]?.hours)} h · {number(energy.data[period]?.kwh)} kWh</span>
+              </div>
+            ))}
+          </div>
+          <div className="dim" style={{ fontSize: 11 }}>Base: {number(energy.data.config?.watts)} W · {money(energy.data.config?.tariff)}/kWh. Conta pelos comandos do painel. Usar o controle original pode alterar a estimativa; não é uma medição elétrica.</div>
+        </Lcd>
+      )}
+      <Key on={learning} disabled={busy || (!canLearn && !learning)} sub="aponte o controle original · até 25 s" onClick={() => { setLearning((old) => !old); setLearned(''); }}>
+        <span className="row" style={{ justifyContent: 'flex-start', gap: 10 }}><Icon name="plus" size={20} />Aprender</span>
+      </Key>
+    </>
+  );
 }

@@ -79,28 +79,20 @@ class RegressoesTest(unittest.TestCase):
                     rebuilt = provision.build(original, {"lights": {}, "irHub": other})
                 self.assertNotIn("frameFix", rebuilt["ar-quarto"])
 
-    def test_dvr_avisa_quando_frigate_desabilitado_ou_obsoleto(self):
-        now = [1000.0]
-        def fetch(path):
-            return b'{"cameras":{"cam1":{}}}' if path == "/api/config" else b"[]"
+    def test_dvr_sempre_avisa_movimento_das_cameras_com_sino(self):
+        event = {"camera": "cam1", "start": 900}
         with tempfile.TemporaryDirectory() as folder:
-            notifier = notify.Notifier(folder, clock=lambda: now[0], fetch=fetch)
-            notifier.poll_frigate()
-            event = {"camera": "cam1", "start": 900}
-            notifier.on_motion(event, {"cam1"})
-            self.assertTrue(notifier.queue.empty())
-            notifier.configure({"enabled": {"pessoas": False}})
+            notifier = notify.Notifier(folder)
             notifier.on_motion(event, {"cam1"})
             self.assertEqual(notifier.queue.get_nowait()[0], "casa-cameras")
-            notifier.configure({"enabled": {"pessoas": True}})
-            notifier.on_motion(event, {"cam1"})
+            notifier.on_motion(event, set())  # câmera sem sino
             self.assertTrue(notifier.queue.empty())
-            now[0] += 3600
-            notifier.on_motion(event, {"cam1"})
+            notifier.configure({"cameraScope": "all"})
+            notifier.on_motion(event, set())
             self.assertEqual(notifier.queue.get_nowait()[0], "casa-cameras")
-            notifier.poll_frigate()
-            notifier.on_motion(event, {"cam1"})
-            self.assertTrue(notifier.queue.empty())
+            for stale in ({"enabled": {"pessoas": True}}, {"frigateKinds": "tudo"}):
+                with self.assertRaises(AppError):
+                    notifier.configure(stale)
 
     def test_worker_camera_sobrevive_a_erros_de_transporte(self):
         for error in (OSError("rede"), TimeoutError("tempo"), urllib.error.URLError("rede"),

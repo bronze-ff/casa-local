@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Icon } from '../../ui.jsx';
+import { Icon, Key, Status } from '../../ui.jsx';
 import { attachMse, mseSupported } from './mse.js';
 import { Overlay, VideoDialog, mediaStyle, stageStyle } from './VideoDialog.jsx';
 
@@ -55,8 +55,8 @@ export default function Live({ cameras, index, poster, move, close, rewind }) {
       onClose={close}
       actions={(
         <>
-          <span className="pill"><span className={`dot ${status === 'live' ? '' : 'warn'}`} />{state}</span>
-          <button type="button" className="btn" onClick={() => rewind(cam)}><Icon name="refresh" />Rever 1 min</button>
+          <Status kind={status === 'live' ? 'ok' : status === 'failed' ? 'fail' : 'warn'}>{state}</Status>
+          <Key center onClick={() => rewind(cam)}><Icon name="refresh" />Rever 1 min</Key>
         </>
       )}
     >
@@ -73,9 +73,20 @@ export default function Live({ cameras, index, poster, move, close, rewind }) {
         {status === 'failed' && <Overlay icon="warn"><span>A transmissão não abriu. Tente de novo em instantes.</span></Overlay>}
       </div>
       <div className="row" style={{ border: 0, padding: 0 }}>
-        <button type="button" className="btn" aria-label="Câmera anterior" onClick={() => move(-1)}><Icon name="left" />Anterior</button>
-        <button type="button" className="btn" aria-label="Próxima câmera" onClick={() => move(1)}>Próxima<Icon name="right" /></button>
+        <Key center aria-label="Câmera anterior" onClick={() => move(-1)} style={{ flex: 1 }}><Icon name="left" />Anterior</Key>
+        <Key center aria-label="Próxima câmera" onClick={() => move(1)} style={{ flex: 1 }}>Próxima<Icon name="right" /></Key>
       </div>
+    </VideoDialog>
+  );
+}
+
+/** Bandeja: sem WebSocket nem MJPEG, só um quadro ampliado (o ao vivo abre no navegador). */
+export function FrameView({ title, sub, src, close }) {
+  const [broken, setBroken] = useState(false);
+  return (
+    <VideoDialog label={`Quadro: ${title}`} title={title} sub={sub} onClose={close}>
+      <div style={stageStyle}>{src && !broken ? <img src={src} alt={`Quadro de ${title}`} style={mediaStyle} onError={() => setBroken(true)} /> : <Overlay icon="warn"><span>Sem imagem.</span></Overlay>}</div>
+      <p className="small muted">Para ver ao vivo, use "Abrir no navegador" no topo da bandeja.</p>
     </VideoDialog>
   );
 }

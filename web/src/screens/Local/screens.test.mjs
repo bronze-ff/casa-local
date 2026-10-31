@@ -35,11 +35,11 @@ for (const zoom of [2, 15, 19]) for (const [lat, lon] of [[0, 0], [-23.55, -46.6
 }
 home = { mode: 'local', home: { devices: [{ id: 'tv-quarto', configured: true, connection: 'online', irKeys: { power: 'aprendido' } }] }, refresh() {} };
 const fixture = (data, error = null) => { poll = { data, error, at: Date.now(), reload() {} }; };
-const screen = Component => render(React.createElement(Component));
-fixture(null); assert.match(screen(TV), /Carregando TVs/);
-fixture({ tvs: [] }); assert.match(screen(TV), /Nenhuma TV encontrada/);
+const screen = (Component, props) => render(React.createElement(Component, props));
+fixture(null); assert.match(screen(TV, { param: 'rede' }), /Carregando TVs/);
+fixture({ tvs: [] }); assert.match(screen(TV, { param: 'rede' }), /Nenhuma TV encontrada/);
 fixture({ tvs: [{ id: 'abcdef123456', label: 'Sala', model: 'Samsung', power: 'off', paired: true }] });
-assert.match(screen(TV), /Fora de alcance/);
+assert.match(screen(TV, { param: 'rede' }), /Fora de alcance/);
 fixture(null, Error('Falha de leitura')); assert.match(screen(Local), /Falha de leitura/);
 fixture(null); assert.match(screen(Local), /Carregando localização/);
 fixture({ configured: false }); assert.match(screen(Local), /primeiro celular/);
