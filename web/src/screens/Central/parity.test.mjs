@@ -29,6 +29,7 @@ globalThis.window = { location: { origin: 'http://casa.local', host: 'casa.local
 globalThis.localStorage = globalThis.window.localStorage;
 const h = React.createElement;
 const Central = load(resolve(root, '../Central.jsx')).default;
+const centralModule = load(resolve(root, '../Central.jsx'));
 const routinesModule = load(resolve(root, 'Routines.jsx'));
 const Routines = routinesModule.default;
 
@@ -65,4 +66,21 @@ test('apagar rotina e modo pedem confirmação: "Remover mesmo" não existe ante
 test('rotação de chave dos atalhos só confirma depois do toque (sem "Trocar" inicial)', () => {
   polls = {};
   assert.doesNotMatch(render(h(Central)), />Trocar</);
+});
+
+test('resumo da central: só o que o servidor devolveu; sem dados não inventa número', () => {
+  assert.deepEqual(centralModule.summaryOf(null, undefined), []);
+  assert.deepEqual(centralModule.summaryOf(null, [{}, {}]), [['Modos', '2']]);
+  const full = centralModule.summaryOf({ state: 'warn', checks: [{ state: 'ok' }, { state: 'fail' }], machine: { memory: { used: 40 }, disk: { freeGb: 80 } } }, []);
+  assert.deepEqual(full.map(([k]) => k), ['Sistema', 'Avisos', 'Memória', 'Disco livre', 'Modos']);
+  assert.equal(full.find(([k]) => k === 'Avisos')[1], '1');
+  assert.equal(centralModule.summaryOf({ state: 'ok', checks: [] }, undefined).some(([k]) => k === 'Memória'), false);
+});
+
+test('Central: navegação interna por botões (não por hash, que quebraria a rota) e uma seção por id', () => {
+  polls = {};
+  const html = render(h(Central));
+  for (const [id] of centralModule.SECTIONS) assert.match(html, new RegExp(`id="${id}"`), id);
+  assert.doesNotMatch(html, /href="#(saude|avisos|modos)/);
+  assert.match(html, /<nav[^>]*aria-label="Seções da central"/);
 });

@@ -23,7 +23,9 @@ function useClock() {
 
 const isOffline = (d) => !!d.connection && !['online', 'preview'].includes(d.connection);
 
-function Hero({ location, size, led }) {
+const greetingFor = (date) => { const h = date.getHours(); return h < 5 ? 'Boa madrugada' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; };
+
+function Hero({ location, size, led, greeting }) {
   const now = useClock();
   const people = location?.people || [];
   const places = Object.fromEntries((location?.places || []).map((p) => [p.id, p.name]));
@@ -33,6 +35,7 @@ function Hero({ location, size, led }) {
       <div className="row" style={{ alignItems: 'flex-start' }}>
         <div>
           <span className="lbl">{day}</span>
+          {greeting && <h2 className="greet">{greetingFor(now)}</h2>}
           <div><Dot size={size}>{now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</Dot></div>
         </div>
         {led}
@@ -52,6 +55,30 @@ function Hero({ location, size, led }) {
       )}
     </Lcd>
   );
+}
+
+/** Resumo do ambiente só com o último estado conhecido dos aparelhos; IR aparece como estimado. */
+export function ambientOf(devices = []) {
+  const lights = devices.filter((d) => d.kind === 'light');
+  const read = lights.filter((d) => d.state?.power != null);
+  const items = [];
+  if (lights.length) items.push(['Luzes', read.length ? `${read.filter((d) => d.state.power === true).length} de ${lights.length} acesas` : 'sem leitura']);
+  for (const [kind, label] of [['climate', 'Ar'], ['tv', 'TV']]) {
+    const d = devices.find((x) => x.kind === kind);
+    if (!d) continue;
+    const st = d.state || {};
+    const value = st.power == null ? 'sem leitura' : st.power ? (kind === 'climate' && st.temperature ? `${st.temperature}° ligado` : 'ligado') : 'desligado';
+    items.push([label, `${value}${d.confidence === 'reported' || st.power == null ? '' : ' · estimado'}`]);
+  }
+  const offline = devices.filter((d) => d.connection && !['online', 'preview'].includes(d.connection)).length;
+  if (offline) items.push(['Sem conexão', String(offline)]);
+  return items;
+}
+
+function Ambient({ devices }) {
+  const items = ambientOf(devices);
+  if (!items.length) return null;
+  return <div className="summary" role="list" aria-label="Resumo do ambiente">{items.map(([label, value]) => <div key={label} role="listitem"><span className="lbl">{label}</span><b style={{ fontSize: 18 }}>{value}</b></div>)}</div>;
 }
 
 function SceneKey({ scene, active, running, other, onRun }) {
@@ -385,33 +412,50 @@ export default function Inicio() {
     );
   }
   const desktop = layout === 'desktop';
-  const left = (
+  const hero = <Hero location={location.data} size={desktop ? 64 : 64} led={led} greeting />;
+  const modesPanel = (
     <>
-      <Hero location={location.data} size={64} led={led} />
       <div className="row"><h2 className="lbl">Modos</h2><span className="lbl">toque para rodar</span></div>
       {modes}
+    </>
+  );
+  const devicesPanel = (
+    <>
       <div className="row"><h2 className="lbl">Aparelhos</h2></div>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(2, minmax(0, 1fr))`, gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
         {devices.map((d) => <DeviceTile key={d.id} d={d} />)}
       </div>
     </>
   );
-  const right = (
-    <>
-      {mode !== 'preview' && <LastMotion cameraNames={cameraNames} motion={motion} />}
-      <LabSummary lab={lab} />
-      <RecentActions />
-    </>
-  );
+  if (desktop) {
+    const motionPanel = mode !== 'preview' && <div className="mod"><LastMotion cameraNames={cameraNames} motion={motion} /></div>;
+    const recent = (home.recentActions || []).length > 0 && <div className="mod"><RecentActions /></div>;
+    const labPanel = !(lab.data && !lab.data.enabled) && <div className="mod"><LabSummary lab={lab} /></div>;
+    return (
+      <>
+        {notice}
+        {hero}
+        <Ambient devices={devices} />
+        <div className="cols">
+          <div className="mod stack">{modesPanel}</div>
+          <div className="mod stack">{devicesPanel}</div>
+          {motionPanel}
+          {labPanel}
+          {recent}
+        </div>
+      </>
+    );
+  }
   return (
     <>
       {notice}
-      {desktop ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: 16, alignItems: 'start' }}>
-          <div className="stack" style={{ gap: 12 }}>{left}</div>
-          <div className="stack" style={{ gap: 12 }}>{right}</div>
-        </div>
-      ) : <>{left}{right}</>}
+      {hero}
+      <Ambient devices={devices} />
+      {modesPanel}
+      {devicesPanel}
+      {mode !== 'preview' && <LastMotion cameraNames={cameraNames} motion={motion} />}
+      <LabSummary lab={lab} />
+      <RecentActions />
     </>
   );
 }

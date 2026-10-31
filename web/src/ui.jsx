@@ -378,6 +378,29 @@ export function useAction() {
   return [run, busy];
 }
 
+/** Bottom sheet nativo (dialog): Esc fecha, foco fica contido e volta ao botão que abriu. O conteúdo fica na árvore mesmo fechado. */
+export function Sheet({ open, onClose, title, children }) {
+  const ref = useRef();
+  const opener = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (open && !el.open) { opener.current = document.activeElement; el.showModal(); }
+    if (!open && el.open) { el.close(); opener.current?.focus?.(); opener.current = null; }
+  }, [open]);
+  return (
+    <dialog ref={ref} className="sheet" onClose={() => { opener.current?.focus?.(); onClose(); }} aria-label={title}
+      onClick={(event) => { if (event.target === ref.current) onClose(); }}>
+      <div className="sheet-handle" aria-hidden="true" />
+      <div className="mod-head" style={{ marginBottom: 12 }}>
+        <h2>{title}</h2>
+        <Key center aria-label="Fechar" onClick={onClose} style={{ minWidth: 44 }}><Icon name="close" /></Key>
+      </div>
+      <div className="stack" style={{ gap: 12 }}>{children}</div>
+    </dialog>
+  );
+}
+
 /** Diálogo nativo (fecha com Esc, prende o foco). */
 export function Modal({ open, onClose, title, children }) {
   const ref = useRef();

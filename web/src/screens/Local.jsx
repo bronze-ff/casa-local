@@ -105,10 +105,51 @@ export default function Local({ param }) {
     <Stale poll={poll} what="localizações" />
     {!data && !poll.error && <Lcd role="status">Carregando localização…</Lcd>}
     {data && <>
-      {data.configured && <Card title="Mapa" aside={person && <span style={small}>{person.name}</span>}>
+      <div className="stage two">
+        <div className="stack" style={{ gap: 14 }}>
+          {data.configured ? <Card title="Mapa" aside={person && <span style={small}>{person.name}</span>}>
         <LocationMap key={person?.id || 'empty'} people={people} places={places} selected={person?.id} draft={draft} onPick={draft && !preview && !busy ? point => setDraft(previous => ({ ...previous, ...point })) : null} />
-      </Card>}
-      <div className="row"><h2 className="lbl">Pessoas · {people.length} de 4</h2><span style={small}>OwnTracks · tailnet</span></div>
+      </Card> : (
+            <section className="map-stage map-empty" aria-label="Mapa">
+              <b>Mapa sem posições ainda</b>
+              <span className="mut small">O mapa aparece quando o primeiro celular enviar a posição pelo OwnTracks. Nada é mostrado antes disso.</span>
+            </section>
+          )}
+          {data.configured && <Card title={`Lugares · ${places.length} de 8`}>
+        {!places.length && <p className="mut">Adicione o primeiro lugar. Comece pela Casa.</p>}
+        <div className="list">
+          {places.map(place => <div key={place.id}>
+            <span>
+              <span className="row" style={{ justifyContent: 'flex-start', gap: 8, flexWrap: 'wrap' }}><strong>{place.name}</strong>{isHome(place) && <Badge>É a casa</Badge>}</span>
+              <small>Raio {place.radius} m · {place.lat}, {place.lon}</small>
+              <small>{people.filter(entry => entry.place === place.id).map(entry => `${entry.name}${entry.stale ? ' (posição antiga)' : ''}`).join(', ') || 'Ninguém na última posição recebida'}</small>
+              {person?.distances?.[place.id] != null && <small>{person.name} a {distance(person.distances[place.id])}{person.stale ? ' · posição antiga' : ''}</small>}
+            </span>
+            <span style={{ display: 'flex', gap: 6 }}>
+              <Key center style={{ minHeight: 44 }} disabled={preview || busy} onClick={() => setDraft({ id: place.id, name: place.name, lat: place.lat, lon: place.lon, radius: place.radius })}>Editar</Key>
+              <Key center style={{ minHeight: 44 }} disabled={preview || busy} onClick={() => setDialog({ type: 'removePlace', place })}>Remover</Key>
+            </span>
+          </div>)}
+        </div>
+        {!draft && <Key disabled={preview || busy || places.length >= 8} onClick={newPlace}>{places.length >= 8 ? 'Limite de 8 lugares' : 'Adicionar lugar'}</Key>}
+        {draft && <form className="stack" style={{ gap: 12 }} onSubmit={savePlace}>
+          <h3 className="lbl">{draft.id ? 'Editar lugar' : 'Novo lugar'}</h3>
+          <label className="field">Nome<input type="text" maxLength={24} required value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
+          <label className="field">Latitude<input type="number" min={-90} max={90} step="any" required value={draft.lat} onChange={event => setDraft({ ...draft, lat: event.target.value })} /></label>
+          <label className="field">Longitude<input type="number" min={-180} max={180} step="any" required value={draft.lon} onChange={event => setDraft({ ...draft, lon: event.target.value })} /></label>
+          <label className="field">Raio em metros (30 a 1000)<input type="number" min={30} max={1000} step={1} required value={draft.radius} onChange={event => setDraft({ ...draft, radius: event.target.value })} /></label>
+          <div style={cols(3)}>{[50, 100, 200].map(radius => <Key center key={radius} on={Number(draft.radius) === radius} onClick={() => setDraft({ ...draft, radius })}>{radius} m</Key>)}</div>
+          <div style={cols(2)}>
+            <Key signal center type="submit" disabled={preview || busy || !draft.name.trim()}>Salvar lugar</Key>
+            <Key center disabled={busy} onClick={() => setDraft(null)}>Cancelar</Key>
+          </div>
+        </form>}
+        <p style={small}>Para marcar a sua casa, use o nome “Casa”. O backend também reconhece “Home”, “Minha Casa” e “Casa Local”. Esse lugar decide a presença usada nos avisos.</p>
+        {people.some(person => person.regionsPending) && <Notice>Os lugares atualizados vão para cada celular no próximo envio de posição.</Notice>}
+          </Card>}
+        </div>
+        <div className="stack" style={{ gap: 14 }}>
+          <Card title={`Pessoas · ${people.length} de 4`} aside={<span style={small}>OwnTracks · tailnet</span>}>
       {!people.length && <p className="mut" style={{ fontSize: 12 }}>Cada pessoa compartilha a posição do próprio celular com este PC pelo OwnTracks. Prepare o primeiro celular para começar.</p>}
       <div style={gridStyle}>
         {people.map(entry => {
@@ -145,46 +186,15 @@ export default function Local({ param }) {
         <span className="row" style={{ justifyContent: 'flex-start', gap: 10 }}><Icon name="plus" size={20} />{people.length >= 4 ? 'Limite de 4 pessoas' : 'Adicionar pessoa'}</span>
       </Key>
       <p style={small}>As posições ficam neste PC por 48 h. Um lugar chamado “Casa” permite identificar quando a casa está vazia.</p>
-
-      {data.configured && <>
-        <div className="row"><h2 className="lbl">Lugares · {places.length} de 8</h2></div>
-        {!places.length && <p className="mut">Adicione o primeiro lugar. Comece pela Casa.</p>}
-        <div className="list">
-          {places.map(place => <div key={place.id}>
-            <span>
-              <span className="row" style={{ justifyContent: 'flex-start', gap: 8, flexWrap: 'wrap' }}><strong>{place.name}</strong>{isHome(place) && <Badge>É a casa</Badge>}</span>
-              <small>Raio {place.radius} m · {place.lat}, {place.lon}</small>
-              <small>{people.filter(entry => entry.place === place.id).map(entry => `${entry.name}${entry.stale ? ' (posição antiga)' : ''}`).join(', ') || 'Ninguém na última posição recebida'}</small>
-              {person?.distances?.[place.id] != null && <small>{person.name} a {distance(person.distances[place.id])}{person.stale ? ' · posição antiga' : ''}</small>}
-            </span>
-            <span style={{ display: 'flex', gap: 6 }}>
-              <Key center style={{ minHeight: 44 }} disabled={preview || busy} onClick={() => setDraft({ id: place.id, name: place.name, lat: place.lat, lon: place.lon, radius: place.radius })}>Editar</Key>
-              <Key center style={{ minHeight: 44 }} disabled={preview || busy} onClick={() => setDialog({ type: 'removePlace', place })}>Remover</Key>
-            </span>
-          </div>)}
-        </div>
-        {!draft && <Key disabled={preview || busy || places.length >= 8} onClick={newPlace}>{places.length >= 8 ? 'Limite de 8 lugares' : 'Adicionar lugar'}</Key>}
-        {draft && <form className="stack" style={{ gap: 12 }} onSubmit={savePlace}>
-          <h3 className="lbl">{draft.id ? 'Editar lugar' : 'Novo lugar'}</h3>
-          <label className="field">Nome<input type="text" maxLength={24} required value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
-          <label className="field">Latitude<input type="number" min={-90} max={90} step="any" required value={draft.lat} onChange={event => setDraft({ ...draft, lat: event.target.value })} /></label>
-          <label className="field">Longitude<input type="number" min={-180} max={180} step="any" required value={draft.lon} onChange={event => setDraft({ ...draft, lon: event.target.value })} /></label>
-          <label className="field">Raio em metros (30 a 1000)<input type="number" min={30} max={1000} step={1} required value={draft.radius} onChange={event => setDraft({ ...draft, radius: event.target.value })} /></label>
-          <div style={cols(3)}>{[50, 100, 200].map(radius => <Key center key={radius} on={Number(draft.radius) === radius} onClick={() => setDraft({ ...draft, radius })}>{radius} m</Key>)}</div>
-          <div style={cols(2)}>
-            <Key signal center type="submit" disabled={preview || busy || !draft.name.trim()}>Salvar lugar</Key>
-            <Key center disabled={busy} onClick={() => setDraft(null)}>Cancelar</Key>
-          </div>
-        </form>}
-        <p style={small}>Para marcar a sua casa, use o nome “Casa”. O backend também reconhece “Home”, “Minha Casa” e “Casa Local”. Esse lugar decide a presença usada nos avisos.</p>
-        {people.some(person => person.regionsPending) && <Notice>Os lugares atualizados vão para cada celular no próximo envio de posição.</Notice>}
-      </>}
-
-      <div className="row"><h2 className="lbl">Últimas 24 h</h2></div>
+          </Card>
+          <Card title="Últimas 24 h">
       {!events.length ? <p className="mut" style={{ fontSize: 12 }}>Nenhuma entrada ou saída dos lugares nas últimas 24 h.</p> : <ol className="list" style={{ listStyle: 'none', margin: 0, padding: 0 }}>{events.map((event, index) => <li key={`${event.person}-${event.tst}-${event.kind}-${event.place}-${index}`} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', minHeight: 44, padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
         <time style={{ ...small, minWidth: 55, fontVariantNumeric: 'tabular-nums' }} dateTime={new Date(event.tst * 1000).toISOString()} title={new Date(event.tst * 1000).toLocaleString('pt-BR')}>{fmtTime(event.tst)}</time>
         <span>{event.name} {event.kind === 'saiu' ? 'saiu de' : 'chegou em'} <strong>{placeName(event.place)}</strong><small style={{ display: 'block', ...small }}>{fmtAgo(event.tst)} · {event.exact ? 'Informado pelo celular' : 'Estimado pela posição'}</small></span>
       </li>)}</ol>}
+          </Card>
+        </div>
+      </div>
     </>}
     <Modal open={!!dialog} onClose={close} title={dialog?.type === 'phone' ? `Celular de ${dialog.name}` : ({ add: 'Adicionar pessoa', rename: 'Nome da pessoa', renew: 'Renovar credencial', removePerson: 'Remover pessoa', removePlace: 'Remover lugar' })[dialog?.type] || 'Local'}>
       {(dialog?.type === 'add' || dialog?.type === 'rename') && <form className="stack" style={{ gap: 14 }} onSubmit={async event => {

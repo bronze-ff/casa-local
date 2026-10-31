@@ -1,7 +1,7 @@
 import { usePoll } from '../../api.js';
 import { Card, Dot, Lcd, Stale, Status } from '../../ui.jsx';
 
-const TITLE = { ok: 'Tudo funcionando', warn: 'Funcionando, com avisos', fail: 'Algo parou' };
+export const TITLE = { ok: 'Tudo funcionando', warn: 'Funcionando, com avisos', fail: 'Algo parou' };
 const LED = { ok: '', warn: 'env', fail: 'off' };
 const CF = { ok: ['ok', 'ok'], warn: ['warn', 'Aviso'], fail: ['fail', 'Falha'] };
 
@@ -12,8 +12,9 @@ function fmtUptime(seconds) {
   return d ? `${d}D${h}H` : `${h}H${Math.floor((seconds % 3600) / 60)}M`;
 }
 
-export default function Health() {
-  const poll = usePoll('/api/health', 20000);
+export default function Health({ poll: shared }) {
+  const own = usePoll(shared ? null : '/api/health', 20000); // a Central já lê a saúde e repassa: um poll só
+  const poll = shared || own;
   const h = poll.data;
   const pc = h?.machine || {};
   const avisos = h ? h.checks.filter((c) => c.state !== 'ok').length : 0;

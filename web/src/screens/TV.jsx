@@ -21,17 +21,17 @@ function Remote({ send, disabled, keys, learning, network }) {
     </Key>
   );
   return (
-    <div className="stack" style={{ gap: 12 }}>
-      <div style={row('1fr 2fr')}>{key('power')}{key('source')}</div>
-      <div className="dpad">
+    <div className="remote">
+      <div className="row2">{key('power')}{key('source')}</div>
+      <div className="ring" role="group" aria-label="Direcional">
         <span />{key('up')}<span />
         {key('left')}{key('ok')}{key('right')}
         <span />{key('down')}<span />
       </div>
-      <div style={row('1fr 1fr')}>{key('back')}{key('home')}</div>
-      <span className="lbl">Volume</span>
-      <div style={row('1fr 1fr 1fr')}>{key('volume_down', { big: true })}{key('mute')}{key('volume_up', { big: true })}</div>
-      {network && <div style={row('1fr 1fr')}>{key('play')}{key('pause')}</div>}
+      <div className="row2b">{key('back')}{key('home')}</div>
+      <span className="lbl group-label">Volume</span>
+      <div className="vol" role="group" aria-label="Volume">{key('volume_down')}{key('mute')}{key('volume_up')}</div>
+      {network && <><span className="lbl group-label">Reprodução</span><div className="row2b">{key('play')}{key('pause')}</div></>}
     </div>
   );
 }
@@ -57,7 +57,7 @@ function Infrared({ device, preview, refresh }) {
   if (!device) return <Card title="TV do quarto"><p className="mut">TV do quarto não está no cadastro.</p></Card>;
   const power = device.state?.power;
   return (
-    <section className="stack" style={{ gap: 12 }} aria-label="Controle IR">
+    <section className="mod" aria-label="Controle IR">
       <Lcd className="row">
         <div><span className="lbl">{(device.name || 'TV do quarto').toLowerCase()}</span><div><Dot size={34}>{power == null ? '– –' : power ? 'ON' : 'OFF'}</Dot></div></div>
         <Confidence kind={kind} />
@@ -94,7 +94,7 @@ function NetworkTV({ tv, preview, reload }) {
   const send = key => mutate('command', { key }, key === 'power' && tv.power === 'off' ? 'Sinal para ligar enviado. Aguarde alguns segundos; pode não funcionar por Wi-Fi.' : 'Comando enviado pela rede.');
   const state = ({ on: 'Ligada', standby: 'Em espera', off: 'Fora de alcance' })[tv.power] || 'Estado desconhecido';
   return (
-    <section className="stack" style={{ gap: 12 }} aria-label={tv.label || 'TV Samsung'}>
+    <section className="stack" style={{ gap: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }} aria-label={tv.label || 'TV Samsung'}>
       <Lcd className="row">
         <div><span className="lbl">{tv.model || 'Samsung'} · {tv.paired ? 'pareada' : 'não pareada'}</span><div style={{ fontWeight: 700 }}>{tv.label || 'TV Samsung'}</div></div>
         <span className={`led ${tv.power === 'on' ? '' : tv.power === 'off' ? 'off' : 'env'}`}>{state}</span>
@@ -126,14 +126,15 @@ function NetworkTV({ tv, preview, reload }) {
 
 function Network({ poll, tvs, preview, busy, scan, reload }) {
   return (
-    <div className="stack" style={{ gap: 12 }}>
+    <section className="mod" aria-label="TVs na rede e apps">
+      <h2 className="panel-title">TVs na rede · apps</h2>
       <Key disabled={preview || busy} loading={busy} sub="Samsung · controle local pela rede" onClick={scan}>{busy ? 'Procurando TVs…' : 'Procurar TVs'}</Key>
       <Stale poll={poll} what="TVs" />
       {!poll.data && !poll.error && <p role="status" className="mut">Carregando TVs…</p>}
       {poll.data && !tvs.length && <p className="mut">Nenhuma TV encontrada. Ligue a TV e toque em Procurar TVs.</p>}
       {poll.data?.scannedAt && <p className="mut" style={{ fontSize: 11 }}>Última busca {fmtAgo(poll.data.scannedAt)}.</p>}
       {tvs.map(tv => <NetworkTV key={tv.id} tv={tv} preview={preview} reload={reload} />)}
-    </div>
+    </section>
   );
 }
 
@@ -159,7 +160,7 @@ export default function TV({ param }) {
     <>
       {preview && <Notice>Prévia: controles, aprendizado e busca na rede estão desativados. Nenhum sinal é enviado.</Notice>}
       {both ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: 16, alignItems: 'start' }}>{ir}{network}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 400px) minmax(0, 1fr)', gap: 16, alignItems: 'start' }}>{ir}{network}</div>
       ) : (
         <>
           <Segmented label="Tipo de controle" value={tab} onChange={setTab} options={[['ir', 'Controle IR'], ['rede', 'Samsung · rede']]} />

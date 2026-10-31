@@ -133,6 +133,7 @@ function Shell({ route, layout, tray }) {
   ) : (
     <Suspense fallback={<div className="page"><Lcd role="status">Carregando…</Lcd></div>}>
       <main className="page">
+        <h1 className="page-title">{current.title}</h1>
         <Screen param={route.param} />
       </main>
     </Suspense>

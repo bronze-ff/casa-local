@@ -26,6 +26,7 @@ const h = React.createElement;
 const topo = load(resolve(root, 'Topology.jsx'));
 const { MachineCard } = load(resolve(root, 'Stats.jsx'));
 const { GameCard } = load(resolve(root, 'GameMode.jsx'));
+const { ambientOf } = load(resolve(root, '../Inicio.jsx'));
 const { createHomeStore } = load(resolve(root, '../../homeStore.js'));
 
 const device = (n, extra = {}) => ({ id: `d${n}`, label: `Aparelho ${n}`, known: true, watched: false, online: true, ...extra });
@@ -94,4 +95,16 @@ test('toggle do Início e Luzes usam a MESMA reserva por físico', async () => {
   assert.equal(posts.length, 1);
   release({ command: { status: 'sent' } });
   await fromHome;
+});
+
+test('resumo do ambiente: só estado conhecido; IR aparece como estimado; sem aparelhos não inventa nada', () => {
+  assert.deepEqual(ambientOf([]), []);
+  const items = Object.fromEntries(ambientOf([
+    { id: 'a', kind: 'light', state: { power: true }, confidence: 'reported' }, { id: 'b', kind: 'light', state: { power: false }, confidence: 'reported' },
+    { id: 'c', kind: 'climate', state: { power: true, temperature: 24 }, confidence: 'estimated' }, { id: 'd', kind: 'tv', state: { power: null }, confidence: 'unknown', connection: 'offline' }]));
+  assert.equal(items.Luzes, '1 de 2 acesas');
+  assert.equal(items.Ar, '24° ligado · estimado');
+  assert.equal(items.TV, 'sem leitura');
+  assert.equal(items['Sem conexão'], '1');
+  assert.equal(ambientOf([{ id: 'a', kind: 'light', state: { power: null } }])[0][1], 'sem leitura');
 });

@@ -6,7 +6,7 @@ Escritor: Vitral. Data: 31/10/2026. Nada aqui é prova de aparência no navegado
 
 | Comando | Resultado |
 |---|---|
-| `node --test src/homeStore.test.mjs src/polling.test.mjs src/api.test.mjs src/state.integration.test.mjs src/screens/Clima/controls.test.mjs src/screens/Lab/overview.test.mjs src/screens/Cameras/lifecycle.test.mjs src/screens/Central/parity.test.mjs` | 71 de 71 passam, 0 pulados |
+| `node --test src/homeStore.test.mjs src/polling.test.mjs src/api.test.mjs src/state.integration.test.mjs src/screens/Clima/controls.test.mjs src/screens/Lab/overview.test.mjs src/screens/Cameras/lifecycle.test.mjs src/screens/Central/parity.test.mjs` | 74 de 74 passam, 0 pulados |
 | `node src/mode.test.mjs` | OK |
 | `node src/ui.test.mjs` | OK |
 | `node src/screens/Clima/check.cjs` | OK (render, ações, cobertura IR) |
@@ -19,25 +19,24 @@ RED observado antes da implementação: homeStore/polling (13 falhas), `controls
 
 | Área | Capacidade existente | Onde está agora | Evidência | Pendência |
 |---|---|---|---|---|
-| Início | presença/localização, modos reais, atalhos de aparelhos, toggle das luzes, movimento recente com foto, resumo do Lab e modo jogo, últimas ações, frames no wide | `screens/Inicio.jsx` (chips de presença novos; resto preservado, nova pele) | toggle usa a mesma reserva que Luzes: `overview.test`; store: `homeStore.test` | conferência visual wide/tray |
-| Luzes | 2 lâmpadas, ligar/desligar, brilho em rascunho + Aplicar, atalhos e ±10, branco/cor, 16 cores, modos reais, motivo de bloqueio | `screens/Luzes.jsx` (cena com halo, controle vertical `VSlider`, roda de 16 cores) | `Clima/check.cjs` (cores, brilho, modos), `controls.test` | conferência visual; arrasto real em toque |
-| Clima | ar IR, power, 17 a 30 conforme cobertura aprendida, modo/ventilação permitidos, extras, aprender, timer, energia, estimado/desconhecido | `screens/Clima.jsx` (dial arrastável; comando só ao soltar) | `controls.test` (esparsa nunca pede temperatura sem sinal; POST=0 no arrasto; 1 ao soltar), `check.cjs` | sheet de extras não virou sheet (ficou na tela); conferência visual |
-| TV | IR e teclas, aprender, busca/pareamento Samsung, renomear, remoto e apps | `screens/TV.jsx` (nova pele: dpad redondo, teclas táteis; lógica intacta) | `Local/screens.test` (render e nenhum POST) | sem recomposição própria; conferência visual |
-| Local | pessoas (até 4), mapa, eventos 24h, lugares (até 8), OwnTracks QR/arquivo/link, prévia sem mutação | `screens/Local.jsx` e `Local/*` (nova pele; lógica intacta) | `qr.test`, `screens.test` | sem recomposição própria; conferência visual |
-| Câmeras | grade e filtros, frame com idade, ao vivo MSE/WS com fallback MJPEG, replay/timeline, fotos/eventos, avisos, tray só frame/foto | `screens/Cameras.jsx` (mosaico assimétrico `.mosaic/.frame`); `Cameras/mse.js` com ciclo de vida corrigido | `lifecycle.test` (fechar 1x, idempotente, revoga objectURL, ignora eventos tardios, um único onFail, reabrir) | timeline do replay mantém o controle antigo (só nova pele); vídeo real não testado |
-| Lab | modo jogo manual/automático, serviços e reiniciar, estatísticas, inventário e varredura, nomes/vigiados | `screens/Lab.jsx` + `Lab/Topology.jsx` (mapa de rede com sheet de inventário), 2 colunas | `overview.test` (topologia só com aparelhos vistos, zero x nulo, jogo sem misturar aceito com fim) | conferência visual |
-| Central | saúde, notificações, modos (criar/editar/ordenar/executar/remover), rotinas, timer, energia, atalhos e rotação, som | `screens/Central.jsx` + `Central/Routines.jsx` (linha do dia nova) | `parity.test` (todas as seções, confirmação antes de remover/trocar, linha do dia acessível) | sem recomposição das demais seções |
-| Shell | oito rotas e deep links, mobile/desktop/wide/tray, `?tray=1`, `?tray=1&alerta=1`, `#oculto`, `open_browser` só se existir | `App.jsx`, `tokens.css`, `mode.js` (lógica de rotas inalterada) | `mode.test`; rotas e `#oculto` sem mudança de código | indicador deslizante da tabbar e fade entre telas só no CSS (não verificado no navegador) |
+| Início | presença, modos reais, atalhos de aparelhos, toggle das luzes, movimento recente com foto, resumo do Lab e modo jogo, últimas ações, frames no wide | `screens/Inicio.jsx`: cabeçalho com saudação por hora e relógio, chips de presença, faixa de resumo do ambiente (`ambientOf`, só estado conhecido; IR como estimado) e painéis em grade que ocupa a largura no desktop; wide e tray preservados | `overview.test` (ambientOf, mesma reserva do toggle); captura 1280 | wide/tray não recapturados |
+| Luzes | 2 lâmpadas, ligar/desligar, brilho + Aplicar, atalhos e ±10, branco/cor, 16 cores, modos, motivo de bloqueio | `screens/Luzes.jsx`: cena com halo, controle vertical, roda de 16 cores | `check.cjs`, `controls.test`; captura 1280 | arrasto em toque real |
+| Clima | ar IR, power, 17 a 30 conforme cobertura, modo/ventilação, extras, aprender, timer, energia, estimado | `screens/Clima.jsx`: dial + painel lateral no desktop; **Funções extras** e **Timer** em bottom sheet real (`Sheet`) | `controls.test`, `check.cjs`; **Playwright**: sheet abre, Esc fecha, foco volta ao botão | arrasto em toque real |
+| TV | IR e teclas, aprender, busca/pareamento Samsung, renomear, remoto e apps | `screens/TV.jsx`: controle físico (corpo, anel direcional com OK, volume/mudo agrupados, reprodução) à esquerda; painel separado "TVs na rede · apps" | `Local/screens.test`; captura 1280 | wide/tray |
+| Local | pessoas (até 4), mapa, eventos 24h, lugares (até 8), OwnTracks QR/arquivo/link, prévia sem mutação | `screens/Local.jsx`: mapa protagonista (ou estado vazio sem mapa fictício) + lugares à esquerda; pessoas + últimas 24 h à direita | `qr.test`, `screens.test`; captura 1280 | mapa com dados reais não capturado (prévia sem posição) |
+| Câmeras | grade e filtros, frame com idade, ao vivo MSE/WS + MJPEG, replay/timeline, fotos/eventos, avisos | `screens/Cameras.jsx` mosaico; `Cameras/mse.js` ciclo de vida | `lifecycle.test`; captura 1280 | timeline do replay mantém o controle de antes; vídeo real |
+| Lab | modo jogo, serviços e reiniciar, estatísticas, inventário, varredura, nomes/vigiados | `screens/Lab.jsx`: máquina + topologia à esquerda, modo jogo à direita, serviços em grade compacta de largura total | `overview.test`; captura 1280 | topologia com aparelhos reais |
+| Central | saúde, notificações, modos, rotinas, timer, energia, atalhos e rotação, som | `screens/Central.jsx`: resumo + navegação interna por botões, seções em colunas balanceadas; modos com identidade (`mode-bubble`); linha do dia nas rotinas | `parity.test` (seções, resumo, navegação sem hash, confirmações) | rotação de chave e atalhos só em SSR |
+| Shell | oito rotas, deep links, mobile/desktop/wide/tray, `?tray=1`, alerta, `#oculto` | `App.jsx` com `h1` por tela (oculto no mobile/tray), `tokens.css` | `mode.test`; Playwright: 1 `h1` por tela | tray/wide não recapturados |
 
 Estados transversais (carregando, vazio, dados antigos com idade, sem conexão, prévia, pendente/enviado/confirmado/divergente/erro, resultado parcial de modo): cobertos pela store e por `homeStore.test`, `state.integration.test` e `controls.test`.
 
 ## Limites e não feito
-- Nenhum build do Vite, servidor, navegador ou dispositivo foi usado por mim. `state.integration.test` usa React real com DOM simulado, não um navegador.
-- Telas TV, Local e Central (exceto linha do dia) receberam a nova linguagem pelos tokens e componentes compartilhados, sem recomposição própria como Clima, Luzes, Lab e Câmeras.
-- Sheet de extras do Clima não implementada como bottom sheet; o sheet usa `dialog` nativo apenas onde já existia (`Modal`).
-- `sent`/`unknown` sem reconciliação posterior por observação seguem conservadores.
-- Pareamento Samsung e ações genéricas mantêm busy local, sem reserva por físico.
-- Arco do dial muda sem animar (só o polegar anima) por restrição a `transform`/`opacity`.
+- Verificação visual feita só em 1280 (todas as telas) e 390 (Início, Clima, TV) com Playwright contra build isolado em `/tmp/vitral-dist` (prévia porta 4175, backend de prévia 8788, sem tocar `dist` nem a 4174); 768, 1600 e tray não foram recapturados.
+- `state.integration.test` usa React real com DOM simulado; o teste de sheet foi feito no navegador via script em `/tmp`, não está no repositório.
+- `sent`/`unknown` sem reconciliação por observação posterior seguem conservadores; Samsung e ações genéricas mantêm busy local.
+- Desabilitados agora usam contraste reduzido com o motivo em texto (sem hachurado); a prévia continua explícita pelo aviso, pela faixa e pelos cartões "Simulado".
+- Arco do dial muda sem animar (só o polegar), por restrição a `transform`/`opacity`.
 
 ## Checagem visual e de desempenho (para quando houver URL/build)
 - Formatos: 390, 768, 1280, 1600 e tray; teclado/foco/Esc, zoom, contraste AA, alvos de 44 px, `prefers-reduced-motion`, arcos e sheets, erro e conteúdo longo.

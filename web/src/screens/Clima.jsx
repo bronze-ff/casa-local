@@ -1,7 +1,7 @@
 ﻿import { useRef, useState } from 'react';
 import { useHome } from '../App.jsx';
 import { fmtAgo, fmtTime, usePoll } from '../api.js';
-import { Card, Confidence, Dial, Dot, Icon, Key, Lcd, Segmented, Stale, useAction, useConfidence } from '../ui.jsx';
+import { Card, Confidence, Dial, Dot, Icon, Key, Lcd, Segmented, Sheet, Stale, useAction, useConfidence } from '../ui.jsx';
 import { FANS, MODES, supportedState, temperatures } from './Clima/coverage.js';
 
 const EXTRAS = [['turbo', 'Turbo'], ['eco', 'Eco'], ['brisa', 'Brisa'], ['display', 'Display']];
@@ -23,6 +23,7 @@ export default function Clima() {
   const [run, busy] = useAction();
   const lock = useRef(false);
   const [learning, setLearning] = useState(false);
+  const [sheet, setSheet] = useState(null);
   const [draft, setDraft] = useState({ temperature: 24, mode: 'cool', fan: 'auto' });
   const [learningLabel, setLearningLabel] = useState('');
   const [learned, setLearned] = useState('');
@@ -91,6 +92,8 @@ export default function Clima() {
       <Stale poll={poll} what="estados do ar" />
       {reason && !poll.error && <Notice err>{reason}</Notice>}
       {learning && <Notice>Escolha o estado abaixo, toque em Gravar e, em até 25 s, aperte Ligar no controle do ar já nesse estado, apontado para a central. Para funções extras, toque aqui e aperte o mesmo botão no controle original.</Notice>}
+      <div className="stage two">
+        <div className="stack" style={{ gap: 14 }}>
       <div className="hero" style={{ '--hero': `linear-gradient(165deg, color-mix(in srgb, var(--cool) ${temp == null ? 10 : Math.round((30 - temp) / 13 * 26)}%, var(--modulo)), color-mix(in srgb, var(--warm) ${temp == null ? 10 : Math.round((temp - 17) / 13 * 26)}%, var(--modulo)))` }}>
         <div className="row">
           <span className="lbl">{learning ? 'estado a gravar' : `ar do quarto · ${label(MODES, state.mode)?.toLowerCase() || '– –'} · ${label(FANS, state.fan)?.toLowerCase() || '– –'}`}</span>
@@ -115,11 +118,48 @@ export default function Clima() {
         </Key>)}
       {!learning && unknown && !!ir?.off && <Key disabled={disabled} onClick={() => command({ power: false })}>Enviar desligar</Key>}
       {!learning && !!ir && !ir.off && <p className="mut" style={{ fontSize: 11 }}>Desligar não aprendido. Use Aprender › Gravar desligar.</p>}
+        </div>
+        <div className="stack" style={{ gap: 14 }}>
       <span className="lbl">Modo · só o que foi aprendido</span>
       <Segmented label="Modo" value={selected.mode ?? null} options={modeOptions} disabled={busy || (!learning && (disabled || unknown))} onChange={(value) => choose('mode', value)} />
       <span className="lbl">Ventilação</span>
       <Segmented label="Ventilação" value={selected.fan ?? null} options={fanOptions} disabled={busy || (!learning && (disabled || unknown))} onChange={(value) => choose('fan', value)} />
-      <span className="lbl">Funções do controle original</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <Key onClick={() => setSheet('extras')} aria-haspopup="dialog"><span className="row" style={{ justifyContent: 'flex-start', gap: 10 }}><Icon name="fan" size={20} />Funções extras</span></Key>
+            <Key onClick={() => setSheet('timer')} aria-haspopup="dialog" sub={timer ? `desliga às ${fmtTime(timer.at)}` : undefined}><span className="row" style={{ justifyContent: 'flex-start', gap: 10 }}><Icon name="power" size={20} />Timer</span></Key>
+          </div>
+      {learning && (
+        <>
+          <Key signal disabled={!canLearn} onClick={() => learn({ state: { power: true, ...draft } }, `${draft.temperature} °C · ${label(MODES, draft.mode)} · ${label(FANS, draft.fan)}`)}>Gravar ligar neste estado</Key>
+          <Key disabled={!canLearn} onClick={() => learn({ key: 'off' }, 'desligar')}>{ir?.off ? 'Regravar desligar' : 'Gravar desligar'}</Key>
+        </>
+      )}
+      {learningLabel && <Notice>Aguardando {learningLabel}… Aperte o botão no controle original, apontado para a central, em até 25 s. Aguarde a confirmação.</Notice>}
+      {learned && <Notice>Aprendido: {learned}. Saia de Aprender e teste olhando o aparelho. Gravar o sinal não confirma que ele funciona no ar.</Notice>}
+      {ir && <p className="mut" style={{ fontSize: 11 }}>Cadastro: {Object.entries(ir.origins || {}).map(([origin, count]) => `${count} ${origin}`).join(' · ') || 'sem sinais'}. {ir.calibrated ? 'Quadros calibrados.' : 'Perfil ainda não confirmado olhando o ar.'}</p>}
+
+      <Key on={learning} disabled={busy || (!canLearn && !learning)} sub="aponte o controle original · até 25 s" onClick={() => { setLearning((old) => !old); setLearned(''); }}>
+        <span className="row" style={{ justifyContent: 'flex-start', gap: 10 }}><Icon name="plus" size={20} />Aprender</span>
+      </Key>
+      <Stale poll={energy} what="estimativas de energia" />
+      {!energy.data ? !energy.error && <p role="status" className="mut">Carregando estimativa…</p> : (
+        <Lcd className="stack">
+          <div className="row"><span className="lbl">gasto do ar</span><Confidence kind={preview ? 'preview' : 'estimated'} /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {spent.map((period) => (
+              <div key={period} className="stack" style={{ gap: 4 }}>
+                <span className="lbl">{period === 'today' ? 'Hoje' : 'Este mês'}</span>
+                <Dot size={34}>{money(energy.data[period]?.cost)}</Dot>
+                <span className="dim" style={{ fontSize: 12 }}>{number(energy.data[period]?.hours)} h · {number(energy.data[period]?.kwh)} kWh</span>
+              </div>
+            ))}
+          </div>
+          <div className="dim" style={{ fontSize: 11 }}>Base: {number(energy.data.config?.watts)} W · {money(energy.data.config?.tariff)}/kWh. Conta pelos comandos do painel. Usar o controle original pode alterar a estimativa; não é uma medição elétrica.</div>
+        </Lcd>
+      )}
+        </div>
+      </div>
+      <Sheet open={sheet === 'extras'} onClose={() => setSheet(null)} title="Funções do controle original">
       <div role="group" aria-label="Funções do controle original" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
         {EXTRAS.map(([key, text]) => {
           const calibrated = key === 'turbo' && ir?.turbo && !learning;
@@ -134,17 +174,8 @@ export default function Clima() {
         })}
       </div>
       <p className="mut" style={{ fontSize: 11 }}>Eco, Brisa e Display alternam no aparelho, sem confirmação de estado. O Turbo calibrado acompanha o estado completo; sem calibração, usa o botão aprendido.</p>
-      {learning && (
-        <>
-          <Key signal disabled={!canLearn} onClick={() => learn({ state: { power: true, ...draft } }, `${draft.temperature} °C · ${label(MODES, draft.mode)} · ${label(FANS, draft.fan)}`)}>Gravar ligar neste estado</Key>
-          <Key disabled={!canLearn} onClick={() => learn({ key: 'off' }, 'desligar')}>{ir?.off ? 'Regravar desligar' : 'Gravar desligar'}</Key>
-        </>
-      )}
-      {learningLabel && <Notice>Aguardando {learningLabel}… Aperte o botão no controle original, apontado para a central, em até 25 s. Aguarde a confirmação.</Notice>}
-      {learned && <Notice>Aprendido: {learned}. Saia de Aprender e teste olhando o aparelho. Gravar o sinal não confirma que ele funciona no ar.</Notice>}
-      {ir && <p className="mut" style={{ fontSize: 11 }}>Cadastro: {Object.entries(ir.origins || {}).map(([origin, count]) => `${count} ${origin}`).join(' · ') || 'sem sinais'}. {ir.calibrated ? 'Quadros calibrados.' : 'Perfil ainda não confirmado olhando o ar.'}</p>}
-
-      <span className="lbl">Desligar em</span>
+      </Sheet>
+      <Sheet open={sheet === 'timer'} onClose={() => setSheet(null)} title="Desligar o ar em">
       <Stale poll={routines} what="timers" />
       {!routines.data && !routines.error && <p role="status" className="mut">Carregando timer…</p>}
       <div role="group" aria-label="Desligar em" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
@@ -162,25 +193,7 @@ export default function Clima() {
       {routines.data?.lastError && <Notice err>Falha no agendador: {routines.data.lastError}</Notice>}
       <p className="mut" style={{ fontSize: 11 }}>O PC de casa e o servidor precisam continuar ligados para executar o timer.{preview ? ' Timers indisponíveis na prévia.' : ''}</p>
 
-      <Stale poll={energy} what="estimativas de energia" />
-      {!energy.data ? !energy.error && <p role="status" className="mut">Carregando estimativa…</p> : (
-        <Lcd className="stack">
-          <div className="row"><span className="lbl">gasto do ar</span><Confidence kind={preview ? 'preview' : 'estimated'} /></div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {spent.map((period) => (
-              <div key={period} className="stack" style={{ gap: 4 }}>
-                <span className="lbl">{period === 'today' ? 'Hoje' : 'Este mês'}</span>
-                <Dot size={34}>{money(energy.data[period]?.cost)}</Dot>
-                <span className="dim" style={{ fontSize: 12 }}>{number(energy.data[period]?.hours)} h · {number(energy.data[period]?.kwh)} kWh</span>
-              </div>
-            ))}
-          </div>
-          <div className="dim" style={{ fontSize: 11 }}>Base: {number(energy.data.config?.watts)} W · {money(energy.data.config?.tariff)}/kWh. Conta pelos comandos do painel. Usar o controle original pode alterar a estimativa; não é uma medição elétrica.</div>
-        </Lcd>
-      )}
-      <Key on={learning} disabled={busy || (!canLearn && !learning)} sub="aponte o controle original · até 25 s" onClick={() => { setLearning((old) => !old); setLearned(''); }}>
-        <span className="row" style={{ justifyContent: 'flex-start', gap: 10 }}><Icon name="plus" size={20} />Aprender</span>
-      </Key>
+      </Sheet>
     </>
   );
 }

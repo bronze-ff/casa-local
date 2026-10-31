@@ -122,8 +122,8 @@ export default function Modes() {
       {!modes.length && <p className="muted">Nenhum modo ainda. Crie um para ligar e desligar várias coisas de uma vez.</p>}
       <div className="stack">
         {modes.map((m, i) => (
-          <div key={m.id} className="row" style={{ flexWrap: 'wrap' }}>
-            <Icon name={iconFor(m.icon)} size={22} />
+          <div key={m.id} className="row mode-row" style={{ flexWrap: 'wrap' }}>
+            <span className="mode-bubble" style={{ '--h': i % 4 }} aria-hidden="true"><Icon name={iconFor(m.icon)} size={22} /></span>
             <div className="stack" style={{ flex: '1 1 160px' }}>
               <strong>{m.name}</strong>
               <span className="muted small">{m.description}</span>

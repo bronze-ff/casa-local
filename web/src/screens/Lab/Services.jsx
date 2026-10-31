@@ -16,18 +16,19 @@ export function ServicesCard({ s, disabled, send }) {
   const running = s.services.filter((x) => x.state === 'running').length;
   return (
     <Card title="Serviços · param no modo jogo" aside={<span className="lbl">{running}/{s.services.length} rodando</span>}>
-      <div className="list">
+      <div className="svc-grid">
         {s.services.map((x) => {
           const url = serviceUrl(x, s.host);
           const on = x.state === 'running';
           const unknown = x.state === 'unknown';
           return (
             <div key={x.id}>
-              <span>{x.name}
+              <span><strong>{x.name}</strong>
                 <small>{x.purpose}{!on && !unknown ? ' · parado' : unknown ? ' · estado desconhecido' : ''}{x.keep ? ' · continua no modo jogo' : ''}</small>
               </span>
-              <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                {unknown ? <Confidence kind="unknown" /> : <Status kind={on ? 'ok' : 'off'}>{on ? 'rodando' : 'parado'}</Status>}
+              <span className="acts">
+                <span>{unknown ? <Confidence kind="unknown" /> : <Status kind={on ? 'ok' : 'off'}>{on ? 'rodando' : 'parado'}</Status>}</span>
+                <span style={{ display: 'flex', gap: 6 }}>
                 {(!inGame || x.keep) && (
                   <Key center aria-label={`Reiniciar ${x.name}`} title="Reiniciar" disabled={disabled || !!s.step}
                     onClick={() => send({ restart: x.id }, `Reiniciando ${x.name}`)} style={{ minHeight: 44, width: 44, padding: 0 }}>
@@ -39,6 +40,7 @@ export function ServicesCard({ s, disabled, send }) {
                     <Icon name="external" size={18} />
                   </a>
                 )}
+                </span>
               </span>
             </div>
           );

@@ -96,4 +96,10 @@ assert.equal(ui.confidenceOf({ ...lamp, updatedAt: '2026-10-25T10:00:05Z' }, { p
 assert.equal(render(h(ui.Status, { kind: 'ok' }, 'rodando')), '<span class="st ok">rodando</span>');
 assert.match(render(h(ui.Status, {}, 'parado')), /class="st off"/); // sem kind = vazado
 assert.equal(render(h(ui.Badge, null, 'Novo')), '<span class="tag">Novo</span>');
+// Sheet: dialog com título e fechar; o conteúdo fica na árvore mesmo fechado (testável), Esc/foco ficam por conta do dialog nativo.
+const sheet = render(h(ui.Sheet, { open: false, onClose() {}, title: 'Extras' }, h('p', null, 'conteúdo')));
+assert.match(sheet, /<dialog[^>]*class="sheet"[^>]*aria-label="Extras"/);
+assert.match(sheet, /<h2>Extras<\/h2>/);
+assert.match(sheet, /aria-label="Fechar"/);
+assert.match(sheet, /conteúdo/);
 console.log('OK: ui (ícones, teclas, barras, slider, números e confiança por comando).');
