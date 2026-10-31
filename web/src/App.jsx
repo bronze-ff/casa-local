@@ -1,5 +1,5 @@
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { bootstrap, get, usePoll } from './api.js';
+import { homeStore, useHomeStore, usePoll, useStatePoll } from './api.js';
 import { layoutFor, parseHash, readTray } from './mode.js';
 import { Icon, Key, Lcd, ToastProvider } from './ui.jsx';
 import Inicio from './screens/Inicio.jsx';
@@ -34,8 +34,7 @@ export const href = (name, param) => `#/${name}${param ? `/${param}` : ''}`;
 const HomeContext = createContext(null);
 export const useHome = () => useContext(HomeContext);
 
-// Última casa conhecida: ao reabrir o popup da bandeja (#oculto desmonta tudo) a tela já nasce preenchida.
-let lastHome = null;
+// A última casa conhecida vive no homeStore (módulo): ao reabrir o popup da bandeja (#oculto desmonta tudo) a tela já nasce preenchida.
 
 function useBuildWatch() {
   // O backend informa o script publicado; se mudou desde que abrimos, recarrega uma vez.
@@ -94,36 +93,27 @@ export default function App() {
 }
 
 function Shell({ route, layout, tray }) {
-  const [home, setHome] = useState(lastHome);
-  const [bootError, setBootError] = useState(null);
+  const { home, bootError, stateError } = useHomeStore();
   const status = useBuildWatch();
-  const state = usePoll(home ? '/api/state' : null, 5000);
+  useStatePoll(!!home); // UM poll compartilhado de /api/state; pausa quando a aba está oculta
   const browser = useBrowserApi();
 
   useEffect(() => {
     let stop = false;
-    const tryBoot = async () => {
-      try {
-        const data = await bootstrap();
-        if (!stop) { lastHome = data; setHome(data); setBootError(null); }
-      } catch (error) {
-        if (!stop) { setBootError(error); setTimeout(tryBoot, 4000); }
-      }
-    };
+    let timer = null;
+    const tryBoot = () => homeStore.bootstrap().catch(() => { if (!stop) timer = setTimeout(tryBoot, 4000); });
     tryBoot();
-    return () => { stop = true; };
+    return () => { stop = true; clearTimeout(timer); };
   }, []);
 
-  useEffect(() => { if (state.data) setHome((old) => { lastHome = { ...old, ...state.data }; return lastHome; }); }, [state.data]);
-
-  const refresh = useCallback(async () => {
-    try { const data = await get('/api/state'); setHome((old) => { lastHome = { ...old, ...data }; return lastHome; }); } catch { /* o próximo ciclo tenta de novo */ }
-  }, []);
+  // O POST já devolve o snapshot e a store o aplica; refresh() das telas é absorvido uma vez após o comando.
+  const refresh = useCallback(() => homeStore.refresh().catch(() => { /* o próximo ciclo tenta de novo */ }), []);
+  const applySnapshot = homeStore.applySnapshot;
 
   const current = ROUTES[route.name];
   const Screen = current.Screen;
   const mode = status.data?.mode || home?.mode;
-  const online = !state.error && !bootError;
+  const online = !stateError && !bootError;
   const rail = layout === 'wide' && route.name === '';
   const link = (name) => ({ href: href(name), 'aria-current': route.name === name ? 'page' : undefined });
   const led = (
@@ -150,7 +140,7 @@ function Shell({ route, layout, tray }) {
 
   return (
     <ToastProvider>
-      <HomeContext.Provider value={{ home, refresh, mode, route, layout, tray }}>
+      <HomeContext.Provider value={{ home, refresh, applySnapshot, mode, route, layout, tray }}>
         <div className={`app ${layout} ${rail ? 'rail' : ''}`}>
           {mode === 'preview' && <div className="faixa-sim" aria-hidden="true" />}
           {(layout === 'desktop' || layout === 'wide') && (

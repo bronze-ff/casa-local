@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { post } from './api.js';
+import { homeStore, useHomeStore } from './api.js';
+import { resultNotice } from './homeStore.js';
 
 /* Ícones de pixel 12x12 (pixel de 2 px, '#' = aceso), herdam a cor do texto. Os 18 primeiros vêm do hub;
    o resto foi desenhado no mesmo grid (a Aquarela revisa). */
@@ -179,37 +180,21 @@ export function Dot({ children, size = 34, style, className = '' }) {
   );
 }
 
-/* Confiança no estado: o "Enviado" nasce no front (comando aceito, sem retorno do aparelho). */
-const SENT_MS = 6000;
-const sent = new Map();
-const watchers = new Set();
-const notify = () => watchers.forEach((fn) => fn());
-
-/** Marca o aparelho como "enviado" por 6 s; base = updatedAt do aparelho na resposta do comando. */
-export function markSent(deviceId, base) {
-  const entry = { at: Date.now(), base: base || null };
-  sent.set(deviceId, entry);
-  notify();
-  setTimeout(() => { if (sent.get(deviceId) === entry) { sent.delete(deviceId); notify(); } }, SENT_MS);
-}
-
+/* Confiança no estado: vem do backend; o estado do COMANDO (store por físico) a refina, sem timer e sem updatedAt. */
 const KINDS = { reported: 'reported', estimated: 'estimated', preview: 'preview' };
-/** 'sent' enquanto o comando é recente e o /api/state não trouxe leitura nova; senão a confiança do backend. */
-export function useConfidence(device) {
-  const [, tick] = useState(0);
-  useEffect(() => {
-    const fn = () => tick((n) => n + 1);
-    watchers.add(fn);
-    return () => { watchers.delete(fn); };
-  }, []);
+/** pending = enviando; sent/unknown = aceito sem prova ou inconclusivo; diverged = leitura contrária ao pedido. Confirmado/erro/prévia usam a confiança do backend. */
+const COMMAND_KIND = { pending: 'pending', sent: 'sent', unknown: 'sent', diverged: 'diverged' };
+export function confidenceOf(device, command) {
   if (!device) return 'unknown';
-  const entry = sent.get(device.id);
-  if (entry && Date.now() - entry.at < SENT_MS && !(entry.base && device.updatedAt && device.updatedAt > entry.base)) return 'sent';
-  return KINDS[device.confidence] || 'unknown';
+  return COMMAND_KIND[command?.phase] || KINDS[device.confidence] || 'unknown';
+}
+export function useConfidence(device) {
+  useHomeStore();
+  return confidenceOf(device, device ? homeStore.commandFor(device.id) : null);
 }
 
 const CONFIDENCE = {
-  reported: ['rep', 'Confirmado'], sent: ['env', 'Enviado · sem retorno'], estimated: ['est', 'Estimado'], preview: ['sim', 'Simulado'], unknown: ['unk', 'Desconhecido'],
+  reported: ['rep', 'Confirmado'], pending: ['env', 'Enviando…'], sent: ['env', 'Enviado · sem retorno'], diverged: ['unk', 'Divergente'], estimated: ['est', 'Estimado'], preview: ['sim', 'Simulado'], unknown: ['unk', 'Desconhecido'],
 };
 /** Estado de serviço ou conexão: quadrado + texto (a cor nunca é o único sinal). */
 export function Status({ kind = 'off', children }) {
@@ -279,18 +264,17 @@ export function ToastProvider({ children }) {
   );
 }
 
-const COMMAND = /^\/api\/devices\/([a-z-]+)\/commands$/;
-/** Ação com POST: mostra erro no toast e devolve o resultado (ou null). Comando aceito marca o aparelho como "enviado". */
+/** Ação com POST: mostra erro no toast e devolve o resultado (ou null). Aparelho e modo passam pela store (exclusão por físico); o resto mantém busy local. */
 export function useAction() {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const run = useCallback(async (path, body, okText) => {
     setBusy(true);
     try {
-      const result = await post(path, body);
-      const device = COMMAND.exec(path);
-      if (device) markSent(device[1], result?.device?.updatedAt);
-      if (okText) toast(okText);
+      const result = await homeStore.run(path, body);
+      const notice = resultNotice(path, result);
+      if (notice.kind === 'warn') toast(notice.text, 'warn');
+      else if (okText) toast(okText);
       return result;
     } catch (error) {
       toast(error.message, 'error');

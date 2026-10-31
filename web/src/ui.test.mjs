@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Componentes base: ícones de todos os nomes usados, teclas, barras e a confiança "Enviado" (calculada no front).
+// Componentes base: ícones de todos os nomes usados, teclas, barras e a confiança por estado de comando.
 const require = createRequire(new URL('../package.json', import.meta.url));
 const { transformSync } = require('esbuild');
 const React = require('react');
@@ -73,26 +73,27 @@ key.props.onClick({}); // sem gancho: não quebra
 assert.match(render(h(ui.Dot, { size: 64 }, '10:26')), /font-size:64px/);
 assert.match(render(h(ui.Dot, { size: 17 }, '1')), /font-size:34px/);
 
-// Confiança: 5 selos; "enviado" por 6 s, ou até o /api/state trazer updatedAt maior.
+// Confiança: selos do backend, refinados pelo estado do COMANDO (sem temporizador e sem updatedAt).
 const label = (kind) => render(h(ui.Confidence, { kind }));
 assert.match(label('reported'), /rep.*Confirmado/);
 assert.match(label('sent'), /env.*Enviado · sem retorno/);
+assert.match(label('pending'), /env.*Enviando/);
+assert.match(label('diverged'), /unk.*Divergente/);
 assert.match(label('estimated'), /est.*Estimado/);
 assert.match(label('preview'), /sim.*Simulado/);
 assert.match(label('qualquer'), /unk.*Desconhecido/);
-function Probe({ device }) { return h('i', null, ui.useConfidence(device)); }
-const kind = (device) => render(h(Probe, { device })).replace(/<\/?i>/g, '');
 const lamp = { id: 'quarto-luz', confidence: 'reported', updatedAt: '2026-10-25T10:00:00Z' };
-assert.equal(kind(lamp), 'reported');
-assert.equal(kind({ ...lamp, confidence: 'estimated' }), 'estimated');
-assert.equal(kind({ ...lamp, confidence: null }), 'unknown');
-assert.equal(kind(null), 'unknown');
-ui.markSent('quarto-luz', '2026-10-25T10:00:00Z');
-assert.equal(kind(lamp), 'sent');
-assert.equal(kind({ ...lamp, updatedAt: '2026-10-25T10:00:05Z' }), 'reported'); // leitura nova encerra o "enviado"
-assert.equal(kind({ ...lamp, id: 'banheiro-luz' }), 'reported'); // outro aparelho não é afetado
+assert.equal(ui.confidenceOf(lamp, null), 'reported');
+assert.equal(ui.confidenceOf({ ...lamp, confidence: 'estimated' }, null), 'estimated');
+assert.equal(ui.confidenceOf({ ...lamp, confidence: null }, null), 'unknown');
+assert.equal(ui.confidenceOf(null, { phase: 'pending' }), 'unknown');
+assert.equal(ui.confidenceOf(lamp, { phase: 'pending' }), 'pending');
+assert.equal(ui.confidenceOf(lamp, { phase: 'sent' }), 'sent'); // aceito sem prova
+assert.equal(ui.confidenceOf(lamp, { phase: 'unknown' }), 'sent'); // inconclusivo nunca vira confirmado
+assert.equal(ui.confidenceOf(lamp, { phase: 'diverged' }), 'diverged');
+assert.equal(ui.confidenceOf(lamp, { phase: 'confirmed' }), 'reported'); // confirmado só pelo receipt; o selo vem do backend
+assert.equal(ui.confidenceOf({ ...lamp, updatedAt: '2026-10-25T10:00:05Z' }, { phase: 'sent' }), 'sent'); // updatedAt maior não confirma
 assert.equal(render(h(ui.Status, { kind: 'ok' }, 'rodando')), '<span class="st ok">rodando</span>');
 assert.match(render(h(ui.Status, {}, 'parado')), /class="st off"/); // sem kind = vazado
 assert.equal(render(h(ui.Badge, null, 'Novo')), '<span class="tag">Novo</span>');
-console.log('OK: ui (ícones, teclas, barras, slider, Doto, confiança e "enviado").');
-process.exit(0); // o temporizador de 6 s do markSent não deve segurar o teste
+console.log('OK: ui (ícones, teclas, barras, slider, Doto e confiança por comando).');
