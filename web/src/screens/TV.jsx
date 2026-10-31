@@ -160,7 +160,7 @@ export default function TV({ param }) {
     <>
       {preview && <Notice>Prévia: controles, aprendizado e busca na rede estão desativados. Nenhum sinal é enviado.</Notice>}
       {both ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 400px) minmax(0, 1fr)', gap: 16, alignItems: 'start' }}>{ir}{network}</div>
+        <div className="tv-cols">{ir}{network}</div>
       ) : (
         <>
           <Segmented label="Tipo de controle" value={tab} onChange={setTab} options={[['ir', 'Controle IR'], ['rede', 'Samsung · rede']]} />

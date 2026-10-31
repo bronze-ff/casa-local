@@ -1,6 +1,7 @@
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { homeStore, useHomeStore, usePoll, useStatePoll } from './api.js';
 import { layoutFor, parseHash, readTray } from './mode.js';
+import ErrorBoundary from './ErrorBoundary.jsx';
 import { Icon, Key, Lcd, ToastProvider } from './ui.jsx';
 import Inicio from './screens/Inicio.jsx';
 
@@ -85,7 +86,7 @@ export default function App() {
   // Página "dormente" da bandeja: nada montado, nenhum poll, nenhuma câmera.
   if (route.name === 'oculto') return <div aria-hidden="true" />;
   if (tray === 'alerta') {
-    return route.name === 'alerta' ? <Suspense fallback={null}><AlertCard key={route.param} param={route.param} /></Suspense> : <div aria-hidden="true" />;
+    return route.name === 'alerta' ? <ErrorBoundary><Suspense fallback={null}><AlertCard key={route.param} param={route.param} /></Suspense></ErrorBoundary> : <div aria-hidden="true" />;
   }
   // #alerta:... só vale na janela de alerta; no painel normal cai no Início.
   const safe = route.name === 'alerta' ? { name: '', param: '' } : route;
@@ -131,12 +132,14 @@ function Shell({ route, layout, tray }) {
       </Lcd>
     </div>
   ) : (
-    <Suspense fallback={<div className="page"><Lcd role="status">Carregando…</Lcd></div>}>
-      <main className="page">
-        <h1 className="page-title">{current.title}</h1>
-        <Screen param={route.param} />
-      </main>
-    </Suspense>
+    <main className="page">
+      <h1 className="page-title">{current.title}</h1>
+      <ErrorBoundary key={route.name}>
+        <Suspense fallback={<Lcd role="status">Carregando…</Lcd>}>
+          <Screen param={route.param} />
+        </Suspense>
+      </ErrorBoundary>
+    </main>
   );
 
   return (

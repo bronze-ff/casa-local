@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { post, usePoll } from '../../api.js';
 import { Icon, Key, Status } from '../../ui.jsx';
 import { attachMse, mseSupported } from './mse.js';
+import { useWhileVisible } from './useMedia.js';
 import { Overlay, VideoDialog, mediaStyle, stageStyle } from './VideoDialog.jsx';
 
 const clock = (t) => new Date(t * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -106,12 +107,20 @@ export default function Replay({ camera, start, from, to, offset, close, goLive 
   // Sair da tela encerra a sessão no servidor (ele também apaga sozinho depois de ~17 min).
   useEffect(() => () => { if (current.current) closeSession(current.current); }, []);
 
-  useEffect(() => {
+  // Aba oculta fecha o WebSocket e solta o vídeo; ao voltar, reabre a sessão na posição em que parou (uma só sessão: `replace`).
+  const tabVisible = useWhileVisible(() => {
     if (replayId && video.current) {
       return attachMse(video.current, `/api/replays/${replayId}/ws`, () => setStatus('live'), () => setStatus('failed'),
         { replay: true, held: () => held.current, onEnd: () => setStatus('ended') });
     }
+    return undefined;
   }, [replayId]);
+  const hidden = useRef(false);
+  useEffect(() => {
+    if (!mseSupported) return;
+    if (!tabVisible) { hidden.current = true; setStatus('paused'); } else if (hidden.current) { hidden.current = false; setStatus('loading'); setAnchor(Math.floor(anchor + played)); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabVisible]);
 
   const position = anchor + played;
   const seek = (t) => setAnchor(Math.min(Math.floor(nowDvr()) - 10, Math.floor(t)));
@@ -160,6 +169,7 @@ export default function Replay({ camera, start, from, to, offset, close, goLive 
             setPlayed(Math.max(0, t - base.current));
           }}
         />
+        {status === 'paused' && <Overlay icon="refresh"><span>Gravação pausada enquanto a aba está oculta. Ela volta sozinha ao reabrir.</span></Overlay>}
         {status === 'loading' && <Overlay icon="refresh"><span>Buscando a gravação no DVR…</span></Overlay>}
         {status === 'failed' && <Overlay icon="warn"><span>{error || 'O DVR não entregou a gravação desse horário (pode não ter sido gravado).'}</span></Overlay>}
         {status === 'ended' && (

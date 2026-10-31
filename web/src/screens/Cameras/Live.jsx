@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon, Key, Status } from '../../ui.jsx';
 import { attachMse, mseSupported } from './mse.js';
+import { useWhileVisible } from './useMedia.js';
 import { Overlay, VideoDialog, mediaStyle, stageStyle } from './VideoDialog.jsx';
 
 const BLANK = 'data:,';
@@ -16,18 +17,18 @@ export default function Live({ cameras, index, poster, move, close, rewind }) {
 
   useEffect(() => { setStatus('loading'); setMjpeg(!mseSupported); }, [cam.id]);
 
-  useEffect(() => {
-    if (!mjpeg && video.current) return attachMse(video.current, `/api/cameras/${cam.id}/ws`, () => setStatus('live'), () => setMjpeg(true));
-  }, [cam.id, mjpeg]);
-
-  // O <img> do MJPEG precisa ser esvaziado ao sair, senão o navegador mantém a conexão aberta.
-  useEffect(() => {
-    const el = img.current;
-    if (mjpeg && el) {
+  // Aba oculta fecha o WebSocket/vídeo (ou esvazia o <img> do MJPEG) e zera o src; ao voltar abre no máximo UM stream.
+  const visible = useWhileVisible(() => {
+    if (mjpeg) {
+      const el = img.current;
+      if (!el) return undefined;
       el.src = `/api/cameras/${cam.id}/live.mjpeg`;
       return () => { el.src = BLANK; };
     }
+    if (video.current) return attachMse(video.current, `/api/cameras/${cam.id}/ws`, () => setStatus('live'), () => setMjpeg(true));
+    return undefined;
   }, [cam.id, mjpeg]);
+  useEffect(() => { setStatus('loading'); }, [visible]);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'ArrowLeft') move(-1); if (e.key === 'ArrowRight') move(1); };
@@ -46,7 +47,7 @@ export default function Live({ cameras, index, poster, move, close, rewind }) {
     else if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.4) move(dx < 0 ? 1 : -1);
   };
 
-  const state = status === 'live' ? 'Ao vivo' : status === 'failed' ? 'Sem sinal' : 'Conectando';
+  const state = !visible ? 'Pausado (aba oculta)' : status === 'live' ? 'Ao vivo' : status === 'failed' ? 'Sem sinal' : 'Conectando';
   return (
     <VideoDialog
       label={`Ao vivo: ${cam.name}`}
@@ -55,7 +56,7 @@ export default function Live({ cameras, index, poster, move, close, rewind }) {
       onClose={close}
       actions={(
         <>
-          <Status kind={status === 'live' ? 'ok' : status === 'failed' ? 'fail' : 'warn'}>{state}</Status>
+          <Status kind={visible && status === 'live' ? 'ok' : status === 'failed' ? 'fail' : 'warn'}>{state}</Status>
           <Key center onClick={() => rewind(cam)}><Icon name="refresh" />Rever 1 min</Key>
         </>
       )}

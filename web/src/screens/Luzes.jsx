@@ -73,15 +73,15 @@ export default function Luzes({ param }) {
         </div>
         <div className="stack" style={{ gap: 12 }}>
           {reason && <p className="mut" role="status" style={{ fontSize: 13 }}>{reason}</p>}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, alignItems: 'center' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 10, alignItems: 'center' }}>
             <Key signal center disabled={disabled || brightness === state.brightness} reason={brightness === state.brightness ? 'brilho já aplicado' : undefined} onClick={() => command({ brightness })}>Aplicar {brightness}%</Key>
             <div className="list" style={{ border: 0 }}>
               <div style={{ border: 0, minHeight: 48 }}><span>{state.power ? 'Acesa' : 'Apagada'}</span><Switch on={state.power === true} label={`Ligar ou apagar ${device.name.toLowerCase()}`} disabled={disabled} onChange={(power) => command({ power })} /></div>
             </div>
           </div>
           <span className="lbl">Atalhos · aplicam ao tocar</span>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>{[20, 40, 60, 80, 100].map(shortcut)}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 6 }}>{[20, 40, 60, 80, 100].map(shortcut)}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 10 }}>
             <Key center aria-label="Diminuir brilho" disabled={disabled || brightness <= 10} onClick={() => command({ brightness: Math.max(10, brightness - 10) })}>− 10</Key>
             <Key center aria-label="Aumentar brilho" disabled={disabled || brightness >= 100} onClick={() => command({ brightness: Math.min(100, brightness + 10) })}>+ 10</Key>
           </div>

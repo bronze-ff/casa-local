@@ -124,7 +124,7 @@ export default function Clima() {
       <Segmented label="Modo" value={selected.mode ?? null} options={modeOptions} disabled={busy || (!learning && (disabled || unknown))} onChange={(value) => choose('mode', value)} />
       <span className="lbl">Ventilação</span>
       <Segmented label="Ventilação" value={selected.fan ?? null} options={fanOptions} disabled={busy || (!learning && (disabled || unknown))} onChange={(value) => choose('fan', value)} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 10 }}>
             <Key onClick={() => setSheet('extras')} aria-haspopup="dialog"><span className="row" style={{ justifyContent: 'flex-start', gap: 10 }}><Icon name="fan" size={20} />Funções extras</span></Key>
             <Key onClick={() => setSheet('timer')} aria-haspopup="dialog" sub={timer ? `desliga às ${fmtTime(timer.at)}` : undefined}><span className="row" style={{ justifyContent: 'flex-start', gap: 10 }}><Icon name="power" size={20} />Timer</span></Key>
           </div>
@@ -145,7 +145,7 @@ export default function Clima() {
       {!energy.data ? !energy.error && <p role="status" className="mut">Carregando estimativa…</p> : (
         <Lcd className="stack">
           <div className="row"><span className="lbl">gasto do ar</span><Confidence kind={preview ? 'preview' : 'estimated'} /></div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
             {spent.map((period) => (
               <div key={period} className="stack" style={{ gap: 4 }}>
                 <span className="lbl">{period === 'today' ? 'Hoje' : 'Este mês'}</span>

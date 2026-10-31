@@ -312,7 +312,7 @@ function WideCameras({ cameras, motion, available }) {
       <div className="row"><h2 className="lbl" style={{ fontSize: 13 }}>Câmeras · frame a cada 4 s</h2><span className="lbl" style={{ fontSize: 13 }}>sem vídeo ao vivo</span></div>
       <Stale poll={motion} what="os eventos" />
       {!available ? <p className="mut">Câmeras indisponíveis na prévia.</p> : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 10 }}>
           {shown.map((c) => (
             <a key={c.id} href={href('cameras', c.id)} className="thumb" style={{ aspectRatio: '16 / 10', display: 'block' }} aria-label={c.name}>
               {frames[c.id]?.url && <img src={frames[c.id].url} alt="" />}
