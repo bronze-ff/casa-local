@@ -1,0 +1,51 @@
+{
+  "checkedAt": "2026-11-01T23:18:00.190477+00:00",
+  "scope": "Runtime credential refresh for owner-authorized Geonav HIRCIR after re-pairing; no product source changes",
+  "causeConfirmed": "Recovered current key differs from previously configured key; authenticated read succeeds with current key",
+  "recovery": {
+    "knownCentralCount": 1,
+    "consistentEvidenceObjects": 2,
+    "windowsDPAPIRoundtripVerified": true,
+    "transfer": "SSH encrypted channel; captured in memory; no key printed",
+    "linuxPrivateMode": "0600",
+    "secretsIgnoredByGit": true,
+    "temporaryAndroidAndWindowsHeapRemoved": true,
+    "emulatorAdbUnrootExecuted": true
+  },
+  "validation": {
+    "method": "Fresh process probe_ir(candidate,max_age=0), DP_QUERY only",
+    "authenticated": true,
+    "physicalIRCommandsSent": 0
+  },
+  "configuration": {
+    "changedDevices": [
+      "tv-quarto",
+      "ar-quarto"
+    ],
+    "onlyChangedField": "localKey",
+    "allOtherFieldsDeepEqual": true,
+    "allLearnedCodesAndCalibrationsPreserved": true,
+    "lightConfigurationsUnchanged": true,
+    "privateBackup": "~/.local/state/casalocal/rollback/20261101-geonav-key/devices.dpapi",
+    "atomicSaveReloadEqual": true
+  },
+  "service": {
+    "previousPid": 509948,
+    "newPid": 2801660,
+    "connection": {
+      "tv-quarto": "online",
+      "ar-quarto": "online"
+    }
+  },
+  "publishedBrowserReadOnly": {
+    "climaPowerControlEnabled": true,
+    "tvEnabledIRControls": 13,
+    "jsErrors": 0,
+    "physicalCommandsSent": 0
+  },
+  "review": "Crivo procedure Pass; runtime evidence executed by Maestro",
+  "limitations": [
+    "Physical reception/effect of IR remains to be observed by owner",
+    "Lamp LAN connectivity was not repaired by this key-only update"
+  ]
+}
