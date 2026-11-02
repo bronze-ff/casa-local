@@ -3,9 +3,10 @@ import { post } from '../../core/api.js';
 import { usePoll, useVisible } from '../../core/hooks.js';
 import { Icon } from '../../ui/Icon.jsx';
 import { Banner, Button, Status } from '../../ui/kit.jsx';
+import { MediaControls } from './MediaControls.jsx';
 import { MediaDialog, StageNote } from './MediaDialog.jsx';
 import { attachMse, mseSupported } from './mse.js';
-import { buildHits, clampSeek, clock, createSessionQueue, isOngoing, keyTarget, nextHit, percentAt, stamp, timeAtX } from './replay.js';
+import { buildHits, clampSeek, clock, createSessionQueue, isOngoing, keyTarget, nextHit, percentAt, replayKey, stamp, timeAtX } from './replay.js';
 import { useMediaGate } from './useMedia.js';
 
 /** Linha do tempo arrastável com marcas de movimento e teclado (setas ±10 s, Home, End). */
@@ -43,6 +44,7 @@ export function Timeline({ from, to, now, hits, seek }) {
 export function Replay({ camera, start, from, to, offset, autoStart, close, goLive }) {
   const nowDvr = () => Date.now() / 1000 + offset;
   const video = useRef(null);
+  const stage = useRef(null);
   const held = useRef(false);
   const base = useRef(null);
   const [started, setStarted] = useState(!!autoStart);
@@ -52,6 +54,7 @@ export function Replay({ camera, start, from, to, offset, autoStart, close, goLi
   const [error, setError] = useState('');
   const [played, setPlayed] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [resume, setResume] = useState(0); // cada retomada da aba abre UMA sessão nova
   const visible = useVisible();
   const wasHidden = useRef(false);
   const queue = useMemo(() => createSessionQueue({ open: ({ camera: id, start: s, replace }) => post(`/api/cameras/${id}/replay`, { start: s, ...(replace ? { replace } : {}) }), close: (id) => post(`/api/replays/${id}/close`, {}) }), []);
@@ -65,14 +68,15 @@ export function Replay({ camera, start, from, to, offset, autoStart, close, goLi
     held.current = false; base.current = null;
     queue.request({ camera: camera.id, start: anchor }).then((id) => { if (live && id) setReplayId(id); }, (e) => { if (live) { setError(e.message); setStatus('failed'); } });
     return () => { live = false; };
-  }, [started, anchor, camera.id, queue]);
+  }, [started, anchor, camera.id, queue, resume]);
 
-  useMediaGate(replayId, (id) => (video.current ? attachMse(video.current, `/api/replays/${id}/ws`, () => setStatus('live'), () => setStatus('failed'), { replay: true, held: () => held.current, onEnd: () => setStatus('ended') }) : undefined));
+  // Só há stream com a busca iniciada, MSE suportado e id válido; antes disso a chave é undefined e nada abre.
+  useMediaGate(replayKey({ started, supported: mseSupported(), id: replayId }), (id) => (video.current ? (video.current.muted = true, attachMse(video.current, `/api/replays/${id}/ws`, () => setStatus('live'), () => setStatus('failed'), { replay: true, held: () => held.current, onEnd: () => setStatus('ended') })) : undefined));
 
   const position = anchor + played;
-  useEffect(() => { // aba oculta: pausado; ao voltar, reabre na posição em que parou (uma só sessão)
+  useEffect(() => { // aba oculta: fecha o socket E a sessão no servidor e descarta abertura pendente; ao voltar, UMA abertura na posição em que parou (sem repetir comando sozinho)
     if (!started || !mseSupported()) return;
-    if (!visible) { wasHidden.current = true; setStatus('paused'); } else if (wasHidden.current) { wasHidden.current = false; setStatus('loading'); setAnchor(Math.floor(position)); }
+    if (!visible) { wasHidden.current = true; queue.suspend(); setReplayId(null); setStatus('paused'); } else if (wasHidden.current) { wasHidden.current = false; setStatus('loading'); setAnchor(Math.floor(position)); setResume((n) => n + 1); }
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
   const seek = (t) => { if (!started) setStarted(true); setAnchor(clampSeek(t, nowDvr())); };
 
@@ -86,7 +90,7 @@ export function Replay({ camera, start, from, to, offset, autoStart, close, goLi
 
   return (
     <MediaDialog label={`Gravação: ${camera.name}`} title={camera.name} sub={`Gravação do DVR · ${stamp(position)}`} onClose={close} actions={<Button variant="s" icon="radio" onClick={goLive}>Ao vivo</Button>}>
-      <div className="stage">
+      <div ref={stage} className="stage">
         <video ref={video} className="media" muted autoPlay playsInline aria-label={`Gravação de ${camera.name}`}
           onTimeUpdate={(e) => { const t = e.currentTarget.currentTime; if (base.current === null) base.current = t; setPlayed(Math.max(0, t - base.current)); }} />
         {status === 'idle' && <StageNote icon="clock"><span>Esta gravação só é buscada no DVR quando você pedir.</span><Button variant="p" onClick={() => setStarted(true)}>Buscar gravação</Button></StageNote>}
@@ -96,6 +100,7 @@ export function Replay({ camera, start, from, to, offset, autoStart, close, goLi
         {status === 'ended' && <StageNote icon="refresh"><span>{atNow ? 'Você chegou ao momento atual da gravação.' : 'Fim deste trecho da gravação. Avance ou volte para continuar.'}</span>{atNow && <Button variant="p" icon="radio" onClick={goLive}>Ver ao vivo</Button>}</StageNote>}
         {status === 'unsupported' && <StageNote icon="alert"><span>Este navegador não toca a gravação. Use o Chrome, o Edge ou o Safari atualizado.</span></StageNote>}
       </div>
+      <MediaControls key={replayId || 'sem-sessao'} video={video} stage={stage} />
       {ongoing && status !== 'ended' && <Button variant="s" onClick={goLive}><Status kind="part">Movimento ainda acontecendo</Status>Ver ao vivo</Button>}
       {motion.stale && <Banner kind="warn" icon="off">Sem conexão para ler os movimentos. As marcas mostram o último dado conhecido.</Banner>}
       <Timeline from={from} to={upper} now={position} hits={hits} seek={seek} />

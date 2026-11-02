@@ -35,15 +35,23 @@ export const keyTarget = (key, now, from, to) => ({ ArrowLeft: now - 10, ArrowRi
 /** Buscar nunca passa de "agora − 10 s": o DVR ainda não gravou isso. */
 export const clampSeek = (t, nowDvr) => Math.min(Math.floor(nowDvr) - 10, Math.floor(t));
 
+/** Id de sessão de replay válido (12 hexadecimais, como o servidor emite). Qualquer outra coisa nunca vira URL de WebSocket. */
+export const REPLAY_ID = /^[0-9a-f]{12}$/;
+/** Chave da porta de mídia do replay: só existe com a busca iniciada, MSE suportado e id válido; senão `undefined` (nada abre). */
+export const replayKey = ({ started, supported, id }) => (started && supported && typeof id === 'string' && REPLAY_ID.test(id) ? id : undefined);
+
 /**
  * Fila de sessões de replay: NUNCA dois "abrir" ao mesmo tempo (o servidor limita a 2 sessões); cada abertura troca a anterior
- * numa chamada só (`replace`); resposta que chega depois de cancelar fecha a sessão no ato; `dispose` fecha a atual.
+ * numa chamada só (`replace`). O id conhecido só some quando o servidor confirma a troca: em falha (409, rede) ele continua
+ * guardado para `suspend`/`dispose` fecharem, e a abertura NUNCA é repetida sozinha. Resposta que chega depois de cancelar,
+ * suspender ou descartar fecha a sessão no ato. `suspend` (aba oculta) fecha a atual e invalida o que estiver em voo.
  */
 export function createSessionQueue({ open, close }) {
   let chain = Promise.resolve();
   let current = null;
   let token = 0;
   const closeQuiet = (id) => { Promise.resolve(close(id)).catch(() => {}); };
+  const release = () => { token += 1; if (current) { closeQuiet(current); current = null; } };
   return {
     request(args) {
       const mine = ++token;
@@ -51,9 +59,9 @@ export function createSessionQueue({ open, close }) {
         chain = chain.then(async () => {
           if (mine !== token) return resolve(null); // já substituído por um pedido mais novo
           const replace = current;
-          current = null;
           try {
             const opened = await open({ ...args, ...(replace ? { replace } : {}) });
+            if (current === replace) current = null; // o servidor trocou a anterior: não há o que fechar
             if (mine !== token) { closeQuiet(opened.id); resolve(null); return; }
             current = opened.id;
             resolve(opened.id);
@@ -62,7 +70,8 @@ export function createSessionQueue({ open, close }) {
       });
     },
     cancel() { token += 1; },
-    dispose() { token += 1; if (current) { closeQuiet(current); current = null; } },
+    suspend: release,
+    dispose: release,
     current: () => current,
   };
 }

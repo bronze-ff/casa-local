@@ -5,7 +5,8 @@ export function createMediaGate({ isVisible, subscribe, start }) {
   let key;
   let stopFn = null;
   let ended = false;
-  const open = () => { if (ended || stopFn || key === undefined || !isVisible()) return; stopFn = start(key) || (() => {}); };
+  // Sem chave não há stream: null/undefined significam "ainda não pronto" (nunca viram URL).
+  const open = () => { if (ended || stopFn || key === undefined || key === null || !isVisible()) return; stopFn = start(key) || (() => {}); };
   const close = () => { const fn = stopFn; stopFn = null; fn?.(); };
   const unsubscribe = subscribe(() => { if (isVisible()) open(); else close(); });
   return {

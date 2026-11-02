@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useHome, usePoll } from '../../core/hooks.js';
 import { useAction } from '../../ui/actions.js';
 import { Banner, Button, Skeleton } from '../../ui/kit.jsx';
@@ -6,6 +6,7 @@ import { Overlay } from '../../ui/Overlay.jsx';
 import { LocalMap } from './LocalMap.jsx';
 import { EventsPanel, PeoplePanel, PlacesPanel } from './Panels.jsx';
 import { PhoneSetup } from './PhoneSetup.jsx';
+import { createPrepare } from './prepare.js';
 import { eventsLast24h, isHomePlace, placeBody, placeProblems } from './geo.js';
 
 const TITLES = { add: 'Adicionar pessoa', rename: 'Nome da pessoa', renew: 'Renovar credencial', removePerson: 'Remover pessoa', removePlace: 'Remover lugar' };
@@ -24,6 +25,11 @@ export default function Local({ param }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState(null);
   const [draft, setDraft] = useState(null);
+  // Preparo do celular: a resposta com a credencial só vale enquanto o diálogo/pessoa/tela são os mesmos que pediram.
+  const latest = useRef({});
+  const prep = useRef(null);
+  if (!prep.current) prep.current = createPrepare({ call: (args) => latest.current.call(args), onReady: (phone, args) => latest.current.ready(phone, args) });
+  useEffect(() => () => prep.current.invalidate(), []);
   if (!home) return <div className="col" role="status"><Skeleton height={28} width="30%" /><Skeleton height={320} /></div>;
 
   const preview = home.mode === 'preview';
@@ -40,16 +46,17 @@ export default function Local({ param }) {
     lock.current = true;
     try { return await run(path, body, message); } finally { lock.current = false; poll.reload(); }
   };
-  const close = () => { setDialog(null); setPhone(null); setName(''); };
-  const prepare = async (target, renew = false) => {
-    const result = await mutate(renew || !target ? '/api/location/setup' : '/api/location/phone',
-      renew ? { name: target.name, person: target.id } : target ? { person: target.id } : { name: name.trim() },
-      renew ? 'Credencial renovada. Importe a configuração novamente.' : undefined);
-    if (!result?.phone) return;
-    setPhone(result.phone);
-    setSelected(result.phone.person);
+  const close = () => { prep.current.invalidate(); setDialog(null); setPhone(null); setName(''); };
+  const select = (id) => { prep.current.invalidate(); setSelected(id); };
+  latest.current.call = ({ target, renew }) => mutate(renew || !target ? '/api/location/setup' : '/api/location/phone',
+    renew ? { name: target.name, person: target.id } : target ? { person: target.id } : { name: name.trim() },
+    renew ? 'Credencial renovada. Importe a configuração novamente.' : undefined);
+  latest.current.ready = (result, { target }) => {
+    setPhone(result);
+    setSelected(result.person);
     setDialog({ type: 'phone', name: target?.name || name.trim() });
   };
+  const prepare = (target, renew = false) => prep.current.start({ target, renew });
   const openName = (target) => { setName(target?.name || ''); setDialog({ type: target ? 'rename' : 'add', person: target }); };
   const newPlace = () => { const point = person?.last || places[0]; setDraft({ name: '', lat: point?.lat ?? '', lon: point?.lon ?? '', radius: 100 }); };
   const problems = draft ? placeProblems(draft) : [];
@@ -92,7 +99,7 @@ export default function Local({ param }) {
               onNew={newPlace} onEdit={(p) => setDraft({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, radius: p.radius })} onRemove={(p) => setDialog({ type: 'removePlace', place: p })} onSave={savePlace} onRadius={(radius) => setDraft({ ...draft, radius })} />}
           </div>
           <div className="col">
-            <PeoplePanel people={people} places={places} events={events} selected={person?.id} onSelect={setSelected} locked={locked}
+            <PeoplePanel people={people} places={places} events={events} selected={person?.id} onSelect={select} locked={locked}
               onPhone={(p) => prepare(p)} onRename={openName} onRenew={(p) => setDialog({ type: 'renew', person: p })} onRemove={(p) => setDialog({ type: 'removePerson', person: p })} onAdd={() => openName(null)} />
             <EventsPanel events={events} placeName={placeName} />
           </div>

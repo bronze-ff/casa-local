@@ -174,3 +174,26 @@ Plano de substituição (M6, sem nova autorização): escrever um encoder própr
 - **Limites:** o fundo do mapa continua vindo do OpenStreetMap pela internet (o navegador pede os quadrados); a bandeja só mostra quadro/foto (sem WebSocket, MJPEG nem replay).
 
 Não verificado: foco real dos diálogos, `<dialog>`/`showModal`, WebSocket e MediaSource reais, `visibilitychange`, ponteiro/toque na linha do tempo e no mapa, layout em tela, contraste. Os efeitos React (`useMedia.js`, `useGridFrames`) não foram executados.
+
+## Reparo Crivo M4 (5 prioritários)
+
+Cada item tem fixture própria (`routes/Local/prepare.test.mjs` com 5 testes, `routes/Cameras/repair.test.mjs` com 10). Os 62 testes M4 anteriores seguem e continuam passando; os 15 novos são adicionais. Os testes novos foram escritos antes do código (RED: módulos `prepare.js` e `media.js` não existiam). Para `gate.js` e `createSessionQueue` não rodei o código antigo contra os testes novos: o RED desses dois é só por leitura do código.
+
+1. **P1 Local, credencial tardia.** `Local/prepare.js` (`createPrepare`): cada pedido tem uma geração; `close`, troca de pessoa (`select`) e desmontagem chamam `invalidate()`. Resposta que chega depois é descartada: não vira estado, nem diálogo, nem log. O servidor já gerou a credencial; a pessoa pede de novo em "Celular".
+2. **P1 Replay, id nulo.** `gate.js` não abre com chave `null` nem `undefined`. `replayKey` (em `replay.js`) só devolve id com 12 hexadecimais, busca iniciada e MSE suportado. Antes disso nada abre, e nunca existe `/api/replays/null/ws`.
+3. **P1 Replay, ocultar.** `createSessionQueue.suspend()` fecha a sessão conhecida no servidor e invalida a abertura em voo (a tardia é fechada no ato). Aba oculta chama `suspend` e zera o id. Ao voltar, `resume` abre UMA sessão na posição em que parou, sem `replace` e sem repetir sozinho.
+4. **P2 Fila, id antigo.** O id conhecido só é descartado quando o servidor confirma a troca. Em 409 ou erro de rede ele fica guardado para `suspend`/`dispose` fecharem. Abertura nunca é repetida automaticamente.
+5. **P2 Som e tela cheia.** `Cameras/media.js` (capacidades) e `MediaControls.jsx`. O vídeo sempre nasce mudo (cada stream recomeça mudo); o som liga por toque, com aviso honesto quando o navegador não prova que há áudio. Tela cheia por elemento (padrão/webkit) ou só do vídeo no iPhone; sem suporte não há botão. Presente no Ao vivo (sem som em MJPEG) e no Replay.
+
+Não verificado (nada foi aberto em navegador): efeitos React reais (`useMediaGate`, visibilidade), `requestFullscreen`, `video.muted`, WebSocket e MediaSource reais.
+
+## M5: estado PAUSADO (checkpoint consistente)
+
+Autorizado: só `routes/Lab/**` e `routes/Central/**`. NÃO alterei `registry.js`, M4, core, ui, shell nem o manifesto em revisão.
+
+- **Lab: escrito e testado (14 testes: `lab.test.mjs` 7, `Lab.test.mjs` 7).** `Lab.jsx`, `GameMode.jsx`, `Machine.jsx`, `Services.jsx`, `Network.jsx`, `Topology.jsx`, `lab.js`, `lab.css`. Leitura com idade; histórico só do servidor (`history`), nunca inventado; varredura só por botão; escritas guardadas por conexão, prévia e home lab inativo.
+  - "Notas" do inventário: o backend (`/api/network/<id>`) só aceita `name`, `known` e `watch`. Não existe campo de notas; não inventei.
+  - Topologia: esquema abstrato com o nome por extenso de cada aparelho; diz que as linhas não são a conexão real.
+- **Central: PARCIAL, sem testes, não é parte do fechamento.** Escritos e só com sintaxe conferida: `central.js`, `sound.js`, `CopyText`, `Health`, `Notifications`, `Modes`, `Routines`. Faltam `Energy`, `Shortcuts`, o cartão de som, `Central.jsx`, `central.css` e os testes. As classes `cen-*` ainda não têm CSS.
+- Pendências para o M6: registrar `lab` e `central` (e `lab.css`, `central.css`) em `registry.js`; chamar `initSound()` no boot do app (a Central só liga o som depois de visitada).
+- Testes na árvore: core 59, ui 39, shell 21, routes 148 (inclui os 15 do reparo e os 14 do Lab).
