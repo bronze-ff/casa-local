@@ -61,7 +61,7 @@ Apagar na troca (M6), só depois de a rota nova existir **e** de os testes legad
 |---|---|---|
 | M0 | Este manifesto | leitura |
 | M1 | `core/` (api, store, poll, route, format, home, hooks) + testes de invariantes | `node --test` em `web/src/core`: **51 de 51 passam** |
-| M2 | `ui/` (tokens, base, kit, overlay com foco preso, rascunho) + shell + alerta | leitura; testes puros de foco/rota |
+| M2 | `ui/` (tokens, base, kit, overlay, rascunho de brilho) + `shell/` (Root, Shell, Boundary, Alert, nav, tema) | **fechado**: 54 testes passam (ui 37 + shell 17), sintaxe de todos os arquivos conferida com esbuild; ver "Estado do M2" |
 | M3 | Início, Luzes, Clima | leitura contra o contrato |
 | M4 | TV, Local, Câmeras | idem |
 | M5 | Lab, Central | idem |
@@ -95,8 +95,8 @@ Os estímulos e asserts contratuais foram preservados por cópia (não o código
 | `mode.test.mjs` | rota por hash, bandeja, layout | `core/route.test.mjs` (layout novo com tablet) | **portado, 4 passam** |
 | — | formatação, ausente é traço | `core/format.test.mjs` | novo, 2 passam |
 | `state.integration.test.mjs` | 4 (React real): ocultar durante o GET compartilhado, reexibir com leitura pendente, modo parcial nunca "Confirmado", `homeAt` real | `core/hooks.test.mjs` | **pendente**: exige React; escrever em M2 com `test.skip` automático se React faltar |
-| `errorBoundary.test.mjs` | 3: repassa filhos, falha vira aviso com `role=alert`, sem reload automático | `shell/Boundary.test.mjs` | pendente M2 |
-| `ui.test.mjs` | 44 asserts: ícones, tecla desabilitada com motivo, slider acessível, roving tabindex, chave de 44 px, gancho de som, confiança por fase do comando, sheet | `ui/kit.test.mjs` (confiança por fase em Node puro; o resto em render estático) | pendente M2 |
+| `errorBoundary.test.mjs` | 3: repassa filhos, falha vira aviso com `role=alert`, sem reload automático | `shell/guards.test.mjs` (teste "Boundary…") | **portado** (React real em render estático) |
+| `ui.test.mjs` | 44 asserts: ícones, tecla desabilitada com motivo, slider acessível, roving tabindex, chave de 44 px, gancho de som, confiança por fase do comando, sheet | `ui/confidence.test.mjs` + `ui/kit.test.mjs` + `ui/css.test.mjs` | **portado em parte**: ícones, botão com motivo, roving tabindex, interruptor, régua, confiança/fase, overlay (aberto/fechado). **Não portado, por design**: gancho de som por tecla e escala "Doto" (o painel novo não tem fonte pixel nem som por tecla). Chave de 44 px: coberta em `css.test.mjs` |
 | `Cameras/lifecycle.test.mjs` | 6: fechar o socket uma vez, idempotência, mensagens atrasadas ignoradas, reabrir, um único fallback MJPEG, fechar antes dos codecs | `routes/Cameras/live.test.mjs` | pendente M4 |
 | `Cameras/effects.test.mjs` | 5: um socket por câmera, ocultar fecha, reexibir abre no máximo um, trocar de câmera, desmontar revoga URLs | `routes/Cameras/effects.test.mjs` | pendente M4 |
 | `Clima/controls.test.mjs` + `check.cjs` | 6: arrastar só rascunho e soltar emite 1, soltar sem mudar não emite, cobertura IR esparsa, teclado, Home/End, geometria de 270° | `routes/Clima/dial.test.mjs` | pendente M3 |
@@ -110,3 +110,19 @@ Regra de M6: um arquivo de teste legado só é apagado quando a linha dele estiv
 ## Estado do M1 (fechado)
 
 Escrito: `web/src/core/{api,poll,route,format,home,hooks,store}.js` e cinco arquivos de teste. Verificado: `node --test` em `web/src/core` com 51 testes passando; `hooks.js` e `home.js` só tiveram a sintaxe checada (`node --check`), porque React não está instalado. Nada foi compilado nem aberto num navegador. O escritor fica fechado para o Root e o Crivo revisarem o `core` antes de as rotas o usarem.
+
+## Estado do M2 (fechado)
+
+Escrito, sem tocar em `core/`:
+
+- `web/src/ui/`: `theme.css`, `base.css`, `kit.css`, `Icon.jsx`, `kit.jsx`, `Overlay.jsx`, `Draft.jsx`, `actions.js`, `confidence.js`, `focus.js`, `draft.js`, `harness.mjs` (carregador de teste) e testes `theme`, `confidence`, `focus`, `draft`, `css`, `kit`.
+- `web/src/shell/`: `Root.jsx`, `Shell.jsx`, `Boundary.jsx`, `Alert.jsx`, `context.js`, `nav.js`, `theme.js`, `theme-logic.js`, `shell.css` e testes `nav`, `guards`.
+- O app legado continua sendo o ponto de entrada; nada novo está ativo. `Root` recebe um `registry` (nome da rota → `{ Screen }` lazy) que será preenchido a partir do M3.
+
+Verificado: `node --test` em `ui/` (37), `shell/` (17) e `core/` (59, intocado). Os testes de render usam o React e o esbuild já instalados no checkout principal, em modo só leitura (`CASA_WEB_ROOT`, padrão `/home/filippe/CasaLocal/web`); sem eles os testes se declaram "skip". Nada foi instalado.
+
+Guardas cobertos por teste: `#oculto` não monta o Shell nem liga poll; a janela de alerta (`?tray=1&alerta=1`) só aceita `#alerta` e carrega o alerta por `lazy`; `#alerta` no painel normal cai no Início; uma falha de tela é contida pelo Boundary sem recarregar sozinho; o Shell liga um único poll de estado e só com a casa carregada; as oito rotas são alcançáveis em todos os layouts (celular: 4 abas + "Mais"); o menu "Mais" fechado não deixa nada no Tab; a prévia é sempre sinalizada.
+
+Decisão de implementação: os overlays usam `<dialog>` nativo com `showModal()`. O navegador prende o Tab, inertiza o fundo, fecha com Esc e coloca o diálogo na camada superior da janela. O código só escolhe o foco inicial e devolve o foco ao botão de origem. **Isso não foi exercitado num navegador**; o teste cobre a estrutura (fechado sem conteúdo, título ligado, botão Fechar marcado), não o foco real.
+
+Limites do M2: contraste calculado dos tokens (AA nos três estados de tema), não medido em tela; fontes do sistema (sem Archivo/Plex); o `Draft` serve só ao brilho; o dial de temperatura (um comando ao soltar) fica para o M3; os testes de hooks com React real (`state.integration`) continuam pendentes.
