@@ -9,4 +9,3 @@ export const attributeFor = (theme, tray) => (tray ? 'escuro' : theme === 'auto'
 export function readTheme(storage) {
   try { const value = storage?.getItem(KEY); return THEMES.includes(value) ? value : 'auto'; } catch { return 'auto'; }
 }
-
