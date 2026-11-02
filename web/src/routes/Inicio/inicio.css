@@ -12,7 +12,7 @@
 /* Objetos: colunas pela LARGURA REAL (auto-fit), altura natural (nada de card esticado vazio) e cada card é container: o que
    está dentro responde à largura do próprio card, não à da janela. O card grande ocupa a linha inteira. */
 .objs { display: grid; gap: 20px; align-items: start; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
-.objs .big { grid-column: 1 / -1; }
+.objs > .obj.big { grid-column: 1 / -1; } /* só o CARD grande (filho direto); ".objs .big" pegaria também o IconButton.big dentro do .obj-main */
 .obj.big { padding: 28px; }
 .inicio .obj { container: obj / inline-size; }
 /* Luz: texto em coluna que pode encolher; o botão de ligar fica na coluna automática e nunca é coberto. */

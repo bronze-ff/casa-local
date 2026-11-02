@@ -398,3 +398,13 @@ Arquivos alterados (como declarado): `routes/Inicio/Parts.jsx` (só classes: `ob
 5. **Alvos de 44 px:** a opção do segmentado passou de 38 para `var(--hit)` (44 px). Mudança COMPARTILHADA: todos os `Segmented` ficam 6 px mais altos.
 
 Limites: tudo conferido em texto de CSS e marcação; NENHUM resultado de tela foi visto. `container-type` e `cqw` exigem navegador recente (Chrome 105+, Safari 16+). O RED foi rodado antes (6 de 6 falharam); depois de implementar, 3 testes ainda falharam por defeito do próprio auxiliar de teste (não removia comentários do CSS), corrigido sem enfraquecer nenhuma verificação. Rebuild e conferência visual são do Root/Crivo quando o usuário não estiver jogando. Contagem: core 59, ui 39, shell 21, routes 217, boot 13 = 349, `skipped 0`.
+
+### Fix leve do Início, residual P2 (Crivo): seletor amplo `.objs .big`
+
+Defeito: `.objs .big { grid-column: 1 / -1 }` alcançava também o `IconButton.big` (classe `ib big round`), filho do grid `.obj-main` dentro do card, não só o card grande. O botão de ligar passava a ocupar as duas colunas do `.obj-main`.
+
+Correção só em `routes/Inicio/inicio.css`: `.objs > .obj.big` (filho direto). O teste que exigia o seletor amplo (`layout.test.mjs`) agora exige o seletor restrito E que `.objs .big` não exista.
+
+Regressão sobre a árvore real (em `layout.test.mjs`, +2 testes): renderiza `LightObject` (grande e pequeno) e `ClimateObject` reais dentro de `.inicio-grid > .objs`, converte o HTML do SSR numa árvore, avalia as regras do `inicio.css` com um casador de seletores mínimo (classes, tag, descendente e `>`, recursivo em `@media`/`@container`) e exige que toda regra com `grid-column`/`grid-row` alcance SÓ o card grande: os dois `button.ib.big` e os cards pequenos ficam de fora. Um teste-guarda aplica o seletor amplo ao texto e exige que a verificação de árvore o reprove.
+
+RED/GREEN: com o seletor amplo (estado anterior) FALHAM 3 testes (inclui "IconButton.big NÃO pode ser alcançado"); com o restrito, 8 de 8 passam. Mutante reaplicado no arquivo real (`.objs > .obj.big` → `.objs .big`) e restaurado byte a byte (`cmp`): 3 falhas; original: GREEN. Limite: o casador de seletores é mínimo (não cobre pseudo-classes nem atributos, que nunca casam) e o resultado em tela continua com o Crivo. Contagem: core 59, ui 39, shell 21, routes 219, boot 13 = 351, `skipped 0`.
