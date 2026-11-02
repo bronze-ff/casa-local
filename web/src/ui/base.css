@@ -1,0 +1,45 @@
+/* Base: reset, foco visível, alvos de 44 px, movimento mínimo e utilitários de layout. */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; min-height: 100dvh; background: var(--bg) var(--wash) fixed; color: var(--ink);
+  font: 400 15.5px/1.45 var(--font); -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4, p, figure { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: inherit; }
+img, svg { display: block; max-width: 100%; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 8px; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.skip { position: absolute; left: 8px; top: -64px; z-index: 100; padding: 12px 16px; border-radius: var(--r-s); background: var(--ink); color: var(--bg); font-weight: 650; }
+.skip:focus { top: 8px; }
+html:has(dialog[open]) { overflow: hidden; }
+
+/* Layout */
+.row { display: flex; align-items: center; gap: 12px; }
+.col { display: flex; flex-direction: column; gap: 12px; }
+.wrap { flex-wrap: wrap; }
+.sp { justify-content: space-between; }
+.grow { flex: 1 1 auto; min-width: 0; }
+.end { margin-left: auto; }
+.grid { display: grid; gap: 14px; }
+
+/* Texto */
+.mut { color: var(--mut); }
+.mono { font-family: var(--mono); font-size: .92em; }
+.cap { font-size: 12px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--mut); }
+.h1 { font-size: 30px; line-height: 1.1; font-weight: 700; letter-spacing: -.02em; }
+.h2 { font-size: 18px; line-height: 1.25; font-weight: 650; }
+.sub { font-size: 13.5px; color: var(--mut); }
+.num { font-weight: 300; letter-spacing: -.035em; line-height: .95; font-variant-numeric: tabular-nums; font-stretch: 112%; }
+.num.xl { font-size: clamp(72px, 12vw, 128px); }
+.num.l { font-size: clamp(48px, 7vw, 80px); }
+.num.m { font-size: 40px; }
+.num.s { font-size: 28px; }
+.num .u { font-size: .38em; font-weight: 500; letter-spacing: 0; margin-left: .15em; }
+
+/* Movimento: só transform e opacity. Com "menos movimento" nada anima. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

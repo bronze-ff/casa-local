@@ -1,0 +1,111 @@
+/* Componentes. Superfície por função: .obj (objeto tátil), .card (neutro), .sand (informativo, plano), .tl (linha do tempo). */
+
+/* Superfícies */
+.card { background: var(--sf); border: 1px solid var(--line); border-radius: var(--r-l); padding: 20px; box-shadow: var(--sh); }
+.obj { position: relative; background: var(--sf); border: 1px solid var(--line); border-radius: 28px; padding: 22px; box-shadow: var(--sh-up); overflow: hidden; }
+.obj.warm::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 60%; background: radial-gradient(120% 90% at 20% 0%, var(--acc-soft), transparent 70%); opacity: .55; pointer-events: none; }
+.obj > * { position: relative; }
+.sand { background: var(--sf2); border-radius: var(--r-l); padding: 18px; }
+.tl { border-left: 2px solid var(--line); padding-left: 16px; margin-left: 6px; }
+
+/* Botões */
+.btn {
+  min-height: var(--hit); padding: 0 18px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1.5px solid var(--ctl); border-radius: var(--r-m); background: transparent; color: var(--ink);
+  font-weight: 600; text-decoration: none; transition: transform .12s var(--ease), opacity .12s var(--ease);
+}
+.btn:active:not(:disabled) { transform: scale(.98); }
+.btn.p { background: var(--acc); border-color: var(--acc); color: var(--acc-ink); }
+.btn.s { background: var(--sf2); border-color: transparent; }
+.btn.g { border-color: transparent; }
+.btn.d { border-color: var(--err); color: var(--err); }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+.btn.busy { cursor: progress; }
+.btn .why { display: block; font-size: 12px; font-weight: 500; }
+.ib { width: var(--hit); height: var(--hit); display: inline-grid; place-items: center; border: 1.5px solid var(--ctl); border-radius: var(--r-m); background: transparent; transition: transform .12s var(--ease); }
+.ib:active:not(:disabled) { transform: scale(.96); }
+.ib:disabled { opacity: .5; cursor: not-allowed; }
+.ib.round { border-radius: var(--r-pill); }
+.ib.on { background: var(--acc); border-color: var(--acc); color: var(--acc-ink); }
+.ib.big { width: 64px; height: 64px; }
+.chip {
+  min-height: var(--hit); padding: 0 16px; display: inline-flex; align-items: center; gap: 8px;
+  border: 1.5px solid var(--ctl); border-radius: var(--r-pill); background: transparent; font-weight: 550;
+}
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.chip.dash { border-style: dashed; color: var(--mut); }
+.chip:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Segmentado (roving tabindex) e chave */
+.seg { display: inline-flex; padding: 3px; gap: 2px; border: 1.5px solid var(--ctl); border-radius: var(--r-m); background: var(--sf2); }
+.seg button { min-height: 38px; min-width: 44px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent; font-weight: 600; color: var(--mut); }
+.seg button[aria-checked="true"] { background: var(--ink); color: var(--bg); }
+.sw { min-height: var(--hit); display: inline-flex; align-items: center; gap: 10px; border: 0; background: none; padding: 0; font-weight: 550; }
+.sw .t { width: 52px; height: 30px; border-radius: var(--r-pill); border: 1.5px solid var(--ctl); background: var(--sf2); position: relative; flex: none; }
+.sw .t::after { content: ""; position: absolute; top: 3px; left: 3px; width: 21px; height: 21px; border-radius: 50%; background: var(--ctl); transition: transform .15s var(--ease); }
+.sw[aria-checked="true"] .t { background: var(--acc); border-color: var(--acc); }
+.sw[aria-checked="true"] .t::after { transform: translateX(22px); background: var(--acc-ink); }
+.sw:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Régua */
+.rng { width: 100%; min-height: var(--hit); accent-color: var(--acc); background: transparent; }
+
+/* Campos */
+.fld { display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 13.5px; }
+.inp { min-height: var(--hit); padding: 0 14px; border: 1.5px solid var(--ctl); border-radius: var(--r-m); background: var(--sf); color: var(--ink); }
+.inp[aria-invalid="true"] { border-color: var(--err); }
+.fld .err { color: var(--err); font-weight: 500; }
+
+/* Estado de comando e confiança: ícone + palavra, a cor nunca é o único sinal */
+.st, .cf { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: var(--r-pill); font-size: 12.5px; font-weight: 650; background: var(--sim-soft); color: var(--sim); }
+.st.ok, .cf.rep { background: var(--ok-soft); color: var(--ok); }
+.st.pend, .st.sent, .cf.env { background: var(--info-soft); color: var(--info); }
+.st.part, .st.warn, .cf.est { background: var(--warn-soft); color: var(--warn); }
+.st.div, .cf.div { background: var(--div-soft); color: var(--div); }
+.st.err { background: var(--err-soft); color: var(--err); }
+.cf.unk, .st.off { background: var(--sim-soft); color: var(--sim); }
+.cf.sim, .st.sim { background: transparent; color: var(--sim); border: 1px dashed var(--ctl); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+
+/* Faixas, vazio e esqueleto estático (mesmo recorte do conteúdo; sem brilho em loop) */
+.ban { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border-radius: var(--r-m); background: var(--sim-soft); color: var(--ink); }
+.ban.err { background: var(--err-soft); }
+.ban.warn { background: var(--warn-soft); }
+.ban.info { background: var(--info-soft); }
+.ban b { display: block; }
+.empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 20px; border: 1.5px dashed var(--ctl); border-radius: var(--r-l); }
+.sk { display: block; border-radius: var(--r-s); background: var(--sf2); min-height: 14px; }
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60; max-width: min(92vw, 520px); padding: 12px 18px; border-radius: var(--r-m); background: var(--ink); color: var(--bg); box-shadow: var(--sh-up); font-weight: 600; }
+.toast.error { background: var(--err); color: var(--acc-ink); }
+.sim-tag { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px dashed var(--ctl); border-radius: var(--r-pill); font-size: 12px; font-weight: 650; color: var(--sim); }
+
+/* Quadro de câmera: foto parada com nome, idade e estado */
+.fr { position: relative; display: block; border-radius: var(--r-l); overflow: hidden; background: #2b2621; color: #fff; text-decoration: none; }
+.fr img { width: 100%; height: 100%; object-fit: cover; }
+.fr .lb { position: absolute; padding: 4px 10px; border-radius: var(--r-pill); background: rgba(20, 16, 12, .86); color: #fff; font-size: 12.5px; font-weight: 650; }
+.fr .tl-ab { top: 10px; left: 10px; } .fr .bl-ab { bottom: 10px; left: 10px; } .fr .br-ab { bottom: 10px; right: 10px; } .fr .tr-ab { top: 10px; right: 10px; }
+
+/* Overlay: <dialog> nativo (camada superior da janela, foco preso pelo navegador, Esc fecha) */
+dialog.ov { border: 0; padding: 0; margin: auto; background: transparent; color: inherit; max-width: none; max-height: none; overflow: visible; }
+dialog.ov::backdrop { background: rgba(20, 14, 8, .55); }
+.ov-box { display: flex; flex-direction: column; width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); background: var(--sf); border: 1px solid var(--ctl); border-radius: var(--r-l); box-shadow: var(--sh-up); }
+.ov-head { display: flex; align-items: center; gap: 12px; padding: 18px 20px 10px; }
+.ov-head h2 { flex: 1 1 auto; }
+.ov-body { flex: 1 1 auto; overflow-y: auto; padding: 4px 20px 16px; display: flex; flex-direction: column; gap: 14px; }
+.ov-foot { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; padding: 12px 20px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--sf); border-radius: 0 0 var(--r-l) var(--r-l); }
+@media (max-width: 759px) {
+  dialog.ov.ov-sheet { position: fixed; inset: auto 0 0 0; margin: 0; width: 100%; }
+  dialog.ov.ov-sheet .ov-box { width: 100%; max-height: 86dvh; border-radius: var(--r-l) var(--r-l) 0 0; border-bottom: 0; }
+}
+@media (min-width: 1100px) {
+  dialog.ov.ov-panel { position: fixed; inset: 0 0 0 auto; margin: 0; height: 100dvh; }
+  dialog.ov.ov-panel .ov-box { width: min(480px, 92vw); height: 100dvh; max-height: 100dvh; border-radius: var(--r-l) 0 0 var(--r-l); border-right: 0; }
+}
+
+/* Rascunho de brilho: o que a luz relatou ao lado do que ainda não foi enviado */
+.draft { display: grid; gap: 14px; }
+.draft .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.draft .box { border-radius: var(--r-l); padding: 14px 16px; background: var(--sf2); }
+.draft .box.dirty { background: transparent; border: 2px dashed var(--info); }
+.draft .box.dirty .v { color: var(--info); }
+@media (max-width: 420px) { .draft .pair { grid-template-columns: 1fr; } }
