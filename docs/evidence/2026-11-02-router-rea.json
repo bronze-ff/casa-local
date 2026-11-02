@@ -77,5 +77,12 @@
     "loginTest": "one nonempty credential submission from label transcription; authentication not established",
     "limitation": "photograph has ambiguous password characters; no additional variants attempted",
     "configurationChanges": 0
+  },
+  "followupCorrectedCredential": {
+    "source": "user clarification; secret omitted",
+    "submissions": 1,
+    "result": "login form returned; protected LAN settings still redirected to login",
+    "configurationChanges": 0,
+    "cause": "not established; do not infer password change solely from this response"
   }
 }
