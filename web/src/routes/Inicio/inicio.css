@@ -9,21 +9,36 @@
 @media (min-width: 1000px) { .inicio-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); } }
 .inicio.wide .inicio-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr); }
 .inicio.wide .cams { grid-column: 3; grid-row: 1 / span 2; }
-.objs { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 700px) { .objs { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); } .objs .big { grid-row: span 2; } }
+/* Objetos: colunas pela LARGURA REAL (auto-fit), altura natural (nada de card esticado vazio) e cada card é container: o que
+   está dentro responde à largura do próprio card, não à da janela. O card grande ocupa a linha inteira. */
+.objs { display: grid; gap: 20px; align-items: start; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+.objs .big { grid-column: 1 / -1; }
 .obj.big { padding: 28px; }
+.inicio .obj { container: obj / inline-size; }
+/* Luz: texto em coluna que pode encolher; o botão de ligar fica na coluna automática e nunca é coberto. */
+.obj-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.obj-main > :first-child { min-width: 0; }
+.inicio .obj .num.xl { font-size: clamp(56px, 20cqw, 128px); }
+.inicio .obj .num.m { font-size: clamp(30px, 11cqw, 40px); }
+.num.word { overflow-wrap: anywhere; line-height: 1.05; }
+.inicio .obj .num.word { font-size: clamp(24px, 9cqw, 40px); }
+/* Ar: anel fixo + texto; quando o card é estreito o texto desce para baixo do anel e o anel encolhe. */
+.climate-row { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+.climate-row .grow { flex: 1 1 150px; min-width: 0; }
 .ring { width: 132px; height: 132px; border-radius: 50%; display: grid; place-items: center; border: 4px dashed var(--warn); flex: none; }
+@container obj (max-width: 260px) { .ring { width: 104px; height: 104px; } .ring .num.l { font-size: 40px; } }
 .rows li { display: flex; align-items: center; gap: 12px; min-height: 52px; border-bottom: 1px solid var(--line); }
 .rows li:last-child { border-bottom: 0; }
 .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
 .summary li { display: flex; flex-direction: column; gap: 2px; }
-.meters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-@media (max-width: 420px) { .meters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.meters { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 10px; }
+.meters > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.meters .num.s { font-size: 24px; overflow-wrap: anywhere; }
 .meters .warn b { color: var(--err); }
 .tl-list li { display: flex; gap: 14px; align-items: baseline; border-left: 2px solid var(--line); padding: 0 0 12px 14px; margin-left: 6px; }
 .tl-list li.bad { border-left-color: var(--err); }
 .inicio.tray .obj { padding: 14px; border-radius: var(--r-l); }
-.meters.hist { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.meters.hist { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
 .meters.hist > div { display: flex; flex-direction: column; gap: 4px; }
 .spark { width: 100%; height: 32px; }
 .spark polyline { fill: none; stroke: var(--info); stroke-width: 2; vector-effect: non-scaling-stroke; }

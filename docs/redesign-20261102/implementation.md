@@ -383,3 +383,18 @@ Depois de apagar:
 - Os cenários dos 14 testes antigos seguem cobertos pelos testes novos listados no inventário de portagem; nenhum teste antigo restou, e eles nunca entravam na contagem de 343.
 
 Estado honesto: não rodei build, navegador nem runtime. Root registrou um primeiro build isolado do Vite e uma prévia; a prova de navegador é do Crivo/Root. `package.json` ainda declara `@fontsource/doto` e `@fontsource/jetbrains-mono` sem uso (tirar exige `npm`, decisão do Root). As pendências de navegador da matriz F01–F19 continuam abertas.
+
+## Fix leve de layout do Início (Crivo QA): caminhos ANTES da mudança
+
+Autorizado por Root. Sem navegador, sem build; testes só SSR e texto de CSS. Alterar: `web/src/routes/Inicio/Parts.jsx` (marcação de `LightObject`, `ClimateObject`, `LabCard`: só classes), `web/src/routes/Inicio/inicio.css`, `web/src/ui/kit.css` (só `.ib` e `.seg button`, regra compartilhada). Novo: `web/src/routes/Inicio/layout.test.mjs`. Não toco: core, shell, backend, segurança, `registry.js`, `main.jsx`, outros CSS de rota.
+
+### Fix leve do Início: o que mudou e o que NÃO está provado
+
+Arquivos alterados (como declarado): `routes/Inicio/Parts.jsx` (só classes: `obj-main`, `climate-row`, e `word` no texto de estado), `routes/Inicio/inicio.css`, `ui/kit.css` (`.ib { flex: none }` e `.seg button { min-height: var(--hit) }`), e o novo `routes/Inicio/layout.test.mjs` (6 testes: texto do CSS e marcação SSR).
+1. **Ar (anel de 132 px):** `.climate-row` com `flex-wrap`; texto com base de 150 px que desce para baixo do anel em coluna estreita; `.inicio .obj` virou container (`container: obj / inline-size`) e o anel encolhe para 104 px quando o card tem até 260 px. Selo de confiança e atalho "Abrir Clima" preservados.
+2. **Hero esticado:** saiu o `grid-row: span 2`; `.objs` usa colunas `auto-fit` pela largura REAL (`minmax(min(100%, 240px), 1fr)`), `align-items: start`, e o card grande ocupa a linha inteira.
+3. **Luz:** `.obj-main` é grid `minmax(0, 1fr) auto` (texto encolhe, botão na coluna automática); número grande escala com a largura do card (`cqw`); "apagada" e "desligado" ganham `word` (quebram em vez de passar por baixo do botão). `.ib` não encolhe mais em flex (no navegador do Crivo ficou com 35 e 42 px).
+4. **Lab (medidores):** `.meters` e `.meters.hist` em `auto-fit` (104 e 120 px), rótulo em cima do valor, `min-width: 0`, valor com 24 px e quebra permitida; os quatro continuam.
+5. **Alvos de 44 px:** a opção do segmentado passou de 38 para `var(--hit)` (44 px). Mudança COMPARTILHADA: todos os `Segmented` ficam 6 px mais altos.
+
+Limites: tudo conferido em texto de CSS e marcação; NENHUM resultado de tela foi visto. `container-type` e `cqw` exigem navegador recente (Chrome 105+, Safari 16+). O RED foi rodado antes (6 de 6 falharam); depois de implementar, 3 testes ainda falharam por defeito do próprio auxiliar de teste (não removia comentários do CSS), corrigido sem enfraquecer nenhuma verificação. Rebuild e conferência visual são do Root/Crivo quando o usuário não estiver jogando. Contagem: core 59, ui 39, shell 21, routes 217, boot 13 = 349, `skipped 0`.
