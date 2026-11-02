@@ -1,0 +1,73 @@
+{
+  "checkedAt": "2026-11-02T13:30:42.484270+00:00",
+  "scope": "User-owned home router public web UI investigation for AdGuard setup",
+  "routerObservedBrand": "Vivo",
+  "routerModel": "not determined; information page requires login",
+  "rea": {
+    "version": "6.7.0",
+    "mode": "installed Windows CLI over authorized SSH; no MCP reconfiguration",
+    "evidenceId": "ev_9076e901df93bf1350e33a9db1b3edc5cbfe8c7800fc1f8bf9b05c552bda7f79",
+    "operation": "analyze_javascript_application",
+    "inputType": "seven locally captured JavaScript files served by router",
+    "artifactDigest": "f1c52e149f99b6e28437f454ddd43a3a05862cbf4993accbef1ddbae0e2b3f00",
+    "statistics": {
+      "relevant_files": 7,
+      "nested_asar_containers": 0,
+      "text_bytes_read": 15292,
+      "invalid_utf8_files": 0,
+      "parsed_javascript_files": 7,
+      "skipped_javascript_files": 0,
+      "visited_ast_nodes": 2801,
+      "findings": 0,
+      "modules": 0,
+      "parse_failures": 0
+    },
+    "limitations": [
+      "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+      "Graph coverage is incomplete; unavailable facts remain explicit and must not be read as absence.",
+      "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+      "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+      "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+      "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+    ]
+  },
+  "observations": {
+    "webRootHTTP200": true,
+    "loginFormPresent": true,
+    "networkSettingsWithoutLogin": "returned login form",
+    "aboutPageWithoutLogin": "returned login form",
+    "loginPasswordProvided": false,
+    "loginAttemptsMade": 0,
+    "routerConfigurationChanges": 0,
+    "routerResetOrFirmwareChanges": false,
+    "adminAccessObtained": false
+  },
+  "conclusions": {
+    "publicClientCodeDidNotSupplyAdminPassword": true,
+    "scopeDoesNotProveAbsenceOfOtherFirmwareIssues": true,
+    "adGuardCanUsePerClientDNSWithoutRouterAdmin": true,
+    "automaticWholeHomeDeploymentRequiresPlannedDNSOrDHCPControl": true
+  },
+  "officialSources": [
+    "https://vivo.com.br/para-voce/por-que-vivo/vivo-explica/internet-e-conectividade/configuracoes-internet",
+    "https://adguard-dns.io/kb/adguard-home/getting-started/"
+  ],
+  "nextRequiredInfo": "router model and availability of the access credentials printed on its label; do not transmit password in public report",
+  "serviceInstallationPerformed": false,
+  "adGuardFallbackPlan": {
+    "status": "prepared; not installed or verified at runtime",
+    "deployment": "official container, isolated bridge and dedicated persistent directories",
+    "dnsBinding": "specific LAN address only, UDP/TCP 53; verify address persistence and reachability first",
+    "adminUI": "loopback only, initial 3000 and final 3080",
+    "dhcpEnabled": false,
+    "preserve": [
+      "systemd-resolved",
+      "Tailscale split DNS",
+      "router configuration",
+      "existing services"
+    ],
+    "validation": "one LAN client, UDP and TCP DNS, allow/block checks; assess IPv6 and encrypted DNS bypass",
+    "rollback": "restore that client DNS settings; stop only the new container",
+    "scope": "only configured clients; host must remain powered on"
+  }
+}
