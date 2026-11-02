@@ -51,7 +51,7 @@ export function Live({ cameras, index, poster, move, close, rewind }) {
   return (
     <MediaDialog label={`Ao vivo: ${cam.name}`} title={cam.name} sub={`Canal ${cam.id.replace('cam', '')}`} onClose={close} onKeyDown={onKeyDown}
       actions={<><Status kind={visible && current.status === 'live' ? 'ok' : current.status === 'failed' ? 'err' : 'part'}>{label}</Status><Button variant="s" icon="refresh" onClick={() => rewind(cam)}>Rever 1 min</Button></>}>
-      <div ref={stage} className="stage" onTouchStart={(e) => { const t = e.touches[0]; touch.current = { x: t.clientX, y: t.clientY }; }} onTouchEnd={onTouchEnd}>
+      <div ref={stage} className="media-stage" onTouchStart={(e) => { const t = e.touches[0]; touch.current = { x: t.clientX, y: t.clientY }; }} onTouchEnd={onTouchEnd}>
         {poster && current.status !== 'live' && <img className="media" src={poster} alt="" />}
         {current.mjpeg ? (
           <img ref={img} className="media over" src={BLANK} alt={`Imagem ao vivo: ${cam.name}`}
@@ -75,7 +75,7 @@ export function FrameView({ title, sub, src, close }) {
   const [broken, setBroken] = useState(false);
   return (
     <MediaDialog label={`Quadro: ${title}`} title={title} sub={sub} onClose={close}>
-      <div className="stage">{src && !broken ? <img className="media" src={src} alt={`Quadro de ${title}`} onError={() => setBroken(true)} /> : <StageNote icon="alert"><span>Sem imagem.</span></StageNote>}</div>
+      <div className="media-stage">{src && !broken ? <img className="media" src={src} alt={`Quadro de ${title}`} onError={() => setBroken(true)} /> : <StageNote icon="alert"><span>Sem imagem.</span></StageNote>}</div>
       <p className="hint">Para ver ao vivo, use “Abrir no navegador” no topo da bandeja.</p>
     </MediaDialog>
   );

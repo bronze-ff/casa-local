@@ -91,7 +91,7 @@ export function Replay({ camera, start, from, to, offset, autoStart, close, goLi
 
   return (
     <MediaDialog label={`Gravação: ${camera.name}`} title={camera.name} sub={`Gravação do DVR · ${stamp(position)}`} onClose={close} actions={<Button variant="s" icon="radio" onClick={goLive}>Ao vivo</Button>}>
-      <div ref={stage} className="stage">
+      <div ref={stage} className="media-stage">
         <video ref={video} className="media" muted autoPlay playsInline aria-label={`Gravação de ${camera.name}`}
           onTimeUpdate={(e) => { const t = e.currentTarget.currentTime; if (base.current === null) base.current = t; setPlayed(Math.max(0, t - base.current)); }} />
         {status === 'idle' && <StageNote icon="clock"><span>Esta gravação só é buscada no DVR quando você pedir.</span><Button variant="p" onClick={() => setStarted(true)}>Buscar gravação</Button></StageNote>}
