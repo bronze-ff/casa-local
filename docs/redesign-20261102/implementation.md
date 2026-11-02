@@ -62,7 +62,7 @@ Apagar na troca (M6), só depois de a rota nova existir **e** de os testes legad
 | M0 | Este manifesto | leitura |
 | M1 | `core/` (api, store, poll, route, format, home, hooks) + testes de invariantes | `node --test` em `web/src/core`: **51 de 51 passam** |
 | M2 | `ui/` (tokens, base, kit, overlay, rascunho de brilho) + `shell/` (Root, Shell, Boundary, Alert, nav, tema) | **fechado**: 54 testes passam (ui 37 + shell 17), sintaxe de todos os arquivos conferida com esbuild; ver "Estado do M2" |
-| M3 | Início, Luzes, Clima | leitura contra o contrato |
+| M3 | Início, Luzes, Clima (`routes/{Inicio,Luzes,Clima}`) | **fechado para checkpoint**: 46 testes de rotas; ver "Estado do M3" |
 | M4 | TV, Local, Câmeras | idem |
 | M5 | Lab, Central | idem |
 | M6 | Troca, remoção do legado, `DESIGN.md`, `index.html` | busca de referências quebradas |
@@ -99,8 +99,8 @@ Os estímulos e asserts contratuais foram preservados por cópia (não o código
 | `ui.test.mjs` | 44 asserts: ícones, tecla desabilitada com motivo, slider acessível, roving tabindex, chave de 44 px, gancho de som, confiança por fase do comando, sheet | `ui/confidence.test.mjs` + `ui/kit.test.mjs` + `ui/css.test.mjs` | **portado em parte**: ícones, botão com motivo, roving tabindex, interruptor, régua, confiança/fase, overlay (aberto/fechado). **Não portado, por design**: gancho de som por tecla e escala "Doto" (o painel novo não tem fonte pixel nem som por tecla). Chave de 44 px: coberta em `css.test.mjs` |
 | `Cameras/lifecycle.test.mjs` | 6: fechar o socket uma vez, idempotência, mensagens atrasadas ignoradas, reabrir, um único fallback MJPEG, fechar antes dos codecs | `routes/Cameras/live.test.mjs` | pendente M4 |
 | `Cameras/effects.test.mjs` | 5: um socket por câmera, ocultar fecha, reexibir abre no máximo um, trocar de câmera, desmontar revoga URLs | `routes/Cameras/effects.test.mjs` | pendente M4 |
-| `Clima/controls.test.mjs` + `check.cjs` | 6: arrastar só rascunho e soltar emite 1, soltar sem mudar não emite, cobertura IR esparsa, teclado, Home/End, geometria de 270° | `routes/Clima/dial.test.mjs` | pendente M3 |
-| `Lab/overview.test.mjs` | 7: layout da topologia, atenção primeiro, só aparelhos reais, métricas (zero ≠ ausente), modo jogo separa o que para, reserva por físico igual no Início e nas Luzes, resumo só com estado conhecido | `routes/Lab/overview.test.mjs` | pendente M5 |
+| `Clima/controls.test.mjs` + `check.cjs` | 6: arrastar só rascunho e soltar emite 1, soltar sem mudar não emite, cobertura IR esparsa, teclado, Home/End, geometria de 270° | `routes/Clima/dial.test.mjs` (+1 de cobertura) | **portado, 7 passam**. `check.cjs` (verificação por parser Babel do legado) não foi portado: o render estático de `Clima.test.mjs` cobre o mesmo comportamento sem depender do parser |
+| `Lab/overview.test.mjs` | 7: layout da topologia, atenção primeiro, só aparelhos reais, métricas (zero ≠ ausente), modo jogo separa o que para, reserva por físico igual no Início e nas Luzes, resumo só com estado conhecido | `routes/Inicio/view.test.mjs` (3 cenários) e `routes/Lab/overview.test.mjs` (4) | **portados no M3**: reserva por físico, resumo do ambiente, métricas zero ≠ ausente, texto do modo jogo. **Pendentes M5**: layout da topologia, atenção primeiro, só aparelhos reais, jogo separa o que para |
 | `Local/screens.test.mjs`, `Local/qr.test.mjs` | 8 + 5 asserts: telas sem posição, QR (tamanhos por versão, limite, JSON) | `routes/Local/*.test.mjs` | pendente M4 |
 | `Central/parity.test.mjs` | 7: linha do dia, todas as seções, rotina pausada, remoção com confirmação, rotação de chave só após o toque, resumo sem inventar, navegação interna por botões | `routes/Central/parity.test.mjs` | pendente M5 |
 | `redesign-verification.md` | notas de verificação do legado | substituído por seção própria em M7 | pendente M7 |
@@ -126,3 +126,25 @@ Guardas cobertos por teste: `#oculto` não monta o Shell nem liga poll; a janela
 Decisão de implementação: os overlays usam `<dialog>` nativo com `showModal()`. O navegador prende o Tab, inertiza o fundo, fecha com Esc e coloca o diálogo na camada superior da janela. O código só escolhe o foco inicial e devolve o foco ao botão de origem. **Isso não foi exercitado num navegador**; o teste cobre a estrutura (fechado sem conteúdo, título ligado, botão Fechar marcado), não o foco real.
 
 Limites do M2: contraste calculado dos tokens (AA nos três estados de tema), não medido em tela; fontes do sistema (sem Archivo/Plex); o `Draft` serve só ao brilho; o dial de temperatura (um comando ao soltar) fica para o M3; os testes de hooks com React real (`state.integration`) continuam pendentes.
+
+## Estado do M3 (fechado para checkpoint)
+
+Escrito em caminhos novos, sem tocar em `core/`, `ui/`, `shell/` nem nos docs fechados:
+
+- `web/src/routes/Inicio/`: `Inicio.jsx`, `Parts.jsx`, `Wide.jsx`, `view.js`, `frames.js`, `inicio.css`, `view.test.mjs`, `Inicio.test.mjs`.
+- `web/src/routes/Luzes/`: `Luzes.jsx`, `colors.js`, `luzes.css`, `Luzes.test.mjs`.
+- `web/src/routes/Clima/`: `Clima.jsx`, `Dial.jsx`, `Extras.jsx`, `Timer.jsx`, `Energy.jsx`, `coverage.js`, `dial.js`, `clima.css`, `dial.test.mjs`, `Clima.test.mjs`.
+- `web/src/routes/{routes.css, harness.mjs, registry.js}`. O `registry.js` lista as três rotas em `lazy` e a ordem dos CSS; **não está ligado ao app**.
+
+Verificado: `node --test` em `routes/` (46) e em `core ui shell` (119, intocados), todos passando; esbuild confere a sintaxe de todos os arquivos novos.
+
+Decisões de implementação:
+
+- **Dados reais, nenhum mock em modo local.** "Simulado" só aparece na prévia (rótulo vindo do backend). Ao abrir, as telas só leem; nenhuma faz POST (testado).
+- **Brilho** usa `Draft` (rascunho + Aplicar), de 10 a 100, com 20/40/60/80/100 como atalhos que só movem o rascunho. **Temperatura** usa o dial de 270°: arrastar muda só a tela e sai **um** comando ao soltar; soltar sem mudar não emite; a cobertura IR esparsa nunca vira temperatura sem sinal. Clima não importa o `Draft` (testado).
+- **Cor:** 16 opções, brancos quente/frio, e "Ligar ao escolher cor" é uma escolha explícita (ligada por padrão): ligada, uma luz apagada acende junto; desligada, só a cor muda.
+- **Ar IR é estimado:** só o último comando enviado; nenhum "Confirmado" para ele (testado). Funções extras (Turbo, Eco, Brisa, Display) ficam todas alcançáveis: não aprendido aparece desabilitado com o motivo; em Aprender, cada uma pode ser gravada. Timer cria/cancela e mostra falha e tentativas do agendador. Energia é sempre estimativa.
+- **Início:** luz e ar são objetos protagonistas (tamanhos diferentes), relógio secundário, presença e modos numa faixa. O resultado de um modo lista cada aparelho (confirmado / enviado sem confirmação / falhou / já estava como pedido) e nunca trata parcial como sucesso. Câmera só com quadros disponíveis. Tela larga: 4 quadros parados (3 pedidos por vez, 4 s, pausa oculto), sem vídeo.
+- **Limites corrigidos do protótipo:** o Clima tem Display alcançável; o Lab/topologia fica para o M5.
+
+Não verificado: foco real e layout em navegador, contraste em tela, os efeitos (poll, timers, URL de imagem), o comportamento do dial com ponteiro real, hooks com React real. Sem fontes Archivo/Plex; ícones novos; o `Draft` anda de 5 em 5 (o legado andava de 10 em 10).

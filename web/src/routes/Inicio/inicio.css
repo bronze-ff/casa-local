@@ -1,0 +1,25 @@
+/* Início: composição assimétrica. Objetos de tamanhos diferentes, faixa de presença e modos, coluna lateral informativa. */
+.inicio-head { align-items: flex-end; }
+.presence { display: flex; flex-wrap: wrap; gap: 8px; }
+.avatar { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--bg); font-weight: 700; font-size: 13px; flex: none; }
+.modes .btn { min-width: 112px; }
+.steps { gap: 4px; }
+.steps li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.inicio-grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1000px) { .inicio-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); } }
+.inicio.wide .inicio-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr); }
+.inicio.wide .cams { grid-column: 3; grid-row: 1 / span 2; }
+.objs { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 700px) { .objs { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); } .objs .big { grid-row: span 2; } }
+.obj.big { padding: 28px; }
+.ring { width: 132px; height: 132px; border-radius: 50%; display: grid; place-items: center; border: 4px dashed var(--warn); flex: none; }
+.rows li { display: flex; align-items: center; gap: 12px; min-height: 52px; border-bottom: 1px solid var(--line); }
+.rows li:last-child { border-bottom: 0; }
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.summary li { display: flex; flex-direction: column; gap: 2px; }
+.meters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 420px) { .meters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.meters .warn b { color: var(--err); }
+.tl-list li { display: flex; gap: 14px; align-items: baseline; border-left: 2px solid var(--line); padding: 0 0 12px 14px; margin-left: 6px; }
+.tl-list li.bad { border-left-color: var(--err); }
+.inicio.tray .obj { padding: 14px; border-radius: var(--r-l); }
