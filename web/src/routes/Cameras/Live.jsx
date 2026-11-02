@@ -16,7 +16,7 @@ export function Live({ cameras, index, poster, move, close, rewind }) {
   const video = useRef(null);
   const img = useRef(null);
   const touch = useRef(null);
-  const stage = useRef(null);
+  const box = useRef(null); // alvo da tela cheia: moldura de vídeo + controles
   const [state, setState] = useState(() => ({ cam: cam.id, status: 'loading', mjpeg: !mseSupported() }));
   // Trocar de câmera recomeça do zero (sem efeito: o estado carrega a câmera a que pertence).
   const fresh = (id) => ({ cam: id, status: 'loading', mjpeg: !mseSupported() });
@@ -51,7 +51,8 @@ export function Live({ cameras, index, poster, move, close, rewind }) {
   return (
     <MediaDialog label={`Ao vivo: ${cam.name}`} title={cam.name} sub={`Canal ${cam.id.replace('cam', '')}`} onClose={close} onKeyDown={onKeyDown}
       actions={<><Status kind={visible && current.status === 'live' ? 'ok' : current.status === 'failed' ? 'err' : 'part'}>{label}</Status><Button variant="s" icon="refresh" onClick={() => rewind(cam)}>Rever 1 min</Button></>}>
-      <div ref={stage} className="media-stage" onTouchStart={(e) => { const t = e.touches[0]; touch.current = { x: t.clientX, y: t.clientY }; }} onTouchEnd={onTouchEnd}>
+      <div ref={box} className="media-box" data-fullscreen-target="true">
+      <div className="media-stage" onTouchStart={(e) => { const t = e.touches[0]; touch.current = { x: t.clientX, y: t.clientY }; }} onTouchEnd={onTouchEnd}>
         {poster && current.status !== 'live' && <img className="media" src={poster} alt="" />}
         {current.mjpeg ? (
           <img ref={img} className="media over" src={BLANK} alt={`Imagem ao vivo: ${cam.name}`}
@@ -61,7 +62,8 @@ export function Live({ cameras, index, poster, move, close, rewind }) {
         {current.status === 'loading' && <StageNote icon="refresh"><span>Carregando…</span></StageNote>}
         {current.status === 'failed' && <StageNote icon="alert"><span>A transmissão não abriu. Tente de novo em instantes.</span></StageNote>}
       </div>
-      <MediaControls key={`${cam.id}|${current.mjpeg ? 'mjpeg' : 'mse'}`} video={video} stage={stage} sound={!current.mjpeg} />
+      <MediaControls key={`${cam.id}|${current.mjpeg ? 'mjpeg' : 'mse'}`} video={video} stage={box} sound={!current.mjpeg} />
+      </div>
       <div className="row">
         <Button variant="s" className="grow" aria-label="Câmera anterior" disabled={cameras.length < 2} reason="Há só uma câmera." onClick={() => move(-1)}><Icon name="back" />Anterior</Button>
         <Button variant="s" className="grow" aria-label="Próxima câmera" disabled={cameras.length < 2} reason="Há só uma câmera." onClick={() => move(1)}>Próxima<Icon name="next" /></Button>

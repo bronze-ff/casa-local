@@ -408,3 +408,17 @@ Correção só em `routes/Inicio/inicio.css`: `.objs > .obj.big` (filho direto).
 Regressão sobre a árvore real (em `layout.test.mjs`, +2 testes): renderiza `LightObject` (grande e pequeno) e `ClimateObject` reais dentro de `.inicio-grid > .objs`, converte o HTML do SSR numa árvore, avalia as regras do `inicio.css` com um casador de seletores mínimo (classes, tag, descendente e `>`, recursivo em `@media`/`@container`) e exige que toda regra com `grid-column`/`grid-row` alcance SÓ o card grande: os dois `button.ib.big` e os cards pequenos ficam de fora. Um teste-guarda aplica o seletor amplo ao texto e exige que a verificação de árvore o reprove.
 
 RED/GREEN: com o seletor amplo (estado anterior) FALHAM 3 testes (inclui "IconButton.big NÃO pode ser alcançado"); com o restrito, 8 de 8 passam. Mutante reaplicado no arquivo real (`.objs > .obj.big` → `.objs .big`) e restaurado byte a byte (`cmp`): 3 falhas; original: GREEN. Limite: o casador de seletores é mínimo (não cobre pseudo-classes nem atributos, que nunca casam) e o resultado em tela continua com o Crivo. Contagem: core 59, ui 39, shell 21, routes 219, boot 13 = 351, `skipped 0`.
+
+## Reparo P2 de tela cheia (Crivo QA R2): caminhos ANTES da mudança
+
+Autorizado por Root. Só fontes e testes curtos (SSR/unitário); nada de servidor, build ou navegador. Alterar: `web/src/routes/Cameras/Live.jsx` e `Replay.jsx` (um contêiner `.media-box`, alvo da tela cheia, que contém a moldura de mídia E os controles), `web/src/routes/Cameras/cameras.css` (regras do `.media-box` em tela cheia). `MediaControls.jsx` só se for preciso. Novo: `web/src/routes/Cameras/fullscreen.test.mjs`. Não toco: core, M5, segurança, backend, `registry.js`, outros CSS.
+
+### Reparo P2 de tela cheia: o que mudou (fontes FECHADAS; verificação completa pendente)
+
+Defeito (Crivo QA R2, 390 px): `requestFullscreen` ia só para `.media-stage` (vídeo e nota), e `MediaControls` ficava FORA dele. Em tela cheia só o elemento alvo e seus descendentes recebem toque, então "Sair da tela cheia" ficava inatingível.
+
+Mudança (só `routes/Cameras`): `Live.jsx` e `Replay.jsx` ganharam o contêiner `.media-box` (`data-fullscreen-target="true"`, ref `box`) que envolve a moldura de vídeo `.media-stage` E os `MediaControls`; `MediaControls` recebe o ref do `.media-box` (`stage={box}`), então `requestFullscreen` vai para o contêiner inteiro. `cameras.css`: `.media-box` em coluna; em `:fullscreen` e `:-webkit-full-screen` fundo preto, conteúdo centralizado e a moldura sem o teto de 54dvh. `MediaControls.jsx`, `media.js` e o caso do iPhone (só o vídeo, sem API de elemento) NÃO mudaram. O som nasce mudo como antes; a lógica do primeiro toque (`createSoundControl`) não foi tocada.
+
+Teste novo: `routes/Cameras/fullscreen.test.mjs` (5 testes): composição real (SSR → árvore) de Ao vivo e de Replay exigindo UM alvo, com vídeo, moldura, grupo "Som e tela", botão de tela cheia e de som todos DENTRO dele e os controles irmãos da moldura; o mesmo ref vai ao alvo e aos controles; API (`requestFullscreen` no contêiner, iPhone no vídeo, sem API nada, sair pelo documento); regras de CSS em tela cheia.
+
+Estado honesto da verificação: o RED foi rodado antes (4 de 5 falharam). Depois da edição, `node --test Cameras css.test.mjs` passou 55 de 55. As suítes completas por pasta, a prova de mutação (controles de volta para fora do alvo) e o `git diff --check` NÃO foram rodados: a coleta de baseline do Root pediu só edição de fonte. Fazer depois da baseline. O comportamento real em tela cheia (390 px) é do Crivo/Root no navegador.

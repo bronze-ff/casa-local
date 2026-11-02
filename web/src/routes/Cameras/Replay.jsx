@@ -45,7 +45,7 @@ export function Timeline({ from, to, now, hits, seek }) {
 export function Replay({ camera, start, from, to, offset, autoStart, close, goLive }) {
   const nowDvr = () => Date.now() / 1000 + offset;
   const video = useRef(null);
-  const stage = useRef(null);
+  const box = useRef(null); // alvo da tela cheia: moldura de vídeo + controles
   const held = useRef(false);
   const base = useRef(null);
   const [started, setStarted] = useState(!!autoStart);
@@ -91,7 +91,8 @@ export function Replay({ camera, start, from, to, offset, autoStart, close, goLi
 
   return (
     <MediaDialog label={`Gravação: ${camera.name}`} title={camera.name} sub={`Gravação do DVR · ${stamp(position)}`} onClose={close} actions={<Button variant="s" icon="radio" onClick={goLive}>Ao vivo</Button>}>
-      <div ref={stage} className="media-stage">
+      <div ref={box} className="media-box" data-fullscreen-target="true">
+      <div className="media-stage">
         <video ref={video} className="media" muted autoPlay playsInline aria-label={`Gravação de ${camera.name}`}
           onTimeUpdate={(e) => { const t = e.currentTarget.currentTime; if (base.current === null) base.current = t; setPlayed(Math.max(0, t - base.current)); }} />
         {status === 'idle' && <StageNote icon="clock"><span>Esta gravação só é buscada no DVR quando você pedir.</span><Button variant="p" onClick={() => setStarted(true)}>Buscar gravação</Button></StageNote>}
@@ -101,7 +102,8 @@ export function Replay({ camera, start, from, to, offset, autoStart, close, goLi
         {status === 'ended' && <StageNote icon="refresh"><span>{atNow ? 'Você chegou ao momento atual da gravação.' : 'Fim deste trecho da gravação. Avance ou volte para continuar.'}</span>{atNow && <Button variant="p" icon="radio" onClick={goLive}>Ver ao vivo</Button>}</StageNote>}
         {status === 'unsupported' && <StageNote icon="alert"><span>Este navegador não toca a gravação. Use o Chrome, o Edge ou o Safari atualizado.</span></StageNote>}
       </div>
-      <MediaControls key={replayId || 'sem-sessao'} video={video} stage={stage} />
+      <MediaControls key={replayId || 'sem-sessao'} video={video} stage={box} />
+      </div>
       {ongoing && status !== 'ended' && <Button variant="s" onClick={goLive}><Status kind="part">Movimento ainda acontecendo</Status>Ver ao vivo</Button>}
       {motion.stale && <Banner kind="warn" icon="off">Sem conexão para ler os movimentos. As marcas mostram o último dado conhecido.</Banner>}
       <Timeline from={from} to={upper} now={position} hits={hits} seek={seek} />
