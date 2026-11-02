@@ -310,3 +310,51 @@ Limite do `routes/tree.mjs`: chama os componentes como funções com hooks falso
 ## Contagem (node --test por pasta, sem dupla contagem)
 
 core 59, ui 39, shell 21, routes 210 (inclui Clima 28 com `actions.test`, Central com `sound.test`, `css.test`), boot 13 = 342.
+
+## M7: matriz de paridade F01–F19 (final, para a revisão de Root)
+
+Esta seção SUBSTITUI `web/src/redesign-verification.md`. Fonte das famílias: `spec.md` §F01–F19 (fechado, não editado). Nenhuma família tem prova de navegador: a coluna "Só o navegador prova" é o que continua aberto. Contagens por arquivo = `test(` de nível superior; os totais por pasta são os do `node --test` (core 59, ui 39, shell 21, routes 210, boot 13 = 342). Caminhos relativos a `web/src/`.
+
+| Família | Implementação | Testes (arquivo · testes) | Divergência de produto conhecida | Só o navegador prova |
+|---|---|---|---|---|
+| F01 Navegação e shell | `shell/{Shell,Root,Alert,Boundary}.jsx`, `shell/{nav,skip,theme,theme-logic}.js`, `core/route.js`, `routes/registry.js`, `boot/{App.jsx,start.js}`, `main.jsx` | `shell/nav.test` 7 · `shell/guards.test` 10 · `shell/skip.test` 4 · `core/route.test` 4 · `boot/boot.test` 7 · `boot/effects.test` 6 | tablet com rail e "Mais" no celular são novos; links antigos `#nome:p1:p2` continuam aceitos | `hashchange` real, janela da bandeja/alerta, pontos de corte de layout, foco ao navegar |
+| F02 Comandos e evidência | `core/{store,api,home,hooks}.js`, `ui/{confidence,actions}.js`, `ui/kit.jsx` (Confidence, CommandState), `routes/Central/{result.js,ModeResult.jsx}` | `core/store.test` 31 · `core/repair.test` 6 · `core/repair2.test` 2 · `core/api.test` 6 · `ui/confidence*.test` · `routes/Inicio/{Inicio,repair,view}.test` 11+8+9 · `routes/Central/repair.test` 13 · `boot/effects.test` (modo parcial nunca "Confirmado") | "Confirmado" só com evidência observada; modo todo pulado é "Nenhuma ação necessária" | tempo real entre envio e leitura, aparência dos selos |
+| F03 Luz/brilho/cor | `routes/Luzes/{Luzes.jsx,colors.js,luzes.css}`, `ui/{Draft.jsx,draft.js}`, `routes/Inicio/Parts.jsx` (LightObject) | `routes/Luzes/Luzes.test` 8 · `ui/draft.test` · `routes/Clima/actions.test` (cenário Luzes: cor, Aplicar 75%, cena, branco quente) | brilho só envia em Aplicar (legado enviava a cada ±10); "ligar ao escolher cor" é escolha explícita | arrastar o slider real, seletor de cor do sistema |
+| F04 Clima/IR | `routes/Clima/{Clima,Dial,Extras,Timer,Energy}.jsx`, `{coverage,dial}.js` | `routes/Clima/Clima.test` 11 · `dial.test` 7 · `repair.test` 3 · `actions.test` 7 | estado sempre "Estimado"; ± vai ao vizinho aprendido; `values: []` trava o dial | arrasto e teclado reais no dial, aprender com a central IR real |
+| F05 TV/pareamento | `routes/TV/{TV,Infrared,NetworkTV,Remote}.jsx`, `keys.js` | `routes/TV/TV.test` 8 · `keys.test` 4 | "Fora de alcance" virou "Sem resposta na rede" (power off não prova desligada); busca só por botão | pareamento com TV real, permissão em até 35 s |
+| F06 Local/OwnTracks | `routes/Local/{Local,LocalMap,PhoneSetup,Panels}.jsx`, `{geo,prepare,qr}.js` | `routes/Local/Local.test` 9 · `geo.test` 6 · `prepare.test` 5 · `qr.test` 2 · `qr.standard.test` 10 (oráculo `qrencode` executado: 9 matrizes idênticas) | mapa de fundo vem do OpenStreetMap pela internet; credencial só com o diálogo aberto; QR reescrito do zero | câmera do iPhone lendo o QR, clipboard e download reais, ponteiro no mapa, tiles |
+| F07 Grade/ao vivo | `routes/Cameras/{Cameras,Live,MediaControls,MediaDialog}.jsx`, `{useFrames,useMedia,gate,mse,media}.js`, `cameras.css` | `routes/Cameras/Cameras.test` 8 · `lifecycle.test` 9 · `effects.test` 6 · `repair.test` 14 · `boot/effects.test` (efeito real de `useMediaGate`) · `routes/css.test` 3 | vídeo nasce mudo (som por toque); bandeja só mostra quadro | WebSocket e MediaSource reais, `requestFullscreen`, `volumechange`, deslizar no celular |
+| F08 Replay/movimento | `routes/Cameras/{Replay,Motion}.jsx`, `{replay,motion}.js` | `routes/Cameras/replay.test` 5 · `motion.test` 5 · `Cameras.test` (deep link, movimento) · `repair.test` (fila, suspend, id inválido) | deep link de replay pede toque em "Buscar gravação"; "Marcar como visto" é botão explícito | linha do tempo por ponteiro, sessão real do DVR |
+| F09 Avisos/computadores | `routes/Cameras/AlertDevices.jsx`, `routes/Central/Notifications.jsx` | `routes/Cameras/Cameras.test` ("onde avisar") · `routes/Central/Central.test` (avisos) | teste de aviso só por botão | entrega real no ntfy |
+| F10 Métricas/histórico Lab | `routes/Lab/{Machine.jsx,lab.js}` | `routes/Lab/Lab.test` 8 · `logic.test` 6 | histórico só do `history` do servidor; sem 2 amostras não há linha | aparência da linha, leitura real do monitor do PC |
+| F11 Modo Jogo/serviços | `routes/Lab/{GameMode,Services}.jsx` | `routes/Lab/Lab.test` · `logic.test` (ritmo 2 s/8 s, fim do passo, link por regra antiga, desconhecido sem inventar) | escrita bloqueada sem conexão, na prévia e com home lab inativo | troca real de modo e o passo, o efeito de 20 s |
+| F12 Inventário/topologia | `routes/Lab/{Network,Topology}.jsx` | `routes/Lab/Lab.test` (inventário, varredura manual, DeviceDetail) · `logic.test` (grupos, topologia) | NÃO há campo de notas: o backend só aceita `name`, `known`, `watch` | toque nos nós, varredura real |
+| F13 Saúde/backup | `routes/Central/Health.jsx`, `routes/Lab/Machine.jsx` | `routes/Central/Central.test` (saúde) · `routes/Lab/Lab.test` (backup com idade real, atrasado, sem backup) | nenhuma | — |
+| F14 Modos da casa | `routes/Central/{Modes,ModeResult}.jsx`, `{central,result}.js` | `routes/Central/Central.test` · `logic.test` 9 · `repair.test` 13 | aparelhos do formulário vêm do cadastro real; aviso de uso em rotina antes do 409 | formulário no painel lateral real |
+| F15 Rotinas | `routes/Central/Routines.jsx`, `central.js` | `routes/Central/Central.test` · `logic.test` | corpo do POST sem o campo `next` | `<input type=time>` do sistema |
+| F16 Timers | `routes/Clima/Timer.jsx`, `routes/Central/Routines.jsx` | `routes/Clima/{Clima,actions}.test` · `routes/Central/Central.test` | timer só do `ar-quarto` (contrato do backend) | agendador real |
+| F17 Energia | `routes/Central/Energy.jsx`, `routes/Clima/Energy.jsx` | `routes/Central/{Central,logic}.test` · `routes/Clima/Clima.test` | sempre "Estimado" (simulado na prévia); limites do backend (100–5000 W, R$ 0,10–5,00) | — |
+| F18 Chaves/configuração | `routes/Central/{Shortcuts,SoundCard}.jsx`, `{keysession,sound}.js`, `routes/Local/PhoneSetup.jsx` | `routes/Central/{Central,repair,sound}.test` · `routes/Local/{Local,prepare}.test` | chave só lida ao tocar em Configurar, só visível após Mostrar chave, resposta tardia descartada; som opcional, desligado | clipboard, AudioContext, Enter/Espaço reais |
+| F19 Formulários/overlays | `ui/{Overlay.jsx,focus.js,Draft.jsx}`, formulários de Modes, Routines, Local, Lab (DeviceDetail) | `ui/{kit,focus,draft}.test` · `routes/Central/Central.test` (formulários) · `routes/Lab/Lab.test` · `routes/Local/Local.test` | `<dialog>` nativo em vez de modal próprio | foco preso, Esc e retorno de foco, `showModal` |
+
+Transversais cobertos por teste de texto: contraste e 44 px (`ui/theme.test`, `ui/css.test`), sem keyframes, sem blur, só `transform`/`opacity`, e a colisão de CSS (`routes/css.test`). Contraste foi CALCULADO, não medido em tela.
+
+## Remoção do legado: lista EXATA (NÃO executada)
+
+Escopo: `web/` do worktree. São 57 arquivos versionados. `src/main.jsx` NÃO entra na lista: já é a entrada nova. Antes de remover, o Root confere que nada novo importa o legado (conferido por mim em `core ui shell routes boot`: as únicas ocorrências de `./api.js` são o `core/api.js` NOVO, que fica).
+
+Raiz de `src/` (17 arquivos):
+`src/AlertCard.jsx` · `src/App.jsx` · `src/ErrorBoundary.jsx` · `src/api.js` · `src/api.test.mjs` · `src/errorBoundary.test.mjs` · `src/homeStore.js` · `src/homeStore.test.mjs` · `src/mode.js` · `src/mode.test.mjs` · `src/polling.js` · `src/polling.test.mjs` · `src/redesign-verification.md` · `src/state.integration.test.mjs` · `src/tokens.css` · `src/ui.jsx` · `src/ui.test.mjs`
+
+Atenção ao nome: `src/api.js` (legado, REMOVER) não é `src/core/api.js` (novo, MANTER).
+
+`src/screens/` inteiro (40 arquivos; a pasta fica vazia e some):
+`src/screens/{Cameras,Central,Clima,Inicio,Lab,Local,Luzes,TV}.jsx` e as subpastas `src/screens/Cameras/` (`AlertDevices.jsx`, `Live.jsx`, `Motion.jsx`, `Replay.jsx`, `VideoDialog.jsx`, `effects.test.mjs`, `lifecycle.test.mjs`, `mse.js`, `replayWindow.js`, `useMedia.js`), `src/screens/Central/` (`CopyText.jsx`, `Energy.jsx`, `Health.jsx`, `Modes.jsx`, `Notifications.jsx`, `Routines.jsx`, `Shortcuts.jsx`, `Sound.js`, `parity.test.mjs`), `src/screens/Clima/` (`check.cjs`, `controls.test.mjs`, `coverage.js`), `src/screens/Lab/` (`GameMode.jsx`, `Network.jsx`, `Services.jsx`, `Stats.jsx`, `Topology.jsx`, `overview.test.mjs`), `src/screens/Local/` (`Map.jsx`, `qr.js`, `qr.test.mjs`, `screens.test.mjs`).
+
+Os 15 arquivos de teste ou verificação desta lista (14 `*.test.mjs` + `check.cjs`) são exatamente os do inventário de portagem acima; todos têm destino novo ou decisão registrada.
+
+NÃO remover: `src/{core,ui,shell,routes,boot}/**`, `src/main.jsx`, `index.html`, `public/**`, `vite.config.js`, `package.json`, `package-lock.json`.
+
+Pendente de decisão do Root, fora desta lista: `package.json` ainda declara `@fontsource/doto` e `@fontsource/jetbrains-mono`, que nenhum arquivo novo importa (a única referência a `fontsource` em `src/` é um teste que garante que a entrada nova NÃO importa). Tirá-las exige `npm`, que não rodei.
+
+Conferências sugeridas ANTES e DEPOIS da remoção (leves): `node --test core ui shell routes boot` (esperado 342, igual antes, porque os 14 testes antigos nunca entraram na contagem); `grep -rnE "screens/|tokens\.css|from '\./(App|ui|homeStore|polling|mode)" src` sem achados fora de `boot/boot.test.mjs`; e UM build SOMENTE em worktree isolado com `outDir` absoluto em `/tmp` (regra de build acima), em que eu não encosto.
