@@ -93,3 +93,27 @@ test('regra de CSS: em tela cheia o alvo é preto e a moldura enche o espaço, s
   assert.match(css, /\.media-box:fullscreen \.media-stage\s*\{[^}]*max-height:\s*none/);
   assert.match(css, /\.media-box:-webkit-full-screen\s*\{/, 'prefixo do Safari antigo');
 });
+
+// Contraste do aviso (.hint) sobre o fundo preto da tela cheia. Cálculo WCAG, não medição em tela.
+const luminance = (hex) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => { const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+
+test('tela cheia: o aviso (.hint) tem contraste >= 4,5:1 sobre o preto, nos dois seletores; o tema claro herdado reprovaria; fora da tela cheia nada muda', () => {
+  const css = readFileSync(new URL('./cameras.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const themeMut = readFileSync(new URL('../../ui/theme.css', import.meta.url), 'utf8').match(/--mut:\s*(#[0-9A-Fa-f]{6})/)[1];
+  assert.equal(themeMut.toUpperCase(), '#665B50');
+  assert.ok(contrast(themeMut, '#000000') < 4.5, `o --mut do tema claro sobre preto é ${contrast(themeMut, '#000000').toFixed(3)}:1 (reprova, defeito original)`);
+  assert.ok(Math.abs(contrast(themeMut, '#000000') - 3.177) < 0.01);
+  for (const selector of ['.media-box:fullscreen .hint', '.media-box:-webkit-full-screen .hint']) {
+    const body = css.match(new RegExp(`${selector.replace(/[.:\-]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1];
+    assert.ok(body, `regra de ${selector}`);
+    const color = body.match(/color:\s*(#[0-9A-Fa-f]{6})/)?.[1];
+    assert.ok(color, `${selector} define cor literal`);
+    assert.ok(contrast(color, '#000000') >= 4.5, `${selector}: ${color} sobre #000 = ${contrast(color, '#000000').toFixed(2)}:1`);
+  }
+  const hintRules = [...css.matchAll(/([^{}]+)\{[^}]*\}/g)].map((m) => m[1].trim()).filter((sel) => /\.hint\b/.test(sel));
+  assert.deepEqual(hintRules.sort(), ['.media-box:-webkit-full-screen .hint', '.media-box:fullscreen .hint'], 'toda regra de .hint em cameras.css vive só dentro da tela cheia (nada vaza para fora dela)');
+});
