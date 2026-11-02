@@ -1,18 +1,27 @@
-# Direção visual: linguagem ambiente
+# Direção visual: Papel e carvão
 
-Aprovada pelo usuário em 31/10/2026 a partir das páginas Clima, Luzes e Lab do protótipo (Casa Design, artefato único). Substitui a direção anterior (pixel/Doto, painel escuro de cartões iguais).
+Interface refeita do zero em novembro de 2026 (frontend novo em `web/src/{core,ui,shell,routes}`). Substitui a "linguagem ambiente" anterior. A forma nasceu de um protótipo no Casa Design (Claude Opus 5.5, esforço médio) e foi implementada à mão por Claude Sonnet 5.5; nenhum componente, CSS ou DOM veio do painel antigo.
 
 ## Princípios
-- **Cada função tem composição própria**, sem a mesma grade de cartões: dial de temperatura no Clima, cena com halo e controle vertical nas Luzes, mapa de topologia no Lab, mosaico assimétrico e linha do tempo nas Câmeras, mapa protagonista no Local, linha do dia nas rotinas.
-- **Claro quente e Noite**, ambos autorais: papel creme e tinta quente; Noite marrom profundo com laranja e ciano. Tokens em `web/src/tokens.css` (`--warm`/`--cool` para calor e frio; `--sinal` para ação).
-- **Tipografia**: sans do sistema com números grandes e tabulares; mono (JetBrains Mono) só em valores secundários. Sem fonte de pixel e sem fonte remota.
-- **Profundidade**: sombras suaves (`--sh-1`, `--sh-2`), superfícies arredondadas (22–28 px), teclas táteis que afundam no toque. Sem blur pesado e sem 3D decorativo.
+- **Cada função tem a composição própria**: a luz é um objeto com brilho em rascunho; o clima é um dial de 270°; a TV tem controle e rede lado a lado; o Local tem o mapa como protagonista; as câmeras têm grade, ao vivo e linha do tempo; o Lab tem modo do PC, máquina, serviços e rede; a Central reúne saúde, avisos, modos, rotinas, energia, atalhos e som.
+- **Claro quente e carvão escuro**, com os mesmos nomes semânticos (`web/src/ui/theme.css`). Acento único em goiaba (`--acc`). O tema segue o sistema e pode ser fixado; a bandeja é sempre escura.
+- **Superfícies por função**: `.obj` (objeto tátil), `.card` (neutro), `.sand` (informativo, plano), `.tl` (linha do tempo). Sem vidro sobre foto, sem 3D, sem blur.
+- **Tipografia do sistema**, números grandes e tabulares; nenhuma fonte remota.
 
 ## Movimento
-Só `transform` e `opacity`, curto (140–240 ms, `--ease`). Sem loops contínuos. O arco do dial muda na hora; só o polegar anima. `prefers-reduced-motion` troca tudo por fade de ~0 ms. Nenhum comando espera animação; slider e dial só atualizam a tela durante o arraste e o comando sai ao soltar. Animações pausam com a aba oculta.
+Só `transform` e `opacity`. Sem `@keyframes`. Com "reduzir movimento" nada anima. Comando nunca espera animação; slider só atualiza a tela durante o arraste e o comando sai ao soltar. O dial de temperatura envia UM comando ao soltar; só o brilho usa rascunho + Aplicar.
 
 ## Acessibilidade
-Alvos de toque de 44 px ou mais, foco visível (anel ciano), contraste AA, texto junto da cor de status, teclado em todos os controles (setas, Home/End), sheets fecham com Esc e devolvem o foco.
+Alvos de 44 px (`--hit`), foco visível, texto ≥ 4,5:1 e borda de controle `--ctl` ≥ 3:1 (conferidos em `theme.test.mjs`, calculados, não medidos em tela), estado sempre com texto junto da cor, teclado em todos os controles, diálogos nativos `<dialog>` que prendem o Tab, fecham com Esc e devolvem o foco.
 
 ## Estados honestos
-Pendente, confirmado (só com receipt por campo), enviado sem confirmação, divergente, erro, prévia (simulado), estimado (IR) e desconhecido têm texto próprio em português; nunca se mostra código HTTP, epoch ou jargão técnico. Dados antigos mostram a idade real.
+Pendente, confirmado (só com recibo por campo), enviado sem confirmação, divergente, erro, simulado (prévia), estimado (infravermelho) e desconhecido têm texto próprio em português. Código HTTP, epoch e jargão nunca aparecem. Dado antigo mostra a idade real. Dado ausente é "—", nunca zero. Nada de "simulado" fora da prévia; histórico só do que o servidor guardou.
+
+## Regras de comportamento (contrato)
+- Abrir uma tela só LÊ (GET). Varredura, busca de TV, teste de aviso e leitura de chave só por toque do usuário.
+- Comando por aparelho físico é exclusivo; modo reserva todos os aparelhos que usa; a resposta tardia de uma sessão encerrada é descartada.
+- Mídia (ao vivo, replay, quadros) abre só com a aba visível e fecha ao ocultar, trocar de câmera ou sair da rota. Todo stream nasce mudo.
+- Segredo (credencial do OwnTracks, chave dos atalhos) só existe na tela enquanto o diálogo ou o painel está aberto; fora disso não vai ao DOM, ao log nem ao armazenamento.
+
+## Arquivos
+`web/src/main.jsx` (entrada), `boot/` (App e preparação), `shell/` (navegação, bandeja, alerta, tema), `routes/registry.js` (as oito rotas, lazy), `routes/*/**.css` (um CSS por rota), `ui/` (tokens, base, kit, Overlay).

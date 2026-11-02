@@ -94,11 +94,11 @@ Os estímulos e asserts contratuais foram preservados por cópia (não o código
 | `api.test.mjs` | 5: recibo no erro, retry único de `invalid_token`, offline sem retry, 502 sem retry | `core/api.test.mjs` (+1 novo: bootstrap compartilhado) | **portado, 6 passam** |
 | `mode.test.mjs` | rota por hash, bandeja, layout | `core/route.test.mjs` (layout novo com tablet) | **portado, 4 passam** |
 | — | formatação, ausente é traço | `core/format.test.mjs` | novo, 2 passam |
-| `state.integration.test.mjs` | 4 (React real): ocultar durante o GET compartilhado, reexibir com leitura pendente, modo parcial nunca "Confirmado", `homeAt` real | `core/hooks.test.mjs` | **pendente**: exige React; escrever em M2 com `test.skip` automático se React faltar |
+| `state.integration.test.mjs` | 4 (React real): ocultar durante o GET compartilhado, reexibir com leitura pendente, modo parcial nunca "Confirmado", `homeAt` real | `boot/effects.test.mjs` | **portado, 4 dos 4 cenários + 2 novos, 6 passam**, com React/ReactDOM reais (`createRoot` + `act`) e DOM mínimo falso sobre o `core/hooks.js` e a store novos: ocultar durante o GET compartilhado não publica a resposta velha; ocultar/reexibir com leitura pendente mantém UMA leitura; modo parcial com power não confirmado nunca mostra "Confirmado"; `usePoll('/api/state').at` real e estável com erro; NOVOS: desmontar para o poll e não deixa ouvinte órfão, e o efeito real de `useMediaGate` (abre uma vez, fecha ao ocultar, troca de câmera, chave nula não abre, desmontar fecha uma vez) |
 | `errorBoundary.test.mjs` | 3: repassa filhos, falha vira aviso com `role=alert`, sem reload automático | `shell/guards.test.mjs` (teste "Boundary…") | **portado** (React real em render estático) |
 | `ui.test.mjs` | 44 asserts: ícones, tecla desabilitada com motivo, slider acessível, roving tabindex, chave de 44 px, gancho de som, confiança por fase do comando, sheet | `ui/confidence.test.mjs` + `ui/kit.test.mjs` + `ui/css.test.mjs` | **portado em parte**: ícones, botão com motivo, roving tabindex, interruptor, régua, confiança/fase, overlay (aberto/fechado). **Não portado, por design**: gancho de som por tecla e escala "Doto" (o painel novo não tem fonte pixel nem som por tecla). Chave de 44 px: coberta em `css.test.mjs` |
 | `Cameras/lifecycle.test.mjs` | 6: fechar o socket uma vez, idempotência, mensagens atrasadas ignoradas, reabrir, um único fallback MJPEG, fechar antes dos codecs | `routes/Cameras/lifecycle.test.mjs` (+3: suporte MSE lido na chamada, pedido de codecs só com socket e MediaSource prontos, onEnd) | **portado, 9 passam** |
-| `Cameras/effects.test.mjs` | 5: um socket por câmera, ocultar fecha, reexibir abre no máximo um, trocar de câmera, desmontar revoga URLs | `routes/Cameras/effects.test.mjs` | **portado, 6 passam**, na porta pura `gate.js` (a lógica de visibilidade/rota/desmontagem). O efeito React que liga a porta (`useMedia.js`) **não** foi executado: pendente de navegador |
+| `Cameras/effects.test.mjs` | 5: um socket por câmera, ocultar fecha, reexibir abre no máximo um, trocar de câmera, desmontar revoga URLs | `routes/Cameras/effects.test.mjs` | **portado, 6 passam**, na porta pura `gate.js` (a lógica de visibilidade/rota/desmontagem). O efeito React que liga a porta (`useMedia.js`) agora É executado em `boot/effects.test.mjs` (React real, DOM falso); `attachMse` com WebSocket/MediaSource reais segue pendente de navegador |
 | `Clima/controls.test.mjs` + `check.cjs` | 6: arrastar só rascunho e soltar emite 1, soltar sem mudar não emite, cobertura IR esparsa, teclado, Home/End, geometria de 270° | `routes/Clima/dial.test.mjs` (+1 de cobertura) | **portado, 7 passam**. `check.cjs` (verificação por parser Babel do legado) não foi portado: o render estático de `Clima.test.mjs` cobre o mesmo comportamento sem depender do parser |
 | `Lab/overview.test.mjs` | 7: layout da topologia, atenção primeiro, só aparelhos reais, métricas (zero ≠ ausente), modo jogo separa o que para, reserva por físico igual no Início e nas Luzes, resumo só com estado conhecido | `routes/Inicio/view.test.mjs` (3 cenários), `routes/Lab/logic.test.mjs` (7) e `routes/Lab/Lab.test.mjs` (7) | **portados**: reserva por físico, resumo do ambiente (M3); métricas zero ≠ ausente, layout da topologia, atenção primeiro, só aparelhos reais com nome por extenso, jogo separa o que para e só conta o resultado quando o passo some (M5) |
 | `Local/screens.test.mjs`, `Local/qr.test.mjs` | 8 + 5 asserts: telas sem posição, QR (tamanhos por versão, limite, JSON) | `routes/Local/{Local,geo,qr}.test.mjs` | **portados**: projeção do mapa, carregando/erro/sem celular, dados reais com zero preservado, prévia, QR (tamanhos 57/97/137/177 e limite). `screens.test` também cobria TV: o texto "Fora de alcance" virou "Sem resposta na rede" (decisão: "off" não prova desligada) e está em `routes/TV/TV.test.mjs` |
@@ -233,3 +233,47 @@ Testes novos: `Central/repair.test.mjs`, 9 testes (fixture no formato real de `a
 - **Não há decodificador de câmera:** a leitura por celular real não foi feita. O que existe é a igualdade com um codificador independente e a leitura de volta pelo próprio teste.
 - **Divulgação:** para confirmar o comportamento de `ownTracksURL` abri as 43 primeiras linhas do `qr.js` antigo, que incluíam as tabelas de blocos. As tabelas são dados públicos da norma (conferidos pelas contagens de palavras e módulos e pelo oráculo); o código foi escrito separado. Cópia do antigo ficou só em área temporária fora do repositório.
 - O QR está em pausa consistente (nenhuma edição durante o reparo da Central).
+
+## Reparo do residual P2 do resultado de modo (Crivo M5)
+
+Defeito: `overview()` caía em "Confirmado" quando não havia nenhuma evidência. Caso real do backend: modo só com o ar e `keepIfOn`, ar já ligado: todos os passos `skipped`, `evidence: not_applicable`, `receipt: null`, resumo `completed` com `notApplicable: 1` e `confirmed: 0`. A tela dizia "Confirmado" sem confirmar nada. `results` vazio também.
+
+Correção em `Central/result.js`: `evidenceCounts()` (resumo do servidor, ou os passos quando o resumo falta). "Confirmado" só com `confirmed > 0` e nenhum passo sem confirmação; tudo pulado = "Nenhuma ação necessária"; sem passo algum = "Sem resultado". `ModeResult.jsx` mudou numa linha: o aviso do infravermelho agora usa `evidenceCounts` (antes dependia do resumo existir). Nenhuma mudança cosmética.
+
+Fixtures (4 testes novos em `Central/repair.test.mjs`): modo todo pulado (SSR do componente real: sem "Confirmado", sem selo verde, sem aviso de IR), resultado vazio ou ausente, resumo ausente com passos reais, e o "Confirmado" legítimo (com evidência observada). RED rodado ANTES da correção: 3 dos 4 falharam (o 4º já passava, é a guarda do caso legítimo); GREEN depois. Testes: routes 196, tudo passa. Nada de M6, M4, core ou QR foi tocado.
+
+## M6 preparação da troca (caminhos ANTES da mudança)
+
+Só no worktree. Nada do legado é apagado. A entrada antiga (`main.jsx`, `App.jsx`, `tokens.css`, `ui.jsx`, `screens/**` e testes) fica no Git do checkpoint e no disco.
+
+Escrever ou alterar:
+- `web/src/routes/registry.js`: registrar `lab` e `central`; somar `lab.css` e `central.css`.
+- `web/src/main.jsx`: nova entrada (CSS novo na ordem, tema da bandeja, `initSound`, service worker).
+- `web/src/boot/start.js` (lógica pura do boot) e `web/src/boot/App.jsx` (Root com o registro).
+- `web/index.html`: fundo e cor do boot nos tokens novos.
+- `DESIGN.md` (raiz do worktree): direção "Papel e carvão".
+- Testes: `web/src/boot/boot.test.mjs` (consistência estática), `web/src/boot/effects.test.mjs` (React real com DOM mínimo falso).
+Não toco: `core/`, `ui/`, `shell/`, `routes/Central/**` (congelado), M4, QR, backend, `package.json`, `vite.config.js`, `public/`.
+
+## Estado do M6 (troca preparada no worktree; legado NÃO removido)
+
+**Feito** (só nos caminhos declarados acima):
+- `routes/registry.js`: as 8 rotas (`''`, `luzes`, `clima`, `tv`, `local`, `cameras`, `lab`, `central`) e os 9 CSS de rota.
+- `main.jsx` novo: CSS na ordem (tema, base, kit, shell, e um por rota, na mesma ordem do registro), `prepareBoot` (bandeja sempre Noite antes de pintar, `initSound` do som opcional salvo), `registerOffline` (só em produção), `<StrictMode><App/></StrictMode>`. O painel antigo não é importado por nada da entrada nova (testado).
+- `boot/App.jsx` (Root + registro) e `boot/start.js`.
+- `index.html`: fundo e cor do tema do boot nos tokens novos (claro `#F2EDE5`, escuro `#1B1917`); texto do boot em fonte do sistema.
+- `DESIGN.md` da raiz do worktree: nova direção "Papel e carvão" com o contrato de comportamento.
+- Testes: `boot/boot.test.mjs` (7) e `boot/effects.test.mjs` (6).
+
+**Sem mudar:** `package.json` (as dependências `@fontsource/doto` e `@fontsource/jetbrains-mono` ficam sem uso; remover é decisão de Root junto com o legado), `vite.config.js`, `public/`, `core/`, `ui/`, `shell/`, `routes/Central/**`, M4, QR, backend, Git.
+
+**Contagem sem dupla contagem** (`node --test` por pasta, rodado no worktree): core 59, ui 39, shell 21, routes 196, boot 13 = 328. `routes` já inclui M3, M4, QR (`Local/qr.test` + `qr.standard.test`), Lab e Central; `boot` não repete nada de `routes`.
+
+**Legado no worktree:** os 14 arquivos de teste antigos (`src/*.test.mjs` e `src/screens/**`) ficam intactos. Neste worktree eles NÃO rodam por inteiro: 8 falham ao carregar com `Cannot find module 'esbuild'`, porque o worktree não tem `node_modules` e esses testes resolvem módulos a partir do `package.json` do worktree. É ambiental, não regressão: os arquivos não foram tocados. No checkout principal eles continuam passando.
+
+### Inventário de regressões antes de remover o legado (para Root revisar)
+- **Portados e passando (nenhum cenário perdido):** `homeStore`, `polling`, `api`, `mode`, `state.integration` (agora com React real), `errorBoundary`, `Cameras/lifecycle`, `Cameras/effects`, `Clima/controls`, `Lab/overview`, `Local/qr`, `Local/screens`, `Central/parity` (tabela acima).
+- **Portado em parte, por decisão:** `ui.test.mjs` (gancho de som por tecla e fonte Doto não existem no painel novo; o som agora é um ouvinte de clique opcional, coberto em `Central/logic.test.mjs`).
+- **Não portado:** `Clima/check.cjs` (parser Babel; substituído por `Clima.test.mjs`) e `redesign-verification.md` (vira seção própria no M7).
+- **Pendente de navegador (nenhum teste cobre):** foco real e `<dialog>`/`showModal`, `requestFullscreen`, `video.muted` e `volumechange`, WebSocket e MediaSource reais, rolagem por âncora na Central, AudioContext, layout e contraste medidos, `visibilitychange` real, ponteiro no mapa e na linha do tempo, service worker.
+- **Antes de apagar:** (1) Root revisar este inventário; (2) remover `App.jsx`, `ui.jsx`, `tokens.css`, `mode.js`, `api.js`, `homeStore.js`, `polling.js`, `ErrorBoundary.jsx`, `AlertCard.jsx`, `screens/**` e os 14 testes antigos de uma vez; (3) decidir as dependências `@fontsource/*`; (4) rodar o build no checkout principal (eu não rodei build).

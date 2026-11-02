@@ -1,6 +1,5 @@
 // Registro das rotas novas: nome da rota → { Screen } (componente lazy; cada rota é um arquivo separado no bundle).
-// NÃO está ligado ao app: o main.jsx legado continua sendo a entrada até a troca (M6). Rotas ainda não escritas ficam de fora
-// e o Shell mostra "Esta tela ainda não está disponível" para elas.
+// Ligado ao app por boot/App.jsx (entrada nova em main.jsx). Rota que faltar aqui aparece como "Esta tela ainda não está disponível".
 import { lazy } from 'react';
 
 export const registry = {
@@ -10,8 +9,9 @@ export const registry = {
   tv: { Screen: lazy(() => import('./TV/TV.jsx')) },
   local: { Screen: lazy(() => import('./Local/Local.jsx')) },
   cameras: { Screen: lazy(() => import('./Cameras/Cameras.jsx')) },
-  // M5: lab, central
+  lab: { Screen: lazy(() => import('./Lab/Lab.jsx')) },
+  central: { Screen: lazy(() => import('./Central/Central.jsx')) },
 };
 
-/** CSS das rotas novas, na ordem de importação que o main.jsx novo deve seguir (M6). */
-export const stylesheets = ['./routes.css', './Inicio/inicio.css', './Luzes/luzes.css', './Clima/clima.css', './TV/tv.css', './Local/local.css', './Cameras/cameras.css'];
+/** CSS das rotas novas, na ordem de importação que o main.jsx segue (boot.test.mjs confere). */
+export const stylesheets = ['./routes.css', './Inicio/inicio.css', './Luzes/luzes.css', './Clima/clima.css', './TV/tv.css', './Local/local.css', './Cameras/cameras.css', './Lab/lab.css', './Central/central.css'];
