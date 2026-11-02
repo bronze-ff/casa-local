@@ -1,0 +1,112 @@
+# Implementação do novo frontend — manifesto e plano (02/11/2026)
+
+Dono: Vitral (Claude, frontend), único escritor de `web/**`, `DESIGN.md` (raiz) e deste arquivo, **somente** neste worktree.
+
+- Worktree: `/home/filippe/work/CasaLocal-redesign-20261102`, branch `wip/casa-redesign-20261102`, base `63f739e`.
+- Autoria honesta: a implementação é feita pela sessão Claude identificada como **Sonnet 5.5**. O desenho de referência foi gerado no `/design` com **Opus 5.5 Médio** (artefato `2xXAzursABM1bcHqj2Q4oq`, versão `1793651364-f3af`). Uma coisa não é atribuída à outra.
+- Não existe `AGENTS.md` neste worktree (conferido: nenhum `AGENTS*` ou `CLAUDE*` até 3 níveis). Valem o contrato `spec.md` e as regras da sessão.
+- Fora de escopo: checkout principal, produção, `backend/**`, `tests/**`, `scripts/**`, `web/public/**`, `web/package*.json`, `web/vite.config.js`, docs fechados (`spec.md`, `references.md`), Git (commit/push é do Root).
+
+## Regras de execução (jogo em andamento)
+
+Só edição e leitura leves. **Sem** `npm install/ci`, build, servidor, navegador, benchmark, suíte ampla nem runtime. Permitido: testes unitários puros e curtos de Node (`node --test` em arquivos novos, com fakes). Nada disso foi iniciado. O código novo **não foi compilado nem aberto num navegador**; a verificação é por leitura e por testes unitários de Node.
+
+## Estratégia
+
+Remake do zero **sem copiar DOM, componentes ou CSS legados**. O código antigo é lido só como especificação de comportamento e de contrato. A camada de estado/API é reescrita com os mesmos invariantes (recibo, epoch/revision, mutação, `physicalId`, single-flight, visibilidade, retry de token).
+
+1. A árvore nova nasce **isolada** em pastas novas de `web/src/` (`core/`, `ui/`, `shell/`, `routes/`). O app legado continua sendo o ponto de entrada até a troca, então cada checkpoint deixa o worktree coerente.
+2. **Troca** (M6): `main.jsx` passa a montar o shell novo; os arquivos legados são apagados do worktree; `index.html` e `DESIGN.md` são atualizados.
+3. As oito rotas são feitas completas (paridade F01–F19), não apenas reskin.
+
+## Manifesto de caminhos
+
+Criar (novos):
+
+| Caminho | Conteúdo |
+|---|---|
+| `web/src/core/api.js` | fetch, token, erro com recibo, retry único só de `invalid_token` |
+| `web/src/core/store.js` | store da casa (snapshot versionado, comandos por físico, recibo, modos) |
+| `web/src/core/poll.js` | poller single-flight com pausa por visibilidade |
+| `web/src/core/route.js` | hash `#/nome/param` e `#nome:p1:p2`, bandeja, layout |
+| `web/src/core/format.js` | hora, idade, números, rótulos humanos de confiança/estado |
+| `web/src/core/hooks.js` | hooks React (store, poll, rota, layout, visibilidade) |
+| `web/src/core/*.test.mjs` | testes novos, curtos, com fakes |
+| `web/src/ui/theme.css` | tokens claro/escuro, tipografia, sombras, movimento |
+| `web/src/ui/base.css` | reset, superfícies, foco, alvos de 44 px, `prefers-reduced-motion` |
+| `web/src/ui/kit.css` | estilos dos componentes |
+| `web/src/ui/Icon.jsx` | ícones inline |
+| `web/src/ui/kit.jsx` | Button, Chip, Switch, Segmented, Slider, Status, Confidence, Empty, Skeleton, Toast |
+| `web/src/ui/Overlay.jsx` | Dialog/Sheet/Painel com viewport, foco preso e retorno de foco |
+| `web/src/ui/Draft.jsx` | controle de rascunho + Aplicar (brilho, temperatura) |
+| `web/src/shell/Shell.jsx` | sidebar/rail/tabbar/bandeja, estados de conexão |
+| `web/src/shell/Alert.jsx` | janela de alerta da bandeja |
+| `web/src/shell/Boundary.jsx` | falha de uma tela não derruba o shell |
+| `web/src/routes/Inicio/…` | Início |
+| `web/src/routes/Luzes/…` | Luzes |
+| `web/src/routes/Clima/…` | Clima (IR) |
+| `web/src/routes/TV/…` | TV (IR + rede) |
+| `web/src/routes/Local/…` | Local |
+| `web/src/routes/Cameras/…` | Câmeras (grade, ao vivo, replay, avisos) |
+| `web/src/routes/Lab/…` | Lab |
+| `web/src/routes/Central/…` | Central |
+
+Substituir na troca (M6): `web/src/main.jsx`, `web/index.html` (só o fundo de boot), `DESIGN.md` (raiz).
+
+Apagar na troca (M6), só depois de a rota nova existir **e** de os testes legados da tabela abaixo estarem portados (regra: nenhuma cobertura se perde por reescrita): `web/src/{App,AlertCard,ErrorBoundary,ui}.jsx`, `web/src/{api,homeStore,polling,mode}.js`, `web/src/tokens.css`, `web/src/screens/**`, testes legados (`*.test.mjs`, `check.cjs`) que testam módulos apagados, e `web/src/redesign-verification.md`.
+
+## Marcos
+
+| Marco | Entrega | Verificação |
+|---|---|---|
+| M0 | Este manifesto | leitura |
+| M1 | `core/` (api, store, poll, route, format, home, hooks) + testes de invariantes | `node --test` em `web/src/core`: **51 de 51 passam** |
+| M2 | `ui/` (tokens, base, kit, overlay com foco preso, rascunho) + shell + alerta | leitura; testes puros de foco/rota |
+| M3 | Início, Luzes, Clima | leitura contra o contrato |
+| M4 | TV, Local, Câmeras | idem |
+| M5 | Lab, Central | idem |
+| M6 | Troca, remoção do legado, `DESIGN.md`, `index.html` | busca de referências quebradas |
+| M7 | Revisão de paridade F01–F19 e limites honestos | tabela no fim deste arquivo |
+
+## Invariantes que a camada nova preserva
+
+Snapshot por `epoch`/`revision` (mesma epoch só avança; outra epoch ressincroniza); recibo com a mesma guarda; só campo observado confirma; pedido vazio (tecla IR) nunca confirma; sem resposta é "desconhecido", nunca "erro" nem "desligado"; exclusão por `physicalId` e por modo; um poll de `/api/state` compartilhado, single-flight e pausado com a aba oculta; POST reaproveita o snapshot devolvido; retry só de `invalid_token` rejeitado antes do efeito, nunca de timeout; `#oculto` não monta nada nem faz poll; `#alerta` só na janela de alerta; nenhum POST físico nem varredura ao navegar.
+
+## Limites conhecidos desde já
+
+- Sem build, não há prova de que o bundle compila. Sem navegador, não há prova visual do produto.
+- Sem dependências novas: as fontes do protótipo (Archivo, IBM Plex Mono) vêm de CDN e **não** entram (o painel é offline na LAN). Usa pilha de fontes do sistema; a identidade vem de escala, peso, números grandes e cor.
+- O contraste AA é calculado a partir dos tokens; não é medido em tela.
+
+## Correções de plano (02/11/2026, sem novo gate)
+
+1. **Testes só saem do worktree em M6 depois de portados.** O inventário está abaixo. Testes fora de `web/` não são alterados.
+2. **Temperatura mantém o contrato atual:** um único comando ao soltar o dial ou a tecla; não há "Aplicar" adicional. **Só o brilho** usa rascunho + Aplicar. O componente `Draft.jsx` serve ao brilho; o dial de temperatura é um componente próprio com a regra "arrastar só muda a tela; soltar emite exatamente 1 comando; soltar sem mudar não emite; dial nunca escolhe temperatura sem sinal aprendido".
+
+## Inventário de testes: legado → novo
+
+Os estímulos e asserts contratuais foram preservados por cópia (não o código de produção). Legenda: **portado** = roda agora; **pendente** = depende de React/DOM instalados (`web/node_modules` não existe neste worktree) ou da rota nova.
+
+| Legado | Cenários | Destino | Estado |
+|---|---|---|---|
+| `homeStore.test.mjs` | 31: ordem epoch/revision, GET em voo, single-flight, recibo por campo, erros 502/504/offline, exclusão por físico, modos, achados B2 1–6 | `core/store.test.mjs` | **portado, 31 passam** |
+| `polling.test.mjs` | 8: UMA leitura em voo, oculto/visível, descarte de resultado velho, stop sem timer órfão, `isCurrent` (achado 4) | `core/poll.test.mjs` | **portado, 8 passam** |
+| `api.test.mjs` | 5: recibo no erro, retry único de `invalid_token`, offline sem retry, 502 sem retry | `core/api.test.mjs` (+1 novo: bootstrap compartilhado) | **portado, 6 passam** |
+| `mode.test.mjs` | rota por hash, bandeja, layout | `core/route.test.mjs` (layout novo com tablet) | **portado, 4 passam** |
+| — | formatação, ausente é traço | `core/format.test.mjs` | novo, 2 passam |
+| `state.integration.test.mjs` | 4 (React real): ocultar durante o GET compartilhado, reexibir com leitura pendente, modo parcial nunca "Confirmado", `homeAt` real | `core/hooks.test.mjs` | **pendente**: exige React; escrever em M2 com `test.skip` automático se React faltar |
+| `errorBoundary.test.mjs` | 3: repassa filhos, falha vira aviso com `role=alert`, sem reload automático | `shell/Boundary.test.mjs` | pendente M2 |
+| `ui.test.mjs` | 44 asserts: ícones, tecla desabilitada com motivo, slider acessível, roving tabindex, chave de 44 px, gancho de som, confiança por fase do comando, sheet | `ui/kit.test.mjs` (confiança por fase em Node puro; o resto em render estático) | pendente M2 |
+| `Cameras/lifecycle.test.mjs` | 6: fechar o socket uma vez, idempotência, mensagens atrasadas ignoradas, reabrir, um único fallback MJPEG, fechar antes dos codecs | `routes/Cameras/live.test.mjs` | pendente M4 |
+| `Cameras/effects.test.mjs` | 5: um socket por câmera, ocultar fecha, reexibir abre no máximo um, trocar de câmera, desmontar revoga URLs | `routes/Cameras/effects.test.mjs` | pendente M4 |
+| `Clima/controls.test.mjs` + `check.cjs` | 6: arrastar só rascunho e soltar emite 1, soltar sem mudar não emite, cobertura IR esparsa, teclado, Home/End, geometria de 270° | `routes/Clima/dial.test.mjs` | pendente M3 |
+| `Lab/overview.test.mjs` | 7: layout da topologia, atenção primeiro, só aparelhos reais, métricas (zero ≠ ausente), modo jogo separa o que para, reserva por físico igual no Início e nas Luzes, resumo só com estado conhecido | `routes/Lab/overview.test.mjs` | pendente M5 |
+| `Local/screens.test.mjs`, `Local/qr.test.mjs` | 8 + 5 asserts: telas sem posição, QR (tamanhos por versão, limite, JSON) | `routes/Local/*.test.mjs` | pendente M4 |
+| `Central/parity.test.mjs` | 7: linha do dia, todas as seções, rotina pausada, remoção com confirmação, rotação de chave só após o toque, resumo sem inventar, navegação interna por botões | `routes/Central/parity.test.mjs` | pendente M5 |
+| `redesign-verification.md` | notas de verificação do legado | substituído por seção própria em M7 | pendente M7 |
+
+Regra de M6: um arquivo de teste legado só é apagado quando a linha dele estiver "portado" e o novo arquivo passar.
+
+## Estado do M1 (fechado)
+
+Escrito: `web/src/core/{api,poll,route,format,home,hooks,store}.js` e cinco arquivos de teste. Verificado: `node --test` em `web/src/core` com 51 testes passando; `hooks.js` e `home.js` só tiveram a sintaxe checada (`node --check`), porque React não está instalado. Nada foi compilado nem aberto num navegador. O escritor fica fechado para o Root e o Crivo revisarem o `core` antes de as rotas o usarem.
