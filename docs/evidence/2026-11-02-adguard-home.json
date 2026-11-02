@@ -1,0 +1,58 @@
+{
+  "checkedAt": "2026-11-02T16:57:55.225675+00:00",
+  "version": "v0.107.79",
+  "imageDigest": "sha256:aba9e3bf0613be3ba3755e1fc311b126e2c24bec25e18b6483894a88283074f0",
+  "container": "casalocal-adguard",
+  "adminUI": "http://127.0.0.1:3080",
+  "bindings": {
+    "dnsTCPandUDP": [
+      "127.0.0.1",
+      "192.168.15.16",
+      "100.123.250.126"
+    ],
+    "uiLoopbackOnly": true
+  },
+  "dhcpEnabled": false,
+  "persistence": "private state directory outside Git",
+  "credentials": "random, private mode0600; omitted",
+  "dnsProof": {
+    "allow": "example.com resolved by UDP/TCP",
+    "block": "doubleclick.net returned 0.0.0.0 by UDP/TCP",
+    "tailscale": "existing hostname resolved by UDP/TCP"
+  },
+  "linuxClient": {
+    "active": true,
+    "method": "NetworkManager DNS loopback; ignore automatic IPv4/IPv6 DNS; preserve systemd-resolved and Tailscale split DNS",
+    "rollbackExecuted": true,
+    "allEightPreviousPropertiesMatched": true,
+    "containerStopNormalDNSAndPanelPreserved": true,
+    "protectionReapplied": true
+  },
+  "windowsClient": {
+    "transport": "authorized SSH over Tailscale",
+    "method": "one additional local NRPT default rule; existing specific rules and adapter DNS retained",
+    "effectivePolicyVerified": true,
+    "defaultDNSWithoutExplicitServerVerified": true,
+    "priorRules": 2,
+    "RollbackPreservedPreviousRules": true,
+    "NormalDNSDuringRollback": true,
+    "ReappliedBlocked": [
+      "0.0.0.0"
+    ],
+    "AdapterDNSUnchanged": true
+  },
+  "panelHTTPS": 200,
+  "iphone": {
+    "status": "instructions only; not configured or tested",
+    "method": "manual DNS on home Wi-Fi",
+    "dns": "192.168.15.16"
+  },
+  "limits": [
+    "LAN IP is DHCP dynamic; verify it if changed",
+    "home PC must remain on; notebook requires Tailscale connectivity",
+    "future corporate VPN behavior not verified",
+    "browser encrypted DNS may bypass operating-system DNS",
+    "no claim of whole-house or cellular filtering"
+  ],
+  "verificationBy": "runtime tests performed by Maestro; source review separately recorded in workboard"
+}
