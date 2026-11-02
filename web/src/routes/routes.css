@@ -1,0 +1,7 @@
+/* Utilitários compartilhados pelas rotas novas (Início, Luzes, Clima). Superfícies e botões vêm de ui/kit.css. */
+.col.tight { gap: 2px; }
+.grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.stage { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1000px) { .stage.two { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); } }
+.hint { font-size: 12.5px; color: var(--mut); }
+.list-plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }

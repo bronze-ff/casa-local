@@ -1,0 +1,12 @@
+/* Luzes: a lâmpada é o objeto; o brilho relatado é o número grande. Só transform e opacity animam. */
+.lamp { position: relative; width: 148px; height: 148px; flex: none; display: grid; place-items: center; }
+.lamp .glow { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, var(--lamp, var(--glow)) 0%, transparent 68%); opacity: var(--o, .1); transform: scale(var(--k, .6)); transition: transform .2s var(--ease), opacity .2s var(--ease); }
+.lamp .bulb { position: relative; width: 64px; height: 64px; border-radius: 50%; background: var(--lamp, var(--glow)); border: 3px solid var(--ink); opacity: var(--b, .35); }
+.lamp.off .bulb { background: var(--sf2); opacity: 1; }
+.swatches { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 560px) { .swatches { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.swatch { min-width: var(--hit); min-height: var(--hit); aspect-ratio: 1; border-radius: var(--r-m); border: 2px solid var(--ctl); cursor: pointer; padding: 0; }
+.swatch[aria-pressed="true"] { outline: 3px solid var(--ink); outline-offset: 2px; }
+.swatch:disabled { opacity: .5; cursor: not-allowed; }
+.picker { display: grid; gap: 12px; }
+.lights-pick { display: flex; gap: 10px; flex-wrap: wrap; }
