@@ -22,7 +22,13 @@ export function createApi({ fetchFn = (...args) => globalThis.fetch(...args) } =
     } catch {
       throw new ApiError('Sem conexão com o PC de casa.', 0, 'offline');
     }
-    const raw = await response.text();
+    let raw;
+    try {
+      raw = await response.text();
+    } catch {
+      // A resposta começou e o corpo não chegou: o comando pode ter sido aceito. Inconclusivo, nunca um erro de aplicação.
+      throw new ApiError('A resposta do PC de casa não chegou inteira.', 0, 'transport');
+    }
     let body = null;
     try { body = raw ? JSON.parse(raw) : null; } catch { body = null; }
     if (!response.ok) {

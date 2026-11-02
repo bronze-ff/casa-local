@@ -27,7 +27,8 @@ export function phaseOfReceipt(receipt) {
 /** Fase quando o POST falhou. Sem resposta: pode ter saído. Erro do servidor antes do efeito: nada saiu. */
 export function phaseOfError(error) {
   const receipt = error?.receipt;
-  if (!receipt) return error?.status === 0 ? 'unknown' : 'error';
+  // Sem recibo: sem resposta (status 0) ou falha que não veio do transporte (sem status numérico) pode ter saído.
+  if (!receipt) return typeof error?.status !== 'number' || error.status === 0 ? 'unknown' : 'error';
   const phase = phaseOfReceipt(receipt);
   if (phase === 'sent') return receipt.delivery === 'not_sent' ? 'error' : 'unknown';
   return phase;
@@ -46,6 +47,9 @@ export function resultNotice(path, result) {
   return { kind: 'ok' };
 }
 
+/** Recusa comprovada ANTES de qualquer envio: o servidor respondeu 4xx. Sem resposta (0) ou 5xx/proxy não prova nada. */
+const rejectedBeforeSend = (error) => typeof error?.status === 'number' && error.status >= 400 && error.status < 500;
+
 /** Como uma versão (snapshot ou recibo) se relaciona com a já aplicada. */
 function relationOf(applied, incoming) {
   if (!applied || !incoming) return 'unversioned';
@@ -60,7 +64,7 @@ export function createStore({ bootstrap: readBootstrap, get, post, ApiError = Bu
   let era = 0;          // muda a cada bootstrap/reset: invalida só LEITURAS em voo
   let mutations = 0;    // backend sem stateVersion: uma mutação invalida o GET em voo
   let actionSeq = 0;
-  let reading = null;   // { promise, guards }
+  let reading = null;   // { promise, guards, era } — a leitura FÍSICA é única; bootstrap/reset só invalidam o commit dela
   let postIsNewest = false; // o último snapshot veio de um POST: refresh() "legado" é absorvido até o próximo poll
 
   const publish = (patch) => { state = { ...state, ...patch }; listeners.forEach((fn) => fn()); };
@@ -87,8 +91,7 @@ export function createStore({ bootstrap: readBootstrap, get, post, ApiError = Bu
   }
 
   async function bootstrap() {
-    const mine = ++era;
-    reading = null;
+    const mine = ++era; // invalida o commit de leituras em voo; a leitura física continua única (reading não é zerado)
     try {
       const data = await readBootstrap();
       if (mine !== era) return state.home;
@@ -107,7 +110,11 @@ export function createStore({ bootstrap: readBootstrap, get, post, ApiError = Bu
   function refresh({ force = false, isCurrent = () => true } = {}) {
     if (!force && postIsNewest) return Promise.resolve(state.home);
     postIsNewest = false;
-    if (reading) { reading.guards.push(isCurrent); return reading.promise; }
+    if (reading) {
+      if (reading.era === era) { reading.guards.push(isCurrent); return reading.promise; }
+      // A leitura em voo foi invalidada (bootstrap/reset): o resultado dela será descartado. Espera ela terminar e lê de novo.
+      return reading.promise.then(() => {}, () => {}).then(() => refresh({ force: true, isCurrent }));
+    }
     const startEra = era;
     const startMutations = mutations;
     const guards = [isCurrent];
@@ -116,7 +123,7 @@ export function createStore({ bootstrap: readBootstrap, get, post, ApiError = Bu
       (data) => { if (valid()) applySnapshot(data); return state.home; },
       (error) => { if (valid()) publish({ stateError: error }); throw error; },
     ).finally(() => { if (reading?.promise === promise) reading = null; });
-    reading = { promise, guards };
+    reading = { promise, guards, era: startEra };
     return promise;
   }
 
@@ -220,7 +227,8 @@ export function createStore({ bootstrap: readBootstrap, get, post, ApiError = Bu
       mutations += 1;
       if (target.kind === 'mode') {
         if (error?.receipt) settle(target.keys, seq, () => ({ phase: phaseOfError(error), receipt: error.receipt, message: error.message || null }));
-        else settle(target.keys, seq, null, { drop: true });
+        else if (rejectedBeforeSend(error)) settle(target.keys, seq, null, { drop: true }); // nada saiu: libera
+        else settle(target.keys, seq, () => ({ phase: 'unknown', receipt: null, staleReceipt: null, message: error?.message || null, mode: true })); // pode ter saído
         throw error;
       }
       const verdict = error?.receipt ? judge(error.receipt, phaseOfError(error), target.deviceId, { merge: true }) : { phase: phaseOfError(error), receipt: null, staleReceipt: null };
@@ -237,6 +245,6 @@ export function createStore({ bootstrap: readBootstrap, get, post, ApiError = Bu
     refresh,
     run,
     commandFor: (deviceId) => state.commands[physicalOf(deviceId)] || null,
-    reset() { era += 1; reading = null; postIsNewest = false; state = EMPTY; listeners.forEach((fn) => fn()); },
+    reset() { era += 1; postIsNewest = false; state = EMPTY; listeners.forEach((fn) => fn()); },
   };
 }
