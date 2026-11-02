@@ -277,3 +277,36 @@ Não toco: `core/`, `ui/`, `shell/`, `routes/Central/**` (congelado), M4, QR, ba
 - **Não portado:** `Clima/check.cjs` (parser Babel; substituído por `Clima.test.mjs`) e `redesign-verification.md` (vira seção própria no M7).
 - **Pendente de navegador (nenhum teste cobre):** foco real e `<dialog>`/`showModal`, `requestFullscreen`, `video.muted` e `volumechange`, WebSocket e MediaSource reais, rolagem por âncora na Central, AudioContext, layout e contraste medidos, `visibilitychange` real, ponteiro no mapa e na linha do tempo, service worker.
 - **Antes de apagar:** (1) Root revisar este inventário; (2) remover `App.jsx`, `ui.jsx`, `tokens.css`, `mode.js`, `api.js`, `homeStore.js`, `polling.js`, `ErrorBoundary.jsx`, `AlertCard.jsx`, `screens/**` e os 14 testes antigos de uma vez; (3) decidir as dependências `@fontsource/*`; (4) rodar o build no checkout principal (eu não rodei build).
+
+## Regra de build (correção do Root, vale daqui para frente)
+
+Todo build futuro roda SOMENTE num worktree isolado, com `outDir` ABSOLUTO em `/tmp/...` (por exemplo `vite build --outDir /tmp/casa-build-AAAAMMDD --emptyOutDir`). Nunca no checkout principal. Nunca `npm run build` do `package.json`: ele encadeia `scripts/build-offline.mjs` e escreve `../dist`, que o backend de produção serve. Eu não rodei build nenhum em nenhum momento.
+
+## Reparo Crivo M6 P1: colisão de `.stage` entre CSS
+
+Defeito: `routes/routes.css` define `.stage` como layout de página (grid; usada por Clima, Local, TV e Lab em `stage two`) e `routes/Cameras/cameras.css` definia `.stage` como moldura de vídeo (fundo preto, `aspect-ratio: 16/9`, `overflow: hidden`, `max-height: 54dvh`). O `main.jsx` importa os dois, então a moldura de vídeo vazava para as quatro páginas.
+
+Correção: a moldura de vídeo agora é `.media-stage` (`cameras.css`, `Live.jsx` em dois lugares — ao vivo e quadro da bandeja — e `Replay.jsx`). `.stage` de layout ficou só em `routes.css`. A grade de câmeras não usava a classe e não mudou. `.stage-note` (camada sobre o vídeo, nome único) ficou.
+
+Fixture: `routes/css.test.mjs` (3 testes, sobre o TEXTO dos CSS): (1) nenhuma classe simples (`.nome` sozinho) é definida em dois arquivos entre os 13 CSS (tema, base, kit, shell, routes e um por rota); (2) o `.stage` de layout não tem aspect-ratio, overflow hidden, fundo preto nem max-height, e `cameras.css` não usa `.stage`; `.media-stage` tem as quatro regras; (3) Live, Replay e a bandeja usam `media-stage`, e Clima, Local, TV e Lab continuam em `stage two`. RED rodado antes da correção (3 falhas, a primeira apontando `.stage: routes/routes.css e routes/Cameras/cameras.css`); GREEN depois.
+
+Varredura dos outros seletores genéricos: só `.stage` colidia como regra base. `.col` e `.grid` (base.css + routes.css) e `.hint` (routes.css + local.css) e `.obj` (kit.css + inicio.css) aparecem em dois arquivos, mas a segunda definição é sempre modificador (`.col.tight`, `.grid.two`, `.hint.accent`, `.obj.big`, `.inicio.tray .obj`), não regra base repetida. Sem refatoração ampla. Limite: o teste não vê a tela; um seletor descendente que vaze ainda dependeria de olhar no navegador.
+
+## Clima/check.cjs: inventário exato e portagem
+
+`screens/Clima/check.cjs` (135 linhas) tinha 4 partes. Estado de cada uma:
+1. **Análise de sintaxe com o parser Babel** (`Luzes.jsx`, `Clima.jsx`, `coverage.js`): NÃO portada, por decisão. Todo teste novo carrega esses arquivos pelo esbuild; erro de sintaxe derruba `Clima.test`, `Luzes.test` e `actions.test`.
+2. **Cobertura (7 asserts, fixture exata)**: `temperatures` cool/auto = [17,20,24,30]; dry = 0; sem cadastro = 14; `supportedState` dry = null; heat/high cai em baixa 21; cool/high 24 = 22; limites [16,17,30,31,24.5] = [17,30]. Portados em `routes/Clima/actions.test.mjs` ("cobertura (a fixture EXATA do check.cjs legado)") e em `dial.test.mjs` (esparsa, sem cadastro, descarte fora de 17–30).
+3. **Render estático (SSR)**: 16 nomes de cor, banheiro apagada; Turbo ligado, Não aprendido, Cancelar timer, Este mês, 30 min, 4 h; estado desconhecido e "Ligar em 24"; modo auto sem temperatura; prévia; erro offline; vazio; carregando; zero chamadas. Portados em `Luzes.test.mjs` ("cor: 16 opções…", "cores: 16 nomes…", "as duas luzes…", "bloqueio explicado…", "estado desconhecido…", "só o brilho usa rascunho… nenhum POST ao abrir") e `Clima.test.mjs` ("estado desconhecido…", "modo sem temperatura…", "funções extras, timer e aprender…", "prévia…", "aparelho ausente e carregando…", "extras…", "timer…", "energia…"). Os textos mudaram de redação onde o design mudou (desconhecido agora é "—", não "– –"); os cenários estão cobertos.
+4. **Ações (a parte que o SSR não vê): o corpo e a rota que cada botão emite**. Era a lacuna. Portada em `routes/Clima/actions.test.mjs` (6 testes) com a árvore de componentes sem hooks reais (`routes/tree.mjs`): Aumentar/Diminuir temperatura (24 → 30 e → 20, vizinho APRENDIDO), Desligar o ar, Turbo calibrado (`turbo:false`), Eco (`key:'eco'`), modo Calor (`mode:'heat', fan:'low', temperature:21` numa chamada), timer 30 min e Cancelar (`/api/routines/timer`), Aprender (entrar não envia; "em até 25 s"; Gravar ligar neste estado; Regravar desligar; extra Brisa), Luzes (Vermelho `colorHex`; Diminuir brilho só muda o rascunho e `Aplicar 75%` envia; cena Noite; trocar de lâmpada e Branco quente liga), e bloqueios (botão desabilitado recusa o clique).
+   Diferença de produto, intencional: o legado enviava o brilho a cada ±10; o novo só envia ao Aplicar (rascunho).
+
+Limite do `routes/tree.mjs`: chama os componentes como funções com hooks falsos; não é navegador (sem foco, layout, evento nativo ou `<dialog>`; o Overlay é trocado por uma passagem direta).
+
+## Som das teclas: teclado
+
+`routes/Central/sound.test.mjs` (4 testes): desligado por padrão e sem ouvinte; ligar instala UM ouvinte de `click` em captura e desligar remove; clique em botão habilitado faz o tique, inclusive com `detail: 0` (é assim que o navegador entrega Enter e Espaço em `<button>`); desabilitado, alvo que não é controle e `null` não fazem som; o ouvinte não chama `preventDefault` nem `stopPropagation`; sem `AudioContext` o clique segue mudo. Não é prova de teclado real: o disparo de `click` por Enter/Espaço pelo navegador está pendente de navegador (cenário para quando houver DOM).
+
+## Contagem (node --test por pasta, sem dupla contagem)
+
+core 59, ui 39, shell 21, routes 210 (inclui Clima 28 com `actions.test`, Central com `sound.test`, `css.test`), boot 13 = 342.
