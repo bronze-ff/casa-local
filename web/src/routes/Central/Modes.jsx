@@ -8,7 +8,7 @@ import { AC_FANS, AC_MODES, ICONS, buildSteps, iconFor, initialSteps, modeProble
 const FORM = 'form-modo';
 
 /** Formulário de modo: nome, ícone e, por aparelho real da casa, não mexer / desligar / ligar com os valores. Salvar só por botão. */
-function ModeForm({ initial, targets, busy, onSave }) {
+export function ModeForm({ initial, targets, busy, onSave }) {
   const [name, setName] = useState(initial?.name ?? '');
   const [icon, setIcon] = useState(initial?.icon ?? 'home');
   const [steps, setSteps] = useState(() => initialSteps(targets, initial?.steps));

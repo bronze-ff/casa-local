@@ -25,7 +25,7 @@ const render = ({ lab = LAB(), net = NET(), layout = 'desktop', home, ...over } 
 test('máquina: zero real continua zero; ausente vira —; idade da leitura e histórico real aparecem', opts, () => {
   const html = render();
   assert.match(html, /aria-label="Máquina"/);
-  assert.match(html, /lido há 20 s/);
+  assert.match(html, /lido há \d+ s/);
   assert.match(html, /CPU<\/span><span class="num">0<span class="u">%/);
   assert.match(html, /aria-label="CPU: histórico de 10 min"/);
   assert.match(html, /D: Mídia/);

@@ -21,7 +21,7 @@ export function DayLine({ routines }) {
   );
 }
 
-function RoutineForm({ initial, modes, places, people, onSave }) {
+export function RoutineForm({ initial, modes, places, people, onSave }) {
   const isPlace = initial?.trigger === 'place';
   const [name, setName] = useState(initial?.name ?? '');
   const [trigger, setTrigger] = useState(initial?.trigger ?? 'time');

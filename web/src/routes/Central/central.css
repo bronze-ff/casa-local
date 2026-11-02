@@ -1,0 +1,27 @@
+/* Central. Superfícies de ui/kit.css; aqui só layout e detalhes. Sem animação. */
+.cen-grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1000px) { .cen-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.cen-sec { scroll-margin-top: 72px; min-width: 0; }
+.cen-summary { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin: 0; }
+.cen-summary > div { padding: 12px; border: 1px solid var(--line); border-radius: var(--r-m); }
+.cen-summary dd { margin: 0; font-weight: 700; font-size: 18px; overflow-wrap: anywhere; }
+.cen-big { font-size: 22px; font-weight: 700; }
+.cen-stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+.cen-stats > div { display: flex; flex-direction: column; gap: 2px; }
+.cen-li { padding: 10px 0; border-top: 1px solid var(--line); }
+.cen-li:first-child { border-top: 0; }
+.cen-sum { min-height: var(--hit); display: flex; align-items: center; cursor: pointer; }
+.cen-steps { padding-left: 20px; gap: 14px; }
+.cen-copy { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
+.cen-copy code { flex: 1; min-width: 0; padding: 10px 12px; background: var(--sf2); border: 1px solid var(--line); border-radius: var(--r-s); overflow-wrap: anywhere; user-select: all; }
+.cen-fs { display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--line); border-radius: var(--r-m); padding: 12px; margin: 0; min-width: 0; }
+.cen-check { display: flex; gap: 10px; align-items: center; min-height: var(--hit); font-size: 14px; }
+.cen-check input { width: 22px; height: 22px; }
+.cen-color { width: 64px; height: var(--hit); padding: 2px; background: var(--sf); border: 1.5px solid var(--ctl); border-radius: var(--r-m); }
+.cen-ico { display: inline-grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--sf2); }
+.cen-week { display: grid; grid-template-columns: 24px 1fr 64px; gap: 8px; align-items: center; }
+.cen-log { gap: 12px; align-items: flex-start; padding: 6px 0; font-size: 14px; }
+.cen-log > span:last-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cen-fail { color: var(--err); font-weight: 600; }
+.dayline { position: relative; height: 24px; border-radius: var(--r-s); background: var(--sf2); border: 1px solid var(--line); }
+.dayline .mark { position: absolute; top: 3px; bottom: 3px; width: 8px; margin-left: -4px; border-radius: 2px; background: var(--ink); }

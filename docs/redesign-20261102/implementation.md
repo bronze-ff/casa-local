@@ -100,9 +100,9 @@ Os estímulos e asserts contratuais foram preservados por cópia (não o código
 | `Cameras/lifecycle.test.mjs` | 6: fechar o socket uma vez, idempotência, mensagens atrasadas ignoradas, reabrir, um único fallback MJPEG, fechar antes dos codecs | `routes/Cameras/lifecycle.test.mjs` (+3: suporte MSE lido na chamada, pedido de codecs só com socket e MediaSource prontos, onEnd) | **portado, 9 passam** |
 | `Cameras/effects.test.mjs` | 5: um socket por câmera, ocultar fecha, reexibir abre no máximo um, trocar de câmera, desmontar revoga URLs | `routes/Cameras/effects.test.mjs` | **portado, 6 passam**, na porta pura `gate.js` (a lógica de visibilidade/rota/desmontagem). O efeito React que liga a porta (`useMedia.js`) **não** foi executado: pendente de navegador |
 | `Clima/controls.test.mjs` + `check.cjs` | 6: arrastar só rascunho e soltar emite 1, soltar sem mudar não emite, cobertura IR esparsa, teclado, Home/End, geometria de 270° | `routes/Clima/dial.test.mjs` (+1 de cobertura) | **portado, 7 passam**. `check.cjs` (verificação por parser Babel do legado) não foi portado: o render estático de `Clima.test.mjs` cobre o mesmo comportamento sem depender do parser |
-| `Lab/overview.test.mjs` | 7: layout da topologia, atenção primeiro, só aparelhos reais, métricas (zero ≠ ausente), modo jogo separa o que para, reserva por físico igual no Início e nas Luzes, resumo só com estado conhecido | `routes/Inicio/view.test.mjs` (3 cenários) e `routes/Lab/overview.test.mjs` (4) | **portados no M3**: reserva por físico, resumo do ambiente, métricas zero ≠ ausente, texto do modo jogo. **Pendentes M5**: layout da topologia, atenção primeiro, só aparelhos reais, jogo separa o que para |
+| `Lab/overview.test.mjs` | 7: layout da topologia, atenção primeiro, só aparelhos reais, métricas (zero ≠ ausente), modo jogo separa o que para, reserva por físico igual no Início e nas Luzes, resumo só com estado conhecido | `routes/Inicio/view.test.mjs` (3 cenários), `routes/Lab/logic.test.mjs` (7) e `routes/Lab/Lab.test.mjs` (7) | **portados**: reserva por físico, resumo do ambiente (M3); métricas zero ≠ ausente, layout da topologia, atenção primeiro, só aparelhos reais com nome por extenso, jogo separa o que para e só conta o resultado quando o passo some (M5) |
 | `Local/screens.test.mjs`, `Local/qr.test.mjs` | 8 + 5 asserts: telas sem posição, QR (tamanhos por versão, limite, JSON) | `routes/Local/{Local,geo,qr}.test.mjs` | **portados**: projeção do mapa, carregando/erro/sem celular, dados reais com zero preservado, prévia, QR (tamanhos 57/97/137/177 e limite). `screens.test` também cobria TV: o texto "Fora de alcance" virou "Sem resposta na rede" (decisão: "off" não prova desligada) e está em `routes/TV/TV.test.mjs` |
-| `Central/parity.test.mjs` | 7: linha do dia, todas as seções, rotina pausada, remoção com confirmação, rotação de chave só após o toque, resumo sem inventar, navegação interna por botões | `routes/Central/parity.test.mjs` | pendente M5 |
+| `Central/parity.test.mjs` | 7: linha do dia, todas as seções, rotina pausada, remoção com confirmação, rotação de chave só após o toque, resumo sem inventar, navegação interna por botões | `routes/Central/Central.test.mjs` (12) e `routes/Central/logic.test.mjs` (9) | **portado, 21 passam**: linha do dia, todas as seções, rotina pausada, remoção com confirmação, rotação de chave só após o toque (a chave nem é lida ao abrir), resumo sem inventar, navegação por botões; mais formulários, timer, energia e som |
 | `redesign-verification.md` | notas de verificação do legado | substituído por seção própria em M7 | pendente M7 |
 
 Regra de M6: um arquivo de teste legado só é apagado quando a linha dele estiver "portado" e o novo arquivo passar.
@@ -187,13 +187,29 @@ Cada item tem fixture própria (`routes/Local/prepare.test.mjs` com 5 testes, `r
 
 Não verificado (nada foi aberto em navegador): efeitos React reais (`useMediaGate`, visibilidade), `requestFullscreen`, `video.muted`, WebSocket e MediaSource reais.
 
-## M5: estado PAUSADO (checkpoint consistente)
+## Estado do M5 (fechado para checkpoint)
 
-Autorizado: só `routes/Lab/**` e `routes/Central/**`. NÃO alterei `registry.js`, M4, core, ui, shell nem o manifesto em revisão.
+Só `routes/Lab/**` e `routes/Central/**`. Não alterei `registry.js`, M4, core, ui, shell. Os nomes dos testes evitam colisão de maiúsculas e minúsculas (Windows): no Lab, `Lab.test.mjs` e `logic.test.mjs`; na Central, `Central.test.mjs` e `logic.test.mjs`.
 
-- **Lab: escrito e testado (14 testes: `lab.test.mjs` 7, `Lab.test.mjs` 7).** `Lab.jsx`, `GameMode.jsx`, `Machine.jsx`, `Services.jsx`, `Network.jsx`, `Topology.jsx`, `lab.js`, `lab.css`. Leitura com idade; histórico só do servidor (`history`), nunca inventado; varredura só por botão; escritas guardadas por conexão, prévia e home lab inativo.
-  - "Notas" do inventário: o backend (`/api/network/<id>`) só aceita `name`, `known` e `watch`. Não existe campo de notas; não inventei.
-  - Topologia: esquema abstrato com o nome por extenso de cada aparelho; diz que as linhas não são a conexão real.
-- **Central: PARCIAL, sem testes, não é parte do fechamento.** Escritos e só com sintaxe conferida: `central.js`, `sound.js`, `CopyText`, `Health`, `Notifications`, `Modes`, `Routines`. Faltam `Energy`, `Shortcuts`, o cartão de som, `Central.jsx`, `central.css` e os testes. As classes `cen-*` ainda não têm CSS.
-- Pendências para o M6: registrar `lab` e `central` (e `lab.css`, `central.css`) em `registry.js`; chamar `initSound()` no boot do app (a Central só liga o som depois de visitada).
-- Testes na árvore: core 59, ui 39, shell 21, routes 148 (inclui os 15 do reparo e os 14 do Lab).
+**Lab (14 testes).** `Lab.jsx`, `GameMode.jsx`, `Machine.jsx`, `Services.jsx`, `Network.jsx`, `Topology.jsx`, `lab.js`, `lab.css`.
+- Modo do PC manual e automático, motivo, jogos abertos, o que para e o que continua, passo de troca (leitura a 2 s só durante o passo, depois 8 s) e resultado só quando o passo some.
+- CPU, memória, GPU, WSL, discos e backup, sempre com a idade da leitura. Histórico: só as amostras de `history` do servidor; coluna nula não vira zero; sem duas amostras não há linha ("sem histórico suficiente").
+- Serviços: estado, desconhecido sem inventar, reiniciar (bloqueado durante a troca e no modo jogo para quem para), link privado pela mesma regra do painel anterior.
+- Rede: inventário em grupos (novos, vigiados, outros), varredura SÓ por botão, "É meu", nome, vigia, remoção em dois passos, topologia abstrata com nome por extenso e aviso de que as linhas não são a conexão real. Não há campo de notas no backend (`/api/network/<id>` aceita só `name`, `known`, `watch`); não inventei.
+- Escrita bloqueada sem conexão, na prévia e com o home lab inativo; leitura continua.
+
+**Central (21 testes).** `Central.jsx`, `Health.jsx`, `Notifications.jsx`, `Modes.jsx`, `Routines.jsx`, `Energy.jsx`, `Shortcuts.jsx`, `SoundCard.jsx`, `CopyText.jsx`, `central.js`, `sound.js`, `central.css`.
+- UM poll por caminho (`/api/health`, `/api/notifications`, `/api/routines`, `/api/location`), compartilhado entre as seções. O legado lia `/api/notifications` e `/api/routines` mais de uma vez.
+- Modos: criar, editar, ordenar (botões), rodar, remover com confirmação e aviso antes quando uma rotina usa o modo (o servidor ainda recusa com 409). Os aparelhos do formulário vêm do cadastro real (luzes e ar), não de uma lista fixa.
+- Rotinas por horário ou lugar (pessoa e faixa), ações avulsas existentes, ativar, editar, remover, histórico com falha, falha do agendador e timer do ar (o timer é só do `ar-quarto`, contrato do backend). O corpo do POST não leva o campo `next`.
+- Energia: sempre "Estimado" (na prévia, "Simulado"); potência e tarifa com os mesmos limites do backend.
+- Atalhos: a chave só é lida quando o usuário toca em Configurar, só aparece depois de Mostrar chave e some ao fechar; trocar pede confirmação; uma leitura da chave em voo é invalidada ao fechar.
+- Som das teclas: opcional, desligado por padrão, um único ouvinte de clique no documento.
+
+Desvios em relação ao legado: o som usa um ouvinte de clique no documento (o legado usava um gancho no componente de tecla); a lista de aparelhos do modo vem do cadastro; salvar modo e rotina é por botão em painel lateral (não por modal central).
+
+Pendências para o M6 (não são do M5): registrar `lab` e `central` e `lab.css`/`central.css` em `registry.js`; chamar `initSound()` no boot do app (a Central só liga o som depois de visitada); trocar `qr.js`.
+
+Não verificado (nada foi aberto em navegador): efeitos e `usePoll` reais, `<dialog>`, rolagem por âncora, AudioContext, layout, contraste. Os testes são de renderização estática e de lógica pura.
+
+Testes: core 59, ui 39, shell 21, routes 169 (M3 57, M4 77, Lab 14, Central 21). Nada disso é Crivo PASS: o M4 reparado segue aguardando o Crivo.
