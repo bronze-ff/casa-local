@@ -108,4 +108,3 @@ O protótipo cobre oito páginas e subfluxos, estados e tamanhos principais; nã
 6. Root integra/publica somente após prova pertinente, backup/rollback e Git; commit/push das alterações delimitadas. Resultado final distingue contrato, protótipo, código, revisão, runtime e aceite visual; nenhum deles é substituto dos demais.
 
 Não iniciar builds/benchmarks/serviços/scans agora. Este contrato não muda jogo, DNS, backend ou UI publicada. Não abrir novas rodadas documentais sem necessidade técnica concreta.
-
