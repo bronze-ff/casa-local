@@ -52,15 +52,31 @@ export function stepView(item, nameOf = (id) => id) {
   };
 }
 
-/** Título e gravidade do conjunto: parcial nunca parece sucesso; sem confirmação física não vira "ok". */
-export function overview(result) {
-  const sum = result?.evidenceSummary || {};
+/** Contagem por evidência OBSERVADA: o resumo do servidor quando existe; senão, os próprios passos. Nunca um padrão otimista. */
+export function evidenceCounts(result) {
   const steps = result?.results || [];
+  const sum = result?.evidenceSummary;
+  if (sum && Object.keys(sum).length) return { confirmed: sum.confirmed || 0, unconfirmed: sum.unconfirmed || 0, diverged: sum.diverged || 0 };
+  const count = (kind) => steps.filter((item) => stepEvidence(item) === kind).length;
+  return { confirmed: count('confirmed'), unconfirmed: count('unconfirmed'), diverged: count('diverged') };
+}
+
+/**
+ * Título e gravidade do conjunto: parcial nunca parece sucesso; sem confirmação física não vira "ok".
+ * "Confirmado" só existe quando algum passo teve evidência observada (confirmed > 0) e nenhum ficou sem confirmação.
+ * Tudo pulado (ex.: ar já ligado com "manter como está") é "Nenhuma ação necessária"; sem passo algum é "Sem resultado".
+ */
+export function overview(result) {
+  const steps = result?.results || [];
+  const sum = result?.evidenceSummary || {};
+  const counts = evidenceCounts(result);
   const failed = steps.filter((item) => stepEvidence(item) === 'failed').length;
-  if (result?.status === 'partial' || failed || sum.diverged > 0) return { kind: 'warn', title: 'Executado em parte', icon: 'alert', failed, sum };
+  if (result?.status === 'partial' || failed || counts.diverged > 0) return { kind: 'warn', title: 'Executado em parte', icon: 'alert', failed, sum };
   if (result?.status === 'preview') return { kind: '', title: 'Simulado', icon: 'eye', failed, sum };
-  if (sum.unconfirmed > 0) return { kind: 'info', title: sum.confirmed > 0 ? 'Enviado; parte sem confirmação física' : 'Enviado; sem confirmação física', icon: 'check', failed, sum };
-  return { kind: 'info', title: 'Confirmado', icon: 'check', failed, sum };
+  if (counts.unconfirmed > 0) return { kind: 'info', title: counts.confirmed > 0 ? 'Enviado; parte sem confirmação física' : 'Enviado; sem confirmação física', icon: 'check', failed, sum };
+  if (counts.confirmed > 0) return { kind: 'info', title: 'Confirmado', icon: 'check', failed, sum };
+  if (steps.length > 0 && steps.every((item) => stepEvidence(item) === 'skipped')) return { kind: 'info', title: 'Nenhuma ação necessária', icon: 'check', failed, sum };
+  return { kind: 'info', title: 'Sem resultado', icon: 'off', failed, sum };
 }
 
 /** Roda o modo UMA vez; devolve o par que a tela mostra (ou null se o POST falhou, caso em que o aviso já foi dado). Nunca repete sozinho. */

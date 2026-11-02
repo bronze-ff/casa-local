@@ -171,3 +171,47 @@ test('P2-2: a tela de Modos usa runScene + ModeResult com o corpo do servidor (s
   assert.ok(!/cen-step|Executado em parte|Resultado de/.test(html));
   assert.match(html, />Rodar</);
 });
+
+// Residual P2 (Crivo M5): "Confirmado" só com evidência OBSERVADA. Modo só com ar + keepIfOn e o ar já ligado: todos pulados.
+const SKIPPED = { deviceId: 'ar-quarto', status: 'skipped', message: 'Já estava ligado; mantido como está.', operation: 'skipped', evidence: 'not_applicable', confirmationExpected: false, receipt: null };
+const ALL_SKIPPED = { status: 'completed', evidenceSummary: { confirmed: 0, unconfirmed: 0, diverged: 0, notApplicable: 1, preview: 0, operationalFailures: 0 }, results: [SKIPPED] };
+
+test('residual: modo todo pulado (keepIfOn, ar já ligado) NÃO é "Confirmado": nenhuma ação necessária, sem confirmação de nada', { skip }, () => {
+  const head = overview(ALL_SKIPPED);
+  assert.notEqual(head.title, 'Confirmado');
+  assert.equal(head.title, 'Nenhuma ação necessária');
+  const html = render({ result: ALL_SKIPPED });
+  assert.doesNotMatch(html, /Boa noite: Confirmado/);
+  assert.match(html, /Boa noite: Nenhuma ação necessária/);
+  assert.match(html, /Já estava como pedido/);
+  assert.match(html, /Já estava ligado; mantido como está\./);
+  assert.match(html, /1 não se aplica/);
+  assert.doesNotMatch(html, /class="st ok"/, 'nenhum selo verde de confirmação');
+  assert.doesNotMatch(html, /Infravermelho não devolve/, 'nada foi enviado, então não há aviso de IR');
+});
+
+test('residual: sem resultado (results vazio, resumo vazio ou resposta ausente) nunca vira "Confirmado"', { skip }, () => {
+  for (const result of [{ status: 'completed', evidenceSummary: {}, results: [] }, { status: 'completed', results: [] }, {}, undefined]) {
+    assert.notEqual(overview(result).title, 'Confirmado', JSON.stringify(result));
+    assert.equal(overview(result).title, 'Sem resultado');
+    const html = render({ result });
+    assert.doesNotMatch(html, /Boa noite: Confirmado/);
+    assert.match(html, /Boa noite: Sem resultado/);
+    assert.match(html, /não devolveu o resultado de nenhum aparelho/);
+  }
+});
+
+test('residual: resumo ausente com passos reais — o título vem da evidência dos passos, não de um padrão otimista', { skip }, () => {
+  const unconfirmedOnly = { status: 'completed', results: [PARTIAL.results[3]] };
+  assert.equal(overview(unconfirmedOnly).title, 'Enviado; sem confirmação física');
+  assert.equal(overview({ status: 'completed', results: [PARTIAL.results[0]] }).title, 'Confirmado');
+  assert.equal(overview({ status: 'completed', results: [PARTIAL.results[0], SKIPPED] }).title, 'Confirmado', 'confirmado observado + um pulado');
+  assert.equal(overview({ status: 'completed', results: [PARTIAL.results[0], PARTIAL.results[3]] }).title, 'Enviado; parte sem confirmação física');
+  assert.match(render({ result: unconfirmedOnly }), /Infravermelho não devolve confirmação/);
+});
+
+test('residual: "Confirmado" continua para evidência observada (resumo e passos concordam)', { skip }, () => {
+  const ok = { status: 'completed', evidenceSummary: { confirmed: 2, unconfirmed: 0, notApplicable: 1 }, results: [PARTIAL.results[0], SKIPPED] };
+  assert.equal(overview(ok).title, 'Confirmado');
+  assert.match(render({ result: ok }), /Boa noite: Confirmado/);
+});

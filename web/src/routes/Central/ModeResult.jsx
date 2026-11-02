@@ -1,5 +1,5 @@
 import { Banner, Button, Status } from '../../ui/kit.jsx';
-import { FIELD_STATE, overview, stepView } from './result.js';
+import { FIELD_STATE, evidenceCounts, overview, stepView } from './result.js';
 
 const COUNTS = [['confirmed', 'confirmados'], ['unconfirmed', 'sem confirmação'], ['diverged', 'divergentes'], ['operationalFailures', 'falhas'], ['notApplicable', 'não se aplica'], ['preview', 'simulados']];
 
@@ -31,7 +31,7 @@ export function ModeResult({ scene, result, nameOf, onClose }) {
           </li>
         ))}
       </ul>
-      {head.title !== 'Simulado' && result?.evidenceSummary?.unconfirmed > 0 && <span className="sub">Infravermelho não devolve confirmação: confira no aparelho.</span>}
+      {head.title !== 'Simulado' && evidenceCounts(result).unconfirmed > 0 && <span className="sub">Infravermelho não devolve confirmação: confira no aparelho.</span>}
     </Banner>
   );
 }
