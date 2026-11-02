@@ -7,8 +7,11 @@ export const registry = {
   '': { Screen: lazy(() => import('./Inicio/Inicio.jsx')) },
   luzes: { Screen: lazy(() => import('./Luzes/Luzes.jsx')) },
   clima: { Screen: lazy(() => import('./Clima/Clima.jsx')) },
-  // M4: tv, local, cameras · M5: lab, central
+  tv: { Screen: lazy(() => import('./TV/TV.jsx')) },
+  local: { Screen: lazy(() => import('./Local/Local.jsx')) },
+  cameras: { Screen: lazy(() => import('./Cameras/Cameras.jsx')) },
+  // M5: lab, central
 };
 
 /** CSS das rotas novas, na ordem de importação que o main.jsx novo deve seguir (M6). */
-export const stylesheets = ['./routes.css', './Inicio/inicio.css', './Luzes/luzes.css', './Clima/clima.css'];
+export const stylesheets = ['./routes.css', './Inicio/inicio.css', './Luzes/luzes.css', './Clima/clima.css', './TV/tv.css', './Local/local.css', './Cameras/cameras.css'];

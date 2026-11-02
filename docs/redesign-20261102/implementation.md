@@ -63,7 +63,7 @@ Apagar na troca (M6), só depois de a rota nova existir **e** de os testes legad
 | M1 | `core/` (api, store, poll, route, format, home, hooks) + testes de invariantes | `node --test` em `web/src/core`: **51 de 51 passam** |
 | M2 | `ui/` (tokens, base, kit, overlay, rascunho de brilho) + `shell/` (Root, Shell, Boundary, Alert, nav, tema) | **fechado**: 54 testes passam (ui 37 + shell 17), sintaxe de todos os arquivos conferida com esbuild; ver "Estado do M2" |
 | M3 | Início, Luzes, Clima (`routes/{Inicio,Luzes,Clima}`) | **fechado para checkpoint**: 46 testes de rotas; ver "Estado do M3" |
-| M4 | TV, Local, Câmeras | idem |
+| M4 | TV, Local, Câmeras (`routes/{TV,Local,Cameras}`) | **fechado para checkpoint**: ver "Estado do M4"; **cópia legada remanescente: `routes/Local/qr.js`** |
 | M5 | Lab, Central | idem |
 | M6 | Troca, remoção do legado, `DESIGN.md`, `index.html` | busca de referências quebradas |
 | M7 | Revisão de paridade F01–F19 e limites honestos | tabela no fim deste arquivo |
@@ -97,11 +97,11 @@ Os estímulos e asserts contratuais foram preservados por cópia (não o código
 | `state.integration.test.mjs` | 4 (React real): ocultar durante o GET compartilhado, reexibir com leitura pendente, modo parcial nunca "Confirmado", `homeAt` real | `core/hooks.test.mjs` | **pendente**: exige React; escrever em M2 com `test.skip` automático se React faltar |
 | `errorBoundary.test.mjs` | 3: repassa filhos, falha vira aviso com `role=alert`, sem reload automático | `shell/guards.test.mjs` (teste "Boundary…") | **portado** (React real em render estático) |
 | `ui.test.mjs` | 44 asserts: ícones, tecla desabilitada com motivo, slider acessível, roving tabindex, chave de 44 px, gancho de som, confiança por fase do comando, sheet | `ui/confidence.test.mjs` + `ui/kit.test.mjs` + `ui/css.test.mjs` | **portado em parte**: ícones, botão com motivo, roving tabindex, interruptor, régua, confiança/fase, overlay (aberto/fechado). **Não portado, por design**: gancho de som por tecla e escala "Doto" (o painel novo não tem fonte pixel nem som por tecla). Chave de 44 px: coberta em `css.test.mjs` |
-| `Cameras/lifecycle.test.mjs` | 6: fechar o socket uma vez, idempotência, mensagens atrasadas ignoradas, reabrir, um único fallback MJPEG, fechar antes dos codecs | `routes/Cameras/live.test.mjs` | pendente M4 |
-| `Cameras/effects.test.mjs` | 5: um socket por câmera, ocultar fecha, reexibir abre no máximo um, trocar de câmera, desmontar revoga URLs | `routes/Cameras/effects.test.mjs` | pendente M4 |
+| `Cameras/lifecycle.test.mjs` | 6: fechar o socket uma vez, idempotência, mensagens atrasadas ignoradas, reabrir, um único fallback MJPEG, fechar antes dos codecs | `routes/Cameras/lifecycle.test.mjs` (+3: suporte MSE lido na chamada, pedido de codecs só com socket e MediaSource prontos, onEnd) | **portado, 9 passam** |
+| `Cameras/effects.test.mjs` | 5: um socket por câmera, ocultar fecha, reexibir abre no máximo um, trocar de câmera, desmontar revoga URLs | `routes/Cameras/effects.test.mjs` | **portado, 6 passam**, na porta pura `gate.js` (a lógica de visibilidade/rota/desmontagem). O efeito React que liga a porta (`useMedia.js`) **não** foi executado: pendente de navegador |
 | `Clima/controls.test.mjs` + `check.cjs` | 6: arrastar só rascunho e soltar emite 1, soltar sem mudar não emite, cobertura IR esparsa, teclado, Home/End, geometria de 270° | `routes/Clima/dial.test.mjs` (+1 de cobertura) | **portado, 7 passam**. `check.cjs` (verificação por parser Babel do legado) não foi portado: o render estático de `Clima.test.mjs` cobre o mesmo comportamento sem depender do parser |
 | `Lab/overview.test.mjs` | 7: layout da topologia, atenção primeiro, só aparelhos reais, métricas (zero ≠ ausente), modo jogo separa o que para, reserva por físico igual no Início e nas Luzes, resumo só com estado conhecido | `routes/Inicio/view.test.mjs` (3 cenários) e `routes/Lab/overview.test.mjs` (4) | **portados no M3**: reserva por físico, resumo do ambiente, métricas zero ≠ ausente, texto do modo jogo. **Pendentes M5**: layout da topologia, atenção primeiro, só aparelhos reais, jogo separa o que para |
-| `Local/screens.test.mjs`, `Local/qr.test.mjs` | 8 + 5 asserts: telas sem posição, QR (tamanhos por versão, limite, JSON) | `routes/Local/*.test.mjs` | pendente M4 |
+| `Local/screens.test.mjs`, `Local/qr.test.mjs` | 8 + 5 asserts: telas sem posição, QR (tamanhos por versão, limite, JSON) | `routes/Local/{Local,geo,qr}.test.mjs` | **portados**: projeção do mapa, carregando/erro/sem celular, dados reais com zero preservado, prévia, QR (tamanhos 57/97/137/177 e limite). `screens.test` também cobria TV: o texto "Fora de alcance" virou "Sem resposta na rede" (decisão: "off" não prova desligada) e está em `routes/TV/TV.test.mjs` |
 | `Central/parity.test.mjs` | 7: linha do dia, todas as seções, rotina pausada, remoção com confirmação, rotação de chave só após o toque, resumo sem inventar, navegação interna por botões | `routes/Central/parity.test.mjs` | pendente M5 |
 | `redesign-verification.md` | notas de verificação do legado | substituído por seção própria em M7 | pendente M7 |
 
@@ -148,3 +148,29 @@ Decisões de implementação:
 - **Limites corrigidos do protótipo:** o Clima tem Display alcançável; o Lab/topologia fica para o M5.
 
 Não verificado: foco real e layout em navegador, contraste em tela, os efeitos (poll, timers, URL de imagem), o comportamento do dial com ponteiro real, hooks com React real. Sem fontes Archivo/Plex; ícones novos; o `Draft` anda de 5 em 5 (o legado andava de 10 em 10).
+
+## Estado do M4 (fechado para checkpoint)
+
+Escrito em caminhos novos, sem tocar em `core/`, `ui/`, `shell/` nem nos docs fechados; o M3 só ganhou o registro em `registry.js`:
+
+- `web/src/routes/TV/`: `TV.jsx`, `Infrared.jsx`, `NetworkTV.jsx`, `Remote.jsx`, `keys.js`, `tv.css`, `keys.test.mjs`, `TV.test.mjs` (12 testes).
+- `web/src/routes/Local/`: `Local.jsx`, `LocalMap.jsx`, `PhoneSetup.jsx`, `Panels.jsx`, `geo.js`, `qr.js`, `local.css`, `geo.test.mjs`, `qr.test.mjs`, `Local.test.mjs`.
+- `web/src/routes/Cameras/`: `Cameras.jsx`, `Live.jsx`, `Replay.jsx`, `Motion.jsx`, `AlertDevices.jsx`, `MediaDialog.jsx`, `mse.js`, `gate.js`, `useMedia.js`, `useFrames.js`, `replay.js`, `motion.js`, `harness.mjs`, `cameras.css`, mais `lifecycle`, `effects`, `replay`, `motion` e `Cameras` `.test.mjs`.
+- `registry.js` agora lista seis rotas em `lazy` e a ordem dos sete CSS; continua **sem ligar ao app**.
+
+Verificado: `node --test` em `routes/TV`, `routes/Local` e `routes/Cameras` passa 62 de 62; `core`, `ui` e `shell` seguem com 119; `esbuild` confere a sintaxe de todos os arquivos novos.
+
+### Cópia legada remanescente (honesto)
+
+**`web/src/routes/Local/qr.js` é cópia do legado** (algoritmo do QR, byte mode, correção M, versões 10/20/30/40) e **está marcado como provisório**. Enquanto ele existir, **o frontend não pode ser descrito como remake 100% sem cópia**. Todo o resto do código novo foi escrito sem copiar componentes, CSS nem DOM do legado; os testes reaproveitam estímulos e asserts contratuais, o que é permitido.
+
+Plano de substituição (M6, sem nova autorização): escrever um encoder próprio, independente, a partir do padrão (ISO/IEC 18004: modo byte, correção M, tabelas de blocos, Reed-Solomon em GF(256), máscaras e informação de formato/versão), **sem criptografia adicional**. Verificação: os testes de interoperabilidade atuais (`qr.test.mjs`: tamanhos por versão, limite, decodificação da URL) continuam valendo, e o `qrencode` do sistema (`/usr/bin/qrencode`) serve de oráculo independente para comparar a matriz módulo a módulo por versão. Se o oráculo divergir, o encoder novo não entra e o `qr.js` provisório permanece, declarado. Dependência de terceiros só se já for auditável e já estiver no projeto; hoje não há nenhuma.
+
+### Decisões de implementação do M4
+
+- **Nenhuma escrita ao abrir.** Todas as telas só leem ao abrir (testado). Busca de TVs é botão. "Marcar como visto" virou botão explícito (o legado marcava sozinho ao escolher a câmera). Um link de fora para um replay abre o diálogo e pede o toque em "Buscar gravação" antes de abrir a sessão no servidor; replay aberto por toque numa linha de evento ou em "Rever 1 min" começa na hora.
+- **Mídia presa à visibilidade e à rota.** `gate.js` (puro, testado) abre no máximo um stream, fecha ao ocultar, trocar de câmera ou sair; a grade usa o ciclo de quadros do M3 (3 pedidos por vez, 4 s, sem laço de espera). Sessões de replay passam por uma fila (`replay.js`): nunca dois "abrir" juntos, cada novo pedido troca o anterior, e a sessão que chega depois de cancelar é fechada.
+- **Segredo fora do DOM.** O QR, o link e o JSON do OwnTracks só existem dentro do diálogo aberto (testado: a página fechada não tem `owntracks://`), nunca vão para log ou armazenamento, e a senha não aparece em texto.
+- **Limites:** o fundo do mapa continua vindo do OpenStreetMap pela internet (o navegador pede os quadrados); a bandeja só mostra quadro/foto (sem WebSocket, MJPEG nem replay).
+
+Não verificado: foco real dos diálogos, `<dialog>`/`showModal`, WebSocket e MediaSource reais, `visibilitychange`, ponteiro/toque na linha do tempo e no mapa, layout em tela, contraste. Os efeitos React (`useMedia.js`, `useGridFrames`) não foram executados.
