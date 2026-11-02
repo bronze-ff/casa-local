@@ -24,7 +24,7 @@ export const CONFIDENCE = {
 /** Fase de um comando: classe, rótulo curto e frase de apoio. */
 export const PHASE = {
   pending: ['pend', 'Enviando…', 'Saiu daqui e ainda não há resposta. Nada é repetido sozinho.'],
-  sent: ['sent', 'Enviado', 'O aparelho aceitou, mas ainda não relatou o novo estado.'],
+  sent: ['sent', 'Enviado · sem confirmação', 'O pedido foi enviado. Não há confirmação do que o aparelho fez.'],
   unknown: ['part', 'Sem resposta', 'Pode ter chegado ao aparelho. O resultado é desconhecido.'],
   diverged: ['div', 'Divergente', 'O aparelho relatou algo diferente do pedido. Vale o que ele relatou.'],
   confirmed: ['ok', 'Confirmado', 'O aparelho relatou exatamente o que foi pedido.'],

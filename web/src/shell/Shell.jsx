@@ -8,6 +8,7 @@ import { Banner, Empty, IconButton, Skeleton, Status, ToastProvider } from '../u
 import Boundary from './Boundary.jsx';
 import { ShellContext } from './context.js';
 import { DESTINATIONS, MOBILE_TABS, MORE, SIDEBAR, connectionOf, mobileTabActive } from './nav.js';
+import { skipToContent } from './skip.js';
 import { LABEL } from './theme-logic.js';
 import { useTheme } from './theme.js';
 
@@ -76,7 +77,7 @@ export default function Shell({ route, layout, tray, registry = {} }) {
   return (
     <ToastProvider>
       <ShellContext.Provider value={value}>
-        <a className="skip" href="#conteudo">Pular para o conteúdo</a>
+        <a className="skip" href="#conteudo" onClick={skipToContent}>Pular para o conteúdo</a>
         <div className={`app ${layout}`}>
           {(layout === 'tablet' || layout === 'desktop' || layout === 'wide') && (
             <aside className="side">
