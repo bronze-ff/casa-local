@@ -19,86 +19,84 @@ function env({ home = HOME(), polls = {} } = {}) {
   const calls = [];
   const idle = { data: null, error: null, stale: false, at: 0, reload() {} };
   const hooks = { useHome: () => ({ home, homeAt: Date.now(), stateError: null, bootError: null, commands: {} }), usePoll: (path) => polls[path] || idle, useCommand: () => null };
-  const actions = { useAction: () => [async (path, body, ok) => { calls.push([path, JSON.parse(JSON.stringify(body)), ok]); return {}; }, false] };
+  const runHook = { fn: async (path, body, ok) => { calls.push([path, JSON.parse(JSON.stringify(body)), ok]); return {}; } };
+  const actions = { useAction: () => [(...args) => runHook.fn(...args), false] };
   const overlay = { Overlay: ({ open, children }) => (open ? children : null) };
   const tree = createTree({ stubs: { 'core/hooks.js': hooks, 'ui/actions.js': actions, 'ui/Overlay.jsx': overlay } });
-  return { tree, calls, load: (file) => tree.load(src(file)).default };
+  return { tree, calls, runHook, load: (file) => tree.load(src(file)).default };
 }
 const ROUTINES = { data: { timers: [{ device: 'ar-quarto', at: Math.floor(Date.now() / 1000) + 1800 }], lastError: null }, reload() {} };
-const last = (calls) => calls[calls.length - 1];
+const CMD = '/api/devices/ar-quarto/commands';
 
-test('Clima: ± anda para a temperatura APRENDIDA vizinha (não ±1), liga/desliga e Turbo calibrado', { skip }, async () => {
+/** Um toque = EXATAMENTE `posts` chamadas novas (legado: um envio por toque). Devolve as chamadas daquele toque como [rota, corpo]. */
+async function tap(e, app, label, posts = 1) {
+  const before = e.calls.length;
+  await app.click(label);
+  const delta = e.calls.slice(before).map(([path, body]) => [path, body]);
+  assert.equal(delta.length, posts, `"${label}": esperado ${posts} POST(s) neste toque, houve ${delta.length}: ${JSON.stringify(delta)}`);
+  return delta;
+}
+/** Toque que NÃO pode enviar nada (rascunho, abrir painel, entrar em Aprender, trocar de seleção). */
+const quiet = (e, app, label) => tap(e, app, label, 0);
+/** Um toque, uma chamada, esta rota e este corpo. */
+async function sends(e, app, label, path, body) {
+  const delta = await tap(e, app, label);
+  assert.deepEqual(delta, [[path, body]], `"${label}": rota e corpo`);
+}
+
+test('Clima: ± anda para a temperatura APRENDIDA vizinha (não ±1), liga/desliga e extras — UM POST por toque, rota e corpo exatos', { skip }, async () => {
   const e = env({ polls: { '/api/routines': ROUTINES } });
   const app = e.tree.mount(e.load('routes/Clima/Clima.jsx'));
-  await app.click('Aumentar temperatura');
-  assert.deepEqual(last(e.calls).slice(0, 2), ['/api/devices/ar-quarto/commands', { action: 'set', values: { temperature: 30 } }], '24 → 30: o próximo valor com sinal');
-  await app.click('Diminuir temperatura');
-  assert.deepEqual(last(e.calls).slice(0, 2), ['/api/devices/ar-quarto/commands', { action: 'set', values: { temperature: 20 } }]);
-  await app.click('Desligar o ar');
-  assert.deepEqual(last(e.calls).slice(0, 2), ['/api/devices/ar-quarto/commands', { action: 'set', values: { power: false } }]);
-  assert.equal(e.calls.length, 3, 'um POST por toque');
-  await app.click('Funções extras');
-  await app.click('Turbo ligadoEstimado');
-  assert.deepEqual(last(e.calls).slice(0, 2), ['/api/devices/ar-quarto/commands', { action: 'set', values: { turbo: false } }]);
-  await app.click('EcoAlterna no aparelho');
-  assert.deepEqual(last(e.calls).slice(0, 2), ['/api/devices/ar-quarto/commands', { action: 'key', key: 'eco' }]);
+  await sends(e, app, 'Aumentar temperatura', CMD, { action: 'set', values: { temperature: 30 } }); // 24 → 30: o próximo valor com sinal
+  await sends(e, app, 'Diminuir temperatura', CMD, { action: 'set', values: { temperature: 20 } });
+  await sends(e, app, 'Desligar o ar', CMD, { action: 'set', values: { power: false } });
+  await quiet(e, app, 'Funções extras'); // abrir o painel não envia
+  await sends(e, app, 'Turbo ligadoEstimado', CMD, { action: 'set', values: { turbo: false } });
+  await sends(e, app, 'EcoAlterna no aparelho', CMD, { action: 'key', key: 'eco' });
+  assert.equal(e.calls.length, 5, 'cinco toques de comando, cinco POSTs, nenhum a mais');
 });
 
 test('Clima: trocar o modo cai na ventilação e na temperatura aprendidas mais próximas (heat → baixa, 21 °C) numa única chamada', { skip }, async () => {
   const e = env();
   const app = e.tree.mount(e.load('routes/Clima/Clima.jsx'));
-  await app.click('Calor');
-  assert.equal(e.calls.length, 1);
-  assert.deepEqual(last(e.calls).slice(0, 2), ['/api/devices/ar-quarto/commands', { action: 'set', values: { mode: 'heat', fan: 'low', temperature: 21 } }]);
+  await sends(e, app, 'Calor', CMD, { action: 'set', values: { mode: 'heat', fan: 'low', temperature: 21 } });
   assert.ok(app.isDisabled('Seco'), 'modo sem sinal aprendido não é clicável');
 });
 
-test('Clima: timer — programar 30 min e cancelar, com o corpo e a rota exatos', { skip }, async () => {
+test('Clima: timer — abrir não envia; programar 30 min e cancelar enviam UM POST cada, com rota e corpo exatos', { skip }, async () => {
   const none = env({ polls: { '/api/routines': { data: { timers: [], lastError: null }, reload() {} } } });
   const a = none.tree.mount(none.load('routes/Clima/Clima.jsx'));
-  await a.click('Timer');
-  await a.click('30 min');
-  assert.deepEqual(last(none.calls).slice(0, 2), ['/api/routines/timer', { device: 'ar-quarto', minutes: 30 }]);
+  await quiet(none, a, 'Timer');
+  await sends(none, a, '30 min', '/api/routines/timer', { device: 'ar-quarto', minutes: 30 });
   const set = env({ polls: { '/api/routines': ROUTINES } });
   const b = set.tree.mount(set.load('routes/Clima/Clima.jsx'));
-  await b.click(b.text().match(/Desliga às \d{2}:\d{2}/)[0]); // o botão do timer mostra a hora programada
-  await b.click('Cancelar timer');
-  assert.deepEqual(last(set.calls).slice(0, 2), ['/api/routines/timer', { device: 'ar-quarto', minutes: 0 }]);
-  assert.equal(set.calls.length, 1);
+  await quiet(set, b, b.text().match(/Desliga às \d{2}:\d{2}/)[0]); // o botão do timer mostra a hora programada; só abre o painel
+  await sends(set, b, 'Cancelar timer', '/api/routines/timer', { device: 'ar-quarto', minutes: 0 });
 });
 
-test('Clima: Aprender — avisa os 25 s, grava o estado, regrava o desligar e grava um extra; nada é enviado antes do toque em Gravar', { skip }, async () => {
+test('Clima: Aprender — entrar e abrir extras não enviam; Gravar estado, Regravar desligar e extra Brisa enviam UM POST cada', { skip }, async () => {
   const e = env({ polls: { '/api/routines': ROUTINES } });
   const app = e.tree.mount(e.load('routes/Clima/Clima.jsx'));
-  await app.click('Aprender');
-  assert.equal(e.calls.length, 0, 'entrar em Aprender não envia nada');
+  await quiet(e, app, 'Aprender');
   assert.match(app.text(), /em até 25 s/);
-  await app.click('Gravar ligar neste estado');
-  assert.deepEqual(last(e.calls).slice(0, 2), ['/api/devices/ar-quarto/learn', { state: { power: true, temperature: 24, mode: 'cool', fan: 'auto' } }]);
+  await sends(e, app, 'Gravar ligar neste estado', '/api/devices/ar-quarto/learn', { state: { power: true, temperature: 24, mode: 'cool', fan: 'auto' } });
   assert.match(app.text(), /Saia de Aprender e teste olhando o aparelho/);
-  await app.click('Regravar desligar');
-  assert.deepEqual(last(e.calls).slice(0, 2), ['/api/devices/ar-quarto/learn', { key: 'off' }]);
-  await app.click('Funções extras');
-  await app.click('BrisaGravar');
-  assert.deepEqual(last(e.calls).slice(0, 2), ['/api/devices/ar-quarto/learn', { key: 'brisa' }]);
+  await sends(e, app, 'Regravar desligar', '/api/devices/ar-quarto/learn', { key: 'off' });
+  await quiet(e, app, 'Funções extras');
+  await sends(e, app, 'BrisaGravar', '/api/devices/ar-quarto/learn', { key: 'brisa' });
   assert.equal(e.calls.length, 3);
 });
 
-test('Luzes: cor emite só a cor (luz acesa); brilho só muda o rascunho até Aplicar; modo roda a cena; trocar de lâmpada e branco quente liga', { skip }, async () => {
+test('Luzes: cor, Aplicar, cena e branco quente enviam UM POST cada; ajustar o rascunho e trocar de lâmpada não enviam', { skip }, async () => {
   const e = env();
   const app = e.tree.mount(e.load('routes/Luzes/Luzes.jsx'));
-  await app.click('Vermelho');
-  assert.deepEqual(last(e.calls).slice(0, 2), ['/api/devices/quarto-luz/commands', { action: 'set', values: { colorHex: '#FF3B30' } }]);
-  const before = e.calls.length;
-  await app.click('Diminuir brilho');
-  assert.equal(e.calls.length, before, 'ajustar o rascunho não envia');
-  await app.click('Aplicar 75%');
-  assert.deepEqual(last(e.calls).slice(0, 2), ['/api/devices/quarto-luz/commands', { action: 'set', values: { brightness: 75 } }]);
-  await app.click('Noite');
-  assert.deepEqual(last(e.calls).slice(0, 2), ['/api/scenes/noite/run', {}]);
-  await app.click('Banheiro · apagada');
-  await app.click('Branco quente');
-  assert.deepEqual(last(e.calls).slice(0, 2), ['/api/devices/banheiro-luz/commands', { action: 'set', values: { colorHex: '#FFD6A0', power: true } }], 'luz apagada + "ligar ao escolher cor" = acende');
+  await sends(e, app, 'Vermelho', '/api/devices/quarto-luz/commands', { action: 'set', values: { colorHex: '#FF3B30' } });
+  await quiet(e, app, 'Diminuir brilho'); // só o rascunho
+  await sends(e, app, 'Aplicar 75%', '/api/devices/quarto-luz/commands', { action: 'set', values: { brightness: 75 } });
+  await sends(e, app, 'Noite', '/api/scenes/noite/run', {});
+  await quiet(e, app, 'Banheiro · apagada'); // trocar a seleção não envia
+  await sends(e, app, 'Branco quente', '/api/devices/banheiro-luz/commands', { action: 'set', values: { colorHex: '#FFD6A0', power: true } }); // luz apagada + "ligar ao escolher cor" = acende
+  assert.equal(e.calls.length, 4);
 });
 
 test('bloqueios: botão desabilitado não emite (sem conexão com o ar, prévia sem aprender); a árvore recusa o clique', { skip }, async () => {
@@ -110,6 +108,16 @@ test('bloqueios: botão desabilitado não emite (sem conexão com o ar, prévia 
   const p = preview.tree.mount(preview.load('routes/Clima/Clima.jsx'));
   await assert.rejects(p.click('Aprender'), /desabilitado/);
   assert.equal(preview.calls.length, 0);
+});
+
+test('o contador de POST por toque FALHA quando um toque envia duas vezes (guarda contra a mutação "onKey chamado 2x")', { skip }, async () => {
+  const doubled = env({ polls: { '/api/routines': ROUTINES } });
+  const realRun = doubled.runHook.fn;
+  doubled.runHook.fn = async (path, body, ok) => { const result = await realRun(path, body, ok); if (body?.key === 'eco' || body?.values?.turbo === false) await realRun(path, body, ok); return result; };
+  const app = doubled.tree.mount(doubled.load('routes/Clima/Clima.jsx'));
+  await quiet(doubled, app, 'Funções extras');
+  await assert.rejects(sends(doubled, app, 'EcoAlterna no aparelho', CMD, { action: 'key', key: 'eco' }), /esperado 1 POST\(s\).*houve 2/);
+  await assert.rejects(sends(doubled, app, 'Turbo ligadoEstimado', CMD, { action: 'set', values: { turbo: false } }), /esperado 1 POST\(s\).*houve 2/);
 });
 
 test('cobertura (a fixture EXATA do check.cjs legado): faixas esparsas, ventilação de reserva, temperatura mais próxima, modo ausente e limites', () => {
