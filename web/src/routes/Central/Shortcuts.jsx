@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { get } from '../../core/api.js';
 import { useAction } from '../../ui/actions.js';
 import { Banner, Button, useToast } from '../../ui/kit.jsx';
 import { CopyText } from './CopyText.jsx';
 import { sceneUrl, shortcutBase } from './central.js';
+import { createKeySession } from './keysession.js';
 
 /**
  * Atalhos da Siri. A chave é um SEGREDO: só é lida do servidor quando o usuário toca em "Configurar", só aparece depois de
@@ -17,25 +18,27 @@ export function Shortcuts({ modes, subscribe, blocked, reason }) {
   const [shown, setShown] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const lock = useRef(false);
-  const generation = useRef(0);
+  const runRef = useRef(run);
+  runRef.current = run;
+  // Leitura e troca da chave pertencem a UMA sessão: fechar, reabrir ou desmontar descarta a resposta tardia (nunca a revela).
+  const session = useMemo(() => createKeySession({ read: () => get('/api/shortcuts'), rotate: () => runRef.current('/api/shortcuts/rotate', {}, 'Chave trocada: atualize seus atalhos.') }), []);
+  useEffect(() => () => session.close(), [session]);
   const base = shortcutBase(subscribe, typeof window === 'undefined' ? '' : window.location.origin);
   const toggle = async () => {
-    generation.current += 1; // fechar ou reabrir invalida uma leitura da chave ainda em voo
-    if (open) { setOpen(false); setKey(null); setShown(false); setConfirm(false); return; }
-    const mine = generation.current;
+    if (open) { session.close(); setOpen(false); setKey(null); setShown(false); setConfirm(false); return; }
     setOpen(true);
     try {
-      const result = await get('/api/shortcuts');
-      if (mine === generation.current) setKey(result.key);
-    } catch (error) { if (mine === generation.current) { toast(error.message, 'error'); setOpen(false); } }
+      const value = await session.open();
+      if (value) setKey(value);
+    } catch (error) { toast(error.message, 'error'); setOpen(false); }
   };
   const rotate = async () => {
     if (blocked || lock.current) return;
     lock.current = true;
     setConfirm(false);
     try {
-      const result = await run('/api/shortcuts/rotate', {}, 'Chave trocada: atualize seus atalhos.');
-      if (result?.key) { setKey(result.key); setShown(true); }
+      const value = await session.rotate(); // null = a sessão mudou no meio: nada é revelado e nada é repetido
+      if (value) { setKey(value); setShown(true); }
     } finally { lock.current = false; }
   };
   return (

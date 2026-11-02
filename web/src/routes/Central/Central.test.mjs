@@ -42,7 +42,9 @@ test('abrir só LÊ: nenhuma escrita, nenhum teste de aviso, a chave não é lid
   assert.doesNotMatch(html, /Lendo a chave|Authorization|Mostrar chave|Trocar a chave|>Trocar</);
   const source = readFileSync(new URL('./Shortcuts.jsx', import.meta.url), 'utf8');
   assert.equal(count(source, /get\('\/api\/shortcuts'\)/g), 1, 'a chave é lida num único lugar');
-  assert.match(source, /const toggle = async \(\) => \{[\s\S]*get\('\/api\/shortcuts'\)/, 'e só dentro do toque em Configurar');
+  assert.match(source, /read: \(\) => get\('\/api\/shortcuts'\)/, 'a leitura mora na sessão da chave');
+  assert.equal(count(source, /session\.open\(\)/g), 1, 'e a sessão só abre dentro do toque em Configurar');
+  assert.match(source, /const toggle = async \(\) => \{[\s\S]*session\.open\(\)/);
 });
 
 test('saúde: estado, tempo ligado, memória alta, cada verificação com detalhe; falha sem dado explica; antigo mostra idade', opts, () => {

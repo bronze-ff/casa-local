@@ -3,6 +3,8 @@ import { useAction } from '../../ui/actions.js';
 import { Banner, Button, Empty, IconButton, Segmented, Slider } from '../../ui/kit.jsx';
 import { Icon } from '../../ui/Icon.jsx';
 import { Overlay } from '../../ui/Overlay.jsx';
+import { ModeResult } from './ModeResult.jsx';
+import { runScene } from './result.js';
 import { AC_FANS, AC_MODES, ICONS, buildSteps, iconFor, initialSteps, modeProblems, modeTargets, moveIds, routinesUsing } from './central.js';
 
 const FORM = 'form-modo';
@@ -54,6 +56,7 @@ export function Modes({ modes, devices, routines, blocked, reason, refresh }) {
   const [run, busy] = useAction();
   const [editing, setEditing] = useState(null); // 'new' | modo
   const [removing, setRemoving] = useState(null);
+  const [last, setLast] = useState(null); // resultado do último "Rodar": por aparelho e por campo
   const lock = useRef(false);
   const targets = modeTargets(devices);
   const off = busy || blocked;
@@ -62,6 +65,12 @@ export function Modes({ modes, devices, routines, blocked, reason, refresh }) {
     lock.current = true;
     try { const result = await run(path, body, ok); if (result) refresh?.(); return result; } finally { lock.current = false; }
   };
+  const play = async (scene) => {
+    if (blocked || lock.current) return;
+    lock.current = true;
+    try { const shown = await runScene(run, scene); if (shown) setLast(shown); refresh?.(); } finally { lock.current = false; }
+  };
+  const nameOf = (id) => devices?.find((d) => d.id === id)?.name || id;
   return (
     <section className="card col" aria-label="Modos da casa">
       <div className="row sp wrap">
@@ -78,7 +87,7 @@ export function Modes({ modes, devices, routines, blocked, reason, refresh }) {
                 <span className="cen-ico" aria-hidden="true"><Icon name={iconFor(m.icon)} /></span>
                 <div className="col tight grow"><b>{m.name}</b><span className="sub">{m.description}{used.length ? ` · usado pela rotina ${used[0].name}${used.length > 1 ? ` e mais ${used.length - 1}` : ''}` : ''}</span></div>
                 <span className="row wrap">
-                  <Button variant="p" disabled={off} reason={reason || 'Aguarde a ação em andamento.'} onClick={() => act(`/api/scenes/${m.id}/run`, {}, `Modo ${m.name} aplicado.`)}>Rodar</Button>
+                  <Button variant="p" disabled={off} reason={reason || 'Aguarde a ação em andamento.'} onClick={() => play(m)}>Rodar</Button>
                   <IconButton icon="up" label={`Subir ${m.name}`} disabled={off || i === 0} onClick={() => act('/api/modes/order', { ids: moveIds(modes.map((x) => x.id), i, -1) })} />
                   <IconButton icon="down" label={`Descer ${m.name}`} disabled={off || i === modes.length - 1} onClick={() => act('/api/modes/order', { ids: moveIds(modes.map((x) => x.id), i, 1) })} />
                   <Button variant="s" icon="edit" aria-label={`Editar ${m.name}`} disabled={blocked} reason={reason} onClick={() => setEditing(m)}>Editar</Button>
@@ -92,6 +101,7 @@ export function Modes({ modes, devices, routines, blocked, reason, refresh }) {
           );
         })}
       </ul>
+      {last && <ModeResult scene={last.scene} result={last.result} nameOf={nameOf} onClose={() => setLast(null)} />}
       <Overlay open={!!editing} onClose={() => setEditing(null)} title={editing === 'new' ? 'Novo modo' : 'Editar modo'} kind="panel"
         footer={<><Button variant="s" onClick={() => setEditing(null)}>Cancelar</Button><Button variant="p" type="submit" form={FORM} busy={busy} disabled={blocked} reason={reason}>Salvar modo</Button></>}>
         {editing && <ModeForm key={editing === 'new' ? 'new' : editing.id} initial={editing === 'new' ? null : editing} targets={targets} busy={busy} onSave={async (body) => { if (await act('/api/modes', body, 'Modo salvo.')) setEditing(null); }} />}

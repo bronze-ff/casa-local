@@ -213,3 +213,23 @@ Pendências para o M6 (não são do M5): registrar `lab` e `central` e `lab.css`
 Não verificado (nada foi aberto em navegador): efeitos e `usePoll` reais, `<dialog>`, rolagem por âncora, AudioContext, layout, contraste. Os testes são de renderização estática e de lógica pura.
 
 Testes: core 59, ui 39, shell 21, routes 169 (M3 57, M4 77, Lab 14, Central 21). Nada disso é Crivo PASS: o M4 reparado segue aguardando o Crivo.
+
+## Reparo do residual P2 de áudio (Crivo M4)
+
+Problema: o stream recomeça mudo ao ocultar e mostrar a aba com a mesma câmera, mas o botão (`key` igual) mantinha o estado "som ligado"; o botão dizia ligado com o vídeo mudo e o primeiro toque não ligava. Correção só em `routes/Cameras`: `createSoundControl` (em `media.js`) lê `muted` do próprio vídeo e reavalia em `volumechange`; `MediaControls` usa `useSyncExternalStore` sobre ele (sem estado paralelo); `Live` e `Replay` reiniciam mudos pela mesma `startMuted` em todo início de stream. 4 testes novos em `Cameras/repair.test.mjs` (vídeo falso com `volumechange`, o componente real renderizado com o vídeo falso, e a garantia de que Live e Replay só usam `startMuted`). Testes: routes 173, tudo passa. O efeito React real (`useSyncExternalStore` com um `<video>` de verdade e `volumechange` do navegador) não foi executado.
+Os 5 reparos originais do M4 e o residual não são Crivo PASS: aguardam o Crivo.
+
+## Reparo Crivo M5 (2 P2)
+
+1. **Atalhos, troca de chave tardia.** `Central/keysession.js` (`createKeySession`): leitura e troca da chave pertencem a uma sessão. Fechar, reabrir ou desmontar a tela (cleanup do efeito) invalida o que estiver em voo; a resposta tardia da troca é descartada e nunca chama `setShown(true)`. Nada é repetido (o POST da troca sai uma vez). A chave nova só aparece pela leitura da sessão vigente e sob "Mostrar chave".
+2. **Modos, resultado do "Rodar".** `Central/result.js` + `ModeResult.jsx` (semântica nova, nenhum componente legado): por aparelho e por campo, o que foi pedido, o que o aparelho leu depois e a evidência do recibo (confirmado, divergente, simulado, sem confirmação, falhou, já estava como pedido), mais a mensagem de falha do servidor inteira. O título do conjunto nunca mostra parcial como sucesso. O aviso genérico por toast (`resultNotice`) continua.
+
+Testes novos: `Central/repair.test.mjs`, 9 testes (fixture no formato real de `app.scene()`: confirmado, divergente, falha com mensagem exclusiva, infravermelho aceito). Passaram. Limite honesto: nesta rodada escrevi o código antes dos testes; o RED não foi demonstrado rodando o código antigo (o defeito antigo é visível na leitura: `setShown(true)` na resposta da troca e `stepLabel` genérico). Efeitos React reais (cleanup do `useEffect`, cliques) não foram executados.
+
+## QR independente (Local/qr.js)
+
+`Local/qr.js` foi reescrito do zero a partir da ISO/IEC 18004 (modo byte, nível M, versões 10/20/30/40; GF(256) 0x11D; Reed-Solomon; BCH(15,5) e BCH(18,6); 8 máscaras com penalidade N1 a N4). O contrato de `qr.test.mjs` está intacto (2 testes). Novo: `qr.standard.test.mjs` (10 testes): vetor público de Reed-Solomon, as 8 palavras de formato do nível M, versão 7, palavras e módulos de dados das 4 versões, estrutura (localizadores, temporização, módulo escuro, duas cópias do formato, informação de versão), leitura de volta com a correção de todos os blocos conferida, limites por bytes UTF-8 (213/214, 666/667, 1370/1371, 2331/2332), escolha da menor penalidade, e o oráculo.
+- **Oráculo executado:** `qrencode` 4.1.1 existe neste computador (`/usr/bin/qrencode`). A matriz é idêntica módulo a módulo, com a mesma máscara, em 9 amostras (versões 10, 20, 30 e 40, UTF-8, URL do OwnTracks sintética, limites). O teste fica `skip` com aviso explícito se o `qrencode` não existir; nesse caso o oráculo NÃO foi executado.
+- **Não há decodificador de câmera:** a leitura por celular real não foi feita. O que existe é a igualdade com um codificador independente e a leitura de volta pelo próprio teste.
+- **Divulgação:** para confirmar o comportamento de `ownTracksURL` abri as 43 primeiras linhas do `qr.js` antigo, que incluíam as tabelas de blocos. As tabelas são dados públicos da norma (conferidos pelas contagens de palavras e módulos e pelo oráculo); o código foi escrito separado. Cópia do antigo ficou só em área temporária fora do repositório.
+- O QR está em pausa consistente (nenhuma edição durante o reparo da Central).
