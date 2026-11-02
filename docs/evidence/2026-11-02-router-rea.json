@@ -69,5 +69,13 @@
     "validation": "one LAN client, UDP and TCP DNS, allow/block checks; assess IPv6 and encrypted DNS bypass",
     "rollback": "restore that client DNS settings; stop only the new container",
     "scope": "only configured clients; host must remain powered on"
+  },
+  "followupLabel": {
+    "brand": "MitraStar",
+    "model": "GPT-2742GX4X5",
+    "portalCreated": "Roteador Vivo",
+    "loginTest": "one nonempty credential submission from label transcription; authentication not established",
+    "limitation": "photograph has ambiguous password characters; no additional variants attempted",
+    "configurationChanges": 0
   }
 }
