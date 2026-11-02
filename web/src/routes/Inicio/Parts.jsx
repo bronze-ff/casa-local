@@ -6,7 +6,20 @@ import { useAction } from '../../ui/actions.js';
 import { confidenceOf } from '../../ui/confidence.js';
 import { Icon, ICON_NAMES } from '../../ui/Icon.jsx';
 import { Banner, Button, CommandState, Confidence, IconButton, Switch } from '../../ui/kit.jsx';
+import { guarded } from '../guard.js';
+import { HISTORY_SCALE, emptyHistory, pushSample, sparkPoints } from './history.js';
 import { gameText, deviceView, meters, newestEvent, stepLabel, whereIs } from './view.js';
+
+/** Acumula amostras REAIS do computador enquanto a tela larga está aberta (uma por leitura nova do servidor). */
+export function useHistory(lab, enabled) {
+  const [history, setHistory] = useState(emptyHistory);
+  const at = lab.at;
+  useEffect(() => {
+    if (!enabled || !lab.data?.stats || !at) return;
+    setHistory((old) => pushSample(old, lab.data.stats, at));
+  }, [enabled, at]);
+  return history;
+}
 
 export function useClock() {
   const [now, setNow] = useState(() => new Date());
@@ -33,20 +46,20 @@ export function Presence({ location, compact }) {
 }
 
 /** Modos da casa. O resultado mostra cada aparelho: parcial nunca parece sucesso, IR aceito não é estado confirmado. */
-export function Modes({ scenes = [], devices = [], limit }) {
+export function Modes({ scenes = [], devices = [], limit, blocked = false }) {
   const [run] = useAction();
   const [running, setRunning] = useState(null);
   const [last, setLast] = useState(null);
   const shown = scenes.slice(0, limit);
   if (!shown.length) return null;
-  const start = async (scene) => {
+  const start = guarded(blocked, async (scene) => {
     if (running) return;
     setRunning(scene.id);
     try {
       const result = await run(`/api/scenes/${scene.id}/run`, {}, `${scene.name} aplicado`);
       if (result) setLast({ scene, result });
     } finally { setRunning(null); }
-  };
+  });
   const name = (id) => devices.find((d) => d.id === id)?.name || id;
   const steps = last?.result?.results || [];
   const partial = last?.result?.status === 'partial';
@@ -54,7 +67,7 @@ export function Modes({ scenes = [], devices = [], limit }) {
     <section className="col" aria-label="Modos">
       <div className="row wrap modes">
         {shown.map((scene) => (
-          <Button key={scene.id} variant="s" icon={ICON_NAMES.includes(scene.icon) ? scene.icon : 'sun'} busy={running === scene.id} disabled={!!running && running !== scene.id} reason="Outro modo está rodando." onClick={() => start(scene)}>{scene.name}</Button>
+          <Button key={scene.id} variant="s" icon={ICON_NAMES.includes(scene.icon) ? scene.icon : 'sun'} busy={running === scene.id} disabled={blocked || (!!running && running !== scene.id)} reason={blocked ? 'Sem conexão com o painel.' : 'Outro modo está rodando.'} onClick={() => start(scene)}>{scene.name}</Button>
         ))}
       </div>
       {last && (
@@ -70,14 +83,14 @@ export function Modes({ scenes = [], devices = [], limit }) {
 }
 
 /** Luz como objeto: número grande do brilho RELATADO, estado do comando e chave direta. */
-export function LightObject({ device, large }) {
+export function LightObject({ device, large, blocked = false }) {
   const command = useCommand(device.id);
   const [run, busy] = useAction();
   const view = deviceView(device);
   const kind = confidenceOf(device, command);
   const lit = device.state?.power === true;
   const offline = view.sub === 'sem conexão';
-  const toggle = () => run(`/api/devices/${device.id}/commands`, { action: 'set', values: { power: !lit } });
+  const toggle = guarded(blocked || offline, () => run(`/api/devices/${device.id}/commands`, { action: 'set', values: { power: !lit } }));
   return (
     <section className={`obj ${lit ? 'warm' : ''} ${large ? 'big' : 'small'} col`} aria-label={device.name}>
       <div className="row sp wrap"><span className="cap">Luz</span><span className="row"><Confidence kind={kind} /><CommandState command={command} /></span></div>
@@ -87,8 +100,9 @@ export function LightObject({ device, large }) {
           <span className={`num ${large ? 'xl' : 'm'}`} aria-live="polite">{view.known && lit ? <>{device.state.brightness ?? '—'}<span className="u">%</span></> : view.value}</span>
           <span className="sub">{view.known ? (lit ? 'brilho relatado pela luz' : 'relatado pela luz') : view.sub}{device.updatedAt ? ` · ${fmtAgo(device.updatedAt)}` : ''}</span>
         </div>
-        <IconButton icon="power" className={`big round ${lit ? 'on' : ''}`} size={26} label={lit ? `Apagar ${device.name.toLowerCase()}` : `Ligar ${device.name.toLowerCase()}`} aria-pressed={lit ? 'true' : 'false'} disabled={busy || offline || device.state?.power == null} onClick={toggle} />
+        <IconButton icon="power" className={`big round ${lit ? 'on' : ''}`} size={26} label={lit ? `Apagar ${device.name.toLowerCase()}` : `Ligar ${device.name.toLowerCase()}`} aria-pressed={lit ? 'true' : 'false'} disabled={blocked || busy || offline || device.state?.power == null} onClick={toggle} />
       </div>
+      {(blocked || offline) && <p className="hint" role="status">{blocked ? 'Sem conexão com o painel.' : 'Sem conexão com a lâmpada.'}</p>}
       {large && <a className="btn g" href={hrefFor('luzes', device.id)}>Brilho e cor em Luzes</a>}
     </section>
   );
@@ -153,21 +167,42 @@ export function LastMotion({ motion, cameraNames, compact }) {
 }
 
 /** Home lab: modo Lab/Jogo, o que o servidor diz que está acontecendo e medidores atuais (sem histórico inventado). */
-export function LabCard({ lab, compact }) {
+export function LabCard({ lab, compact, blocked = false, history }) {
   const [run, busy] = useAction();
   const d = lab.data;
   if (d && !d.enabled) return null;
   const game = d?.mode === 'jogo';
-  const toggle = async () => { if (await run('/api/homelab', { mode: game ? 'lab' : 'jogo' }, game ? 'Voltando ao normal…' : 'Ligando o modo jogo…')) lab.reload(); };
+  const toggle = guarded(blocked, async () => { if (await run('/api/homelab', { mode: game ? 'lab' : 'jogo' }, game ? 'Voltando ao normal…' : 'Ligando o modo jogo…')) lab.reload(); });
+  const readings = meters(d?.stats);
   return (
     <section className="sand col" aria-label="Home lab">
       <div className="row sp"><h2 className="h2">Home lab</h2>{!compact && <a className="btn g" href={hrefFor('lab')}>Abrir Lab</a>}</div>
       {lab.stale && <p className="sub">Sem conexão com o home lab. Mostrando o último dado conhecido.</p>}
       <div className="row sp"><div className="col tight"><span className="num m">{!d ? '—' : game ? 'Jogo' : 'Lab'}</span><span className="sub">{d ? gameText(d) : 'Lendo o home lab…'}</span></div>
-        <Switch on={game} label="Modo jogo" disabled={!d || busy || !!d?.step} onChange={toggle} /></div>
+        <Switch on={game} label="Modo jogo" disabled={blocked || !d || busy || !!d?.step} onChange={toggle} /></div>
+      {blocked && <p className="hint" role="status">Sem conexão com o painel. O modo jogo fica bloqueado.</p>}
       <div className="meters">
-        {meters(d?.stats).map((m) => <div key={m.key} className={m.warn ? 'warn' : ''}><span className="cap">{m.label}</span><b className="num s">{m.value}</b></div>)}
+        {readings.map((m) => <div key={m.key} className={m.warn ? 'warn' : ''}><span className="cap">{m.label}</span><b className="num s">{m.value}</b></div>)}
       </div>
+      {history && (
+        <div className="col" aria-label="Histórico do computador">
+          <h3 className="cap">Histórico desde que esta tela abriu</h3>
+          <div className="meters hist">
+            {readings.map((m) => {
+              const samples = history[m.key] || [];
+              const points = sparkPoints(samples, { hi: HISTORY_SCALE[m.key] });
+              return (
+                <div key={m.key}>
+                  <span className="cap">{m.label}</span>
+                  {points ? <svg viewBox="0 0 120 32" className="spark" role="img" aria-label={`${m.label}: ${samples.length} amostras reais`}><polyline points={points} /></svg> : <span className="sub">ainda sem histórico</span>}
+                  <span className="sub">{samples.length ? `última amostra ${fmtAgo(samples.at(-1).at)}` : 'sem amostra'}</span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="hint">Só amostras reais lidas enquanto esta tela está aberta (até 24). O servidor entrega apenas o valor atual; nada é preenchido com zero.</p>
+        </div>
+      )}
     </section>
   );
 }

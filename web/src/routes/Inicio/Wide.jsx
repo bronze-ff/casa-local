@@ -1,42 +1,28 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fmtAgo, fmtTime } from '../../core/format.js';
 import { hrefFor } from '../../core/route.js';
 import { Banner } from '../../ui/kit.jsx';
-import { WIDE_EVERY, pickWide, runCycle } from './frames.js';
+import { createFrameCycle, createFrameLoader, pickWide } from './frames.js';
 
-/** Quadros parados da tela larga: ciclo de 4 s, 3 pedidos por vez, pausa com a aba oculta, URLs de imagem sempre liberadas. */
+/** Quadros parados da tela larga: ciclo de 4 s, 3 pedidos por vez, parado com a aba oculta (sem laço de espera), URLs sempre liberadas. */
 function useWideFrames(ids) {
   const [frames, setFrames] = useState({});
-  const urls = useRef({});
   const key = ids.join(',');
   useEffect(() => {
     if (!key) return undefined;
-    let stop = false;
-    let timer;
-    const load = async (id) => {
-      try {
-        const response = await fetch(`/api/cameras/${id}/frame.jpg`, { cache: 'no-store' });
-        if (!response.ok) throw new Error('sem imagem');
-        const age = Number(response.headers.get('X-Frame-Age') ?? 0);
-        const url = URL.createObjectURL(await response.blob());
-        if (stop) { URL.revokeObjectURL(url); return; }
-        const old = urls.current[id];
-        urls.current[id] = url;
-        setFrames((f) => ({ ...f, [id]: { url, at: Date.now() - (Number.isFinite(age) ? age * 1000 : 0) } }));
-        if (old) setTimeout(() => URL.revokeObjectURL(old), 1000);
-      } catch {
-        if (!stop) setFrames((f) => ({ ...f, [id]: { ...f[id], failed: true } }));
-      }
-    };
-    const cycle = async () => {
-      if (document.hidden) { timer = setTimeout(cycle, 1500); return; }
-      await runCycle({ ids: key.split(','), load, stopped: () => stop });
-      if (!stop) timer = setTimeout(cycle, WIDE_EVERY);
-    };
-    cycle();
-    return () => { stop = true; clearTimeout(timer); };
+    const visible = () => !document.hidden;
+    const loader = createFrameLoader({
+      fetchFn: (path, options) => fetch(path, options), createURL: (blob) => URL.createObjectURL(blob), revokeURL: (url) => URL.revokeObjectURL(url), active: () => !ended && visible(),
+      onFrame: (id, frame) => setFrames((f) => ({ ...f, [id]: frame })), onFail: (id) => setFrames((f) => ({ ...f, [id]: { ...f[id], failed: true } })),
+    });
+    let ended = false;
+    const cycle = createFrameCycle({
+      ids: key.split(','), load: loader.load, isVisible: visible,
+      subscribe: (fn) => { document.addEventListener('visibilitychange', fn); return () => document.removeEventListener('visibilitychange', fn); },
+      setTimer: (fn, ms) => setTimeout(fn, ms), clearTimer: (id) => clearTimeout(id),
+    });
+    return () => { ended = true; cycle.stop(); loader.release(); };
   }, [key]);
-  useEffect(() => () => Object.values(urls.current).forEach((u) => URL.revokeObjectURL(u)), []);
   return frames;
 }
 

@@ -13,14 +13,17 @@ export function angleToProgress(angle) {
 }
 
 export function createDial({ min, max, values, onCommit }) {
-  const list = values?.length ? [...values].sort((a, b) => a - b) : Array.from({ length: max - min + 1 }, (_, i) => min + i);
+  // `values` ausente = sem informação de cobertura (vale a faixa inteira). `values` = [] = cobertura conhecida e VAZIA: nada a escolher.
+  const list = Array.isArray(values) ? [...values].sort((a, b) => a - b) : Array.from({ length: max - min + 1 }, (_, i) => min + i);
+  const none = list.length === 0;
   const nearest = (raw) => list.reduce((best, v) => (Math.abs(v - raw) < Math.abs(best - raw) ? v : best), list[0]);
   let origin = null;
   let current = null;
   return {
     start(value) { origin = value; current = value; },
-    move(progress) { current = nearest(min + Math.max(0, Math.min(1, progress)) * (max - min)); return current; },
+    move(progress) { if (none) return null; current = nearest(min + Math.max(0, Math.min(1, progress)) * (max - min)); return current; },
     key(direction) {
+      if (none) return null;
       if (direction === 'home') current = list[0];
       else if (direction === 'end') current = list[list.length - 1];
       else current = list[Math.max(0, Math.min(list.length - 1, list.indexOf(nearest(current ?? list[0])) + direction))];
@@ -28,7 +31,7 @@ export function createDial({ min, max, values, onCommit }) {
     },
     draft: () => current,
     release() {
-      if (current == null || current === origin) return null;
+      if (none || current == null || current === origin) return null;
       const value = current;
       origin = value;
       onCommit(value);

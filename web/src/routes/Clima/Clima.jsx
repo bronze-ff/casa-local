@@ -51,14 +51,15 @@ export default function Clima() {
   const baseFan = state.fan ?? 'auto';
   const available = temperatures(ir, baseMode, baseFan);
   const templess = !learning && !!ir?.templess?.includes(`${state.mode}/${state.fan}`);
-  const locked = !learning && (blocked || unknown || templess);
+  const noSignal = !learning && !!ir && !templess && available.length === 0; // cadastro existe e este modo/ventilação não tem nenhum sinal
+  const locked = !learning && (blocked || unknown || templess || noSignal);
   const temp = unknown && !learning ? null : selected.temperature;
   const timer = routines.data?.timers?.find((item) => item.device === DEVICE);
   const kind = confidenceOf(device, command);
   const initial = supportedState(ir, 'cool', 'auto', 24);
 
   async function action(path, body, okText) {
-    if (lock.current) return null;
+    if (lock.current || stateError) return null; // sem conexão: o banner promete bloqueio, o handler também cumpre
     lock.current = true;
     try {
       const result = await run(path, body, okText);
@@ -103,7 +104,7 @@ export default function Clima() {
             <span className="row"><Confidence kind={kind} /><CommandState command={command} /></span>
           </div>
           <Dial label="Temperatura do ar" unit=" graus" min={17} max={30} values={learning ? undefined : available} value={templess || temp == null ? null : temp} disabled={busy || locked || templess}
-            onCommit={(value) => (learning ? setDraft((old) => ({ ...old, temperature: value })) : send({ temperature: value }))}>
+            onCommit={(value) => (learning ? setDraft((old) => ({ ...old, temperature: value })) : available.includes(value) ? send({ temperature: value }) : null)}>
             {(shown) => (
               <>
                 <span className="num xl" aria-live="polite">{templess ? 'Auto' : shown == null ? '—' : <>{shown}<sup>°</sup></>}</span>
@@ -119,6 +120,7 @@ export default function Clima() {
             {learning ? 'Gravando: o ar não recebe nada até você tocar em Gravar.' : unknown ? 'Estado estimado desconhecido' : state.power ? 'Ligado · estimado' : 'Desligado · estimado'} · {device.updatedAt ? `último envio ${fmtAgo(device.updatedAt)}` : 'sem envio recente'}
           </p>
           <p className="hint">O ar não confirma o que recebeu por infravermelho. Usar o controle original deixa o painel diferente do aparelho.</p>
+          {noSignal && <Banner kind="warn" icon="alert">Nenhuma temperatura aprendida para este modo e ventilação. Use Aprender para gravar os sinais.</Banner>}
           {templess && <Banner kind="warn" icon="alert">Neste modo o controle não envia temperatura; o próprio ar decide. Para escolher, use Resfriar ou Aquecer.</Banner>}
           {!learning && (unknown
             ? <Button variant="p" disabled={blocked || !initial || initial.fan !== 'auto' || initial.temperature !== 24} reason={blocked ? reason : 'Esse estado inicial não foi aprendido.'} onClick={() => send({ power: true, temperature: 24, mode: 'cool', fan: 'auto' })}>Ligar em 24 °C · resfriar · auto</Button>

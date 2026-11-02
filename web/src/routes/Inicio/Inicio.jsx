@@ -4,7 +4,7 @@ import { get } from '../../core/api.js';
 import { fmtAgo } from '../../core/format.js';
 import { Banner, Skeleton } from '../../ui/kit.jsx';
 import { useShell } from '../../shell/context.js';
-import { ClimateObject, LabCard, LastMotion, LightObject, Modes, OtherDevices, Presence, RecentActions, useClock } from './Parts.jsx';
+import { ClimateObject, LabCard, LastMotion, LightObject, Modes, OtherDevices, Presence, RecentActions, useClock, useHistory } from './Parts.jsx';
 import { WideCameras } from './Wide.jsx';
 import { ambientOf, greetingFor } from './view.js';
 
@@ -25,6 +25,7 @@ export default function Inicio() {
   const location = usePoll('/api/location', 60000);
   const motion = usePoll(preview ? null : '/api/motion', tray ? 30000 : 15000);
   const lab = usePoll('/api/homelab', wide ? 5000 : 15000);
+  const history = useHistory(lab, wide);
   const [cameras, setCameras] = useState([]);
   useEffect(() => {
     if (preview) return;
@@ -33,6 +34,7 @@ export default function Inicio() {
   const names = useMemo(() => Object.fromEntries(cameras.map((c) => [c.id, c.name])), [cameras]);
 
   if (!home) return <div className="col" role="status"><Skeleton height={28} width="30%" /><Skeleton height={240} /></div>;
+  const blocked = !!stateError; // o banner promete bloqueio: botões E handlers o cumprem
   const devices = home.devices || [];
   const lights = devices.filter((d) => d.kind === 'light');
   const climates = devices.filter((d) => d.kind === 'climate');
@@ -58,12 +60,12 @@ export default function Inicio() {
       <div className="col inicio tray">
         {banners}
         {head}
-        <Modes scenes={home.scenes} devices={devices} />
-        {lights.map((d) => <LightObject key={d.id} device={d} />)}
+        <Modes scenes={home.scenes} devices={devices} blocked={blocked} />
+        {lights.map((d) => <LightObject key={d.id} device={d} blocked={blocked} />)}
         {climates.map((d) => <ClimateObject key={d.id} device={d} />)}
         <OtherDevices devices={others} />
         {!preview && <LastMotion motion={motion} cameraNames={names} compact />}
-        <LabCard lab={lab} compact />
+        <LabCard lab={lab} compact blocked={blocked} />
       </div>
     );
   }
@@ -71,17 +73,17 @@ export default function Inicio() {
     <div className={`col inicio ${wide ? 'wide' : ''}`}>
       {banners}
       {head}
-      <Modes scenes={home.scenes} devices={devices} />
+      <Modes scenes={home.scenes} devices={devices} blocked={blocked} />
       <div className="inicio-grid">
         <div className="objs">
-          {lights.map((d, i) => <LightObject key={d.id} device={d} large={i === 0} />)}
+          {lights.map((d, i) => <LightObject key={d.id} device={d} large={i === 0} blocked={blocked} />)}
           {climates.map((d) => <ClimateObject key={d.id} device={d} />)}
         </div>
         <aside className="col side-col">
           <OtherDevices devices={others} />
           {summary.length > 0 && <ul className="list-plain summary" aria-label="Resumo do ambiente">{summary.map(([label, value]) => <li key={label}><span className="cap">{label}</span><b>{value}</b></li>)}</ul>}
           {!preview && !wide && <LastMotion motion={motion} cameraNames={names} />}
-          <LabCard lab={lab} />
+          <LabCard lab={lab} blocked={blocked} history={wide ? history : undefined} />
           <RecentActions actions={home.recentActions} />
         </aside>
         {wide && <div className="cams"><WideCameras cameras={cameras} motion={motion} available={!preview} /></div>}

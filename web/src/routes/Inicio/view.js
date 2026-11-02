@@ -71,9 +71,15 @@ export function gameText(d) {
   return d.auto ? `Desligado · liga sozinho ao abrir ${(d.games || []).join(', ')}` : 'Desligado';
 }
 
-/** Linha de resultado de um passo de modo, em linguagem humana. */
+/**
+ * Linha de resultado de um passo de modo, em linguagem humana. Forma confirmada da API (backend/app.py `_step_result`):
+ * { deviceId, status, operation, evidence, confirmationExpected, message, receipt }. A operação (saiu ou falhou) e a EVIDÊNCIA
+ * (o que o aparelho provou) são coisas diferentes: divergente e simulado nunca viram "enviado"; falha mantém a evidência ao lado.
+ */
+const EVIDENCE = { confirmed: 'Confirmado', diverged: 'Divergente', preview: 'Simulado' };
 export function stepLabel(item) {
   if (item.status === 'skipped') return 'Já estava como pedido';
-  if (item.status === 'failed' || item.operation === 'failed') return 'Falhou';
-  return item.evidence === 'confirmed' ? 'Confirmado' : 'Enviado · sem confirmação';
+  const evidence = EVIDENCE[item.evidence];
+  if (item.status === 'failed' || item.operation === 'failed') return evidence ? `Falhou · ${evidence.toLowerCase()}` : 'Falhou';
+  return evidence || 'Enviado · sem confirmação';
 }
