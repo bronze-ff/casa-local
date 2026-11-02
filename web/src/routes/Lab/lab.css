@@ -1,0 +1,28 @@
+/* Lab. Superfícies de ui/kit.css; só cor/borda/tamanho aqui. Sem animação. */
+.lab-reads { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
+.lab-read { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-m); }
+.lab-read .num { font-size: 28px; font-weight: 700; line-height: 1.1; }
+.lab-read .u { font-size: 14px; font-weight: 500; color: var(--mut); margin-left: 2px; }
+.lab-read .spark { width: 100%; height: 32px; fill: none; stroke: var(--ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.lab-read .spark polyline { vector-effect: non-scaling-stroke; }
+.bar { height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--ink); }
+.bar.hot > i { background: var(--err); }
+.lab-two { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+.lab-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip-s { display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border: 1px solid var(--ctl); border-radius: 999px; font-size: 13px; }
+.lab-auto { border-top: 1px solid var(--line); padding-top: 12px; }
+.lab-svc > li, .lab-dev { padding: 10px 0; border-top: 1px solid var(--line); }
+.lab-svc > li:first-child, .lab-dev:first-child { border-top: 0; }
+.lab-sum { min-height: var(--hit); display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.badge { margin-left: 8px; padding: 1px 8px; border: 1px solid var(--ctl); border-radius: 999px; font-size: 12px; font-weight: 600; }
+.topo { position: relative; width: 100%; aspect-ratio: 16 / 10; min-height: 260px; border: 1px dashed var(--ctl); border-radius: var(--r-l); }
+.topo svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.topo line { stroke: var(--ctl); stroke-width: 1.5; }
+.topo line.off { stroke-dasharray: 4 4; opacity: .7; }
+.topo .node { position: absolute; transform: translate(-50%, -50%); display: inline-flex; align-items: center; gap: 6px; min-height: var(--hit); max-width: 34%; padding: 4px 10px; border: 1.5px solid var(--ctl); border-radius: 999px; background: var(--sf); color: var(--ink); font: inherit; font-size: 13px; text-align: left; overflow-wrap: anywhere; line-height: 1.2; }
+.topo .node.hub { border-style: solid; font-weight: 700; pointer-events: none; }
+.topo .node.warn { border-color: var(--warn, var(--ctl)); }
+.topo .node.bad { border-color: var(--err); }
+.topo .node .dot { flex: none; }
+@media (max-width: 599px) { .topo { aspect-ratio: 1 / 1.15; } .topo .node { max-width: 44%; } }
