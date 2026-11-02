@@ -339,7 +339,7 @@ Esta seção SUBSTITUI `web/src/redesign-verification.md`. Fonte das famílias: 
 
 Transversais cobertos por teste de texto: contraste e 44 px (`ui/theme.test`, `ui/css.test`), sem keyframes, sem blur, só `transform`/`opacity`, e a colisão de CSS (`routes/css.test`). Contraste foi CALCULADO, não medido em tela.
 
-## Remoção do legado: lista EXATA (NÃO executada)
+## Remoção do legado: lista EXATA (EXECUTADA, ver "Remoção concluída" ao fim)
 
 Escopo: `web/` do worktree. São 57 arquivos versionados. `src/main.jsx` NÃO entra na lista: já é a entrada nova. Antes de remover, o Root confere que nada novo importa o legado (conferido por mim em `core ui shell routes boot`: as únicas ocorrências de `./api.js` são o `core/api.js` NOVO, que fica).
 
@@ -368,3 +368,18 @@ Correção só em `routes/Clima/actions.test.mjs` (produto intacto: `Clima.jsx` 
 Prova de mutação (sem navegador), feita trocando `Clima.jsx` por um mutante e restaurando byte a byte (conferido com `cmp`): (a) Eco e Turbo enviando 2x em sequência: o teste de comandos FALHA em "Turbo ligadoEstimado: esperado 1 POST(s), houve 2" e o teste-guarda também; (b) só o Eco enviando 2x: o teste de comandos FALHA no Eco. Original: GREEN. Um teste-guarda extra duplica a chamada no `run` falso (como o Crivo fez) e exige que o contador reprove. Observação honesta: o `lock` de `action()` já impede dois POSTs simultâneos no produto; o mutante precisou enviar em sequência para duplicar.
 
 Suíte curta (SSR, árvore sem hooks, lógica pura; sem rede): `routes/Clima` 29 testes; total por pasta: core 59, ui 39, shell 21, routes 211, boot 13 = 343, todos passam. Legado NÃO removido.
+
+## Remoção do legado concluída (M7)
+
+Autorizada por Root com a lista validada `/tmp/casa-legacy-removal-57.json` (57 paths, `problems: []`, gerada deste manifesto). Executada SÓ no worktree, sobre a base `8a2e484`, que estava limpa (a única entrada fora do Git era o `web/node_modules`, um link somente leitura criado pelo Root; não toquei nele).
+
+Antes de apagar: lista regenerada e igual à validada; por path, arquivo existe, está versionado no Git e não cai em `core`, `ui`, `shell`, `routes`, `boot`, `main.jsx`, `index.html`, `public`, `vite.config.js`, `package.json` nem `package-lock.json`. Se QUALQUER path falhasse, nada seria apagado (verificação em passada separada). Depois, 57 arquivos apagados e 6 pastas vazias removidas (`src/screens` e as 5 subpastas).
+
+Depois de apagar:
+- `git status`: 57 deleções (`D`) e nada mais além do `web/node_modules` não versionado do Root. `git diff --name-status`: só `D`. O conjunto de deletados é IGUAL ao da lista (comparação por conjunto, 57 e 57, nada a mais e nada a menos).
+- `git diff --check`: limpo.
+- Busca de imports legados em `core ui shell routes boot main.jsx`: nenhum achado (a única menção está em `boot/boot.test.mjs`, que garante a ausência). Todos os imports relativos e `import '...css'` do código restante resolvem para arquivos que existem.
+- Suíte curta (`node --test` por pasta, fakes, sem rede): core 59, ui 39, shell 21, routes 211, boot 13 = 343, todos passam, `skipped 0`, `cancelled 0`, `todo 0`. O teste do oráculo `qrencode` não foi pulado (o CLI existe aqui).
+- Os cenários dos 14 testes antigos seguem cobertos pelos testes novos listados no inventário de portagem; nenhum teste antigo restou, e eles nunca entravam na contagem de 343.
+
+Estado honesto: não rodei build, navegador nem runtime. Root registrou um primeiro build isolado do Vite e uma prévia; a prova de navegador é do Crivo/Root. `package.json` ainda declara `@fontsource/doto` e `@fontsource/jetbrains-mono` sem uso (tirar exige `npm`, decisão do Root). As pendências de navegador da matriz F01–F19 continuam abertas.
