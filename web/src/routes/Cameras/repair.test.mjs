@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createMediaGate } from './gate.js';
-import { audioAvailability, fullscreenKind } from './media.js';
+import { audioAvailability, createSoundControl, fullscreenKind, startMuted } from './media.js';
+import { readFileSync } from 'node:fs';
 import { createSessionQueue, replayKey } from './replay.js';
 import { CAMS, count, setupCameras, skip } from './harness.mjs';
 
@@ -136,4 +137,64 @@ test('P2: Live e Replay têm som e tela cheia acessíveis quando o navegador ofe
   const t = setupCameras();
   const none = t.render(t.mod('Cameras/Live.jsx').Live, { cameras: CAMS, index: 0, poster: null, move() {}, close() {}, rewind() {} });
   assert.ok(!/aria-label="Tela cheia"/.test(none), 'sem suporte do navegador, sem botão que não funciona');
+});
+
+// Residual P2 (Crivo): o stream recomeça mudo (ocultar/mostrar a mesma câmera) sem remontar o botão; o estado do botão tem de seguir o vídeo.
+function fakeVideo(muted = true) {
+  const listeners = new Set(); let value = muted;
+  return { listeners, addEventListener: (type, fn) => { if (type === 'volumechange') listeners.add(fn); }, removeEventListener: (type, fn) => { if (type === 'volumechange') listeners.delete(fn); },
+    get muted() { return value; }, set muted(next) { if (next !== value) { value = next; [...listeners].forEach((fn) => fn()); } } };
+}
+
+test('residual P2: som ligado -> ocultar/mostrar a mesma câmera -> o stream recomeça mudo, o botão volta a "desligado" e o PRIMEIRO toque liga', () => {
+  const video = fakeVideo(true);
+  const control = createSoundControl({ current: video });
+  let notified = 0;
+  const off = control.subscribe(() => { notified += 1; });
+  assert.equal(control.isOn(), false, 'nasce mudo');
+  control.toggle();
+  assert.equal(control.isOn(), true);
+  startMuted(video); // aba voltou: o stream abre de novo e recomeça mudo, sem remontar o botão
+  assert.equal(control.isOn(), false, 'o botão acompanha o elemento');
+  assert.ok(notified >= 2, 'o React é avisado das duas mudanças');
+  control.toggle();
+  assert.equal(video.muted, false, 'o primeiro toque liga o som');
+  assert.equal(control.isOn(), true);
+  off();
+  assert.equal(video.listeners.size, 0, 'solta o ouvinte ao desmontar');
+});
+
+test('residual P2: sem vídeo o controle é seguro; trocar o elemento reata o ouvinte', () => {
+  const ref = { current: null };
+  const control = createSoundControl(ref);
+  const off = control.subscribe(() => {});
+  assert.equal(control.isOn(), false);
+  control.toggle();
+  const video = fakeVideo(true);
+  ref.current = video;
+  control.toggle();
+  assert.equal(video.muted, false);
+  assert.equal(video.listeners.size, 1);
+  off();
+});
+
+test('residual P2: o componente REAL mostra o estado do vídeo (mudo = "Ligar o som"; com som = "Desligar o som" pressionado)', { skip }, () => {
+  const t = setupCameras();
+  const { MediaControls } = t.mod('Cameras/MediaControls.jsx');
+  const draw = (muted) => t.bare(t.h(MediaControls, { video: { current: fakeVideo(muted) }, stage: { current: null } }));
+  const muted = draw(true);
+  assert.match(muted, /aria-label="Ligar o som"[^>]*aria-pressed="false"/);
+  assert.match(muted, />Som desligado</);
+  const loud = draw(false);
+  assert.match(loud, /aria-label="Desligar o som"[^>]*aria-pressed="true"/);
+  assert.match(loud, />Som ligado</);
+  assert.match(t.bare(t.h(MediaControls, { video: { current: null }, stage: { current: null } })), /aria-label="Ligar o som"/, 'sem vídeo: desligado');
+});
+
+test('residual P2: Live e Replay reiniciam mudos pela mesma função em TODO início de stream', () => {
+  for (const file of ['Live.jsx', 'Replay.jsx']) {
+    const source = readFileSync(new URL(`./${file}`, import.meta.url), 'utf8');
+    assert.match(source, /startMuted\(video\.current\)/, file);
+    assert.ok(!/video\.current\.muted\s*=/.test(source), `${file} não mexe em muted por conta própria`);
+  }
 });

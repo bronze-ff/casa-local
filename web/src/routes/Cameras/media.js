@@ -23,3 +23,24 @@ export function enterFullscreen(kind, stage, video) {
 
 export const exitFullscreen = (doc) => (doc.exitFullscreen || doc.webkitExitFullscreen)?.call(doc);
 export const fullscreenElement = (doc) => doc.fullscreenElement || doc.webkitFullscreenElement || null;
+
+/** Todo stream nasce mudo (exigência de autoplay), inclusive ao reabrir a mesma câmera depois de ocultar a aba. */
+export const startMuted = (video) => { if (video) video.muted = true; };
+
+/**
+ * Som do vídeo, lido DO ELEMENTO (`muted`) e reavaliado em `volumechange`: o botão nunca diz "ligado" com o vídeo mudo,
+ * mesmo quando o stream recomeça (ocultar/mostrar a aba, trocar de câmera) sem remontar o botão.
+ * `ref` = { current: <video> | null }. Devolve { subscribe, isOn, toggle } para useSyncExternalStore.
+ */
+export function createSoundControl(ref) {
+  const listeners = new Set();
+  let bound = null;
+  const notify = () => listeners.forEach((fn) => fn());
+  const unbind = () => { bound?.removeEventListener?.('volumechange', notify); bound = null; };
+  const bind = () => { const el = ref.current; if (el === bound) return; unbind(); bound = el; el?.addEventListener?.('volumechange', notify); };
+  return {
+    subscribe(fn) { listeners.add(fn); bind(); return () => { listeners.delete(fn); if (!listeners.size) unbind(); }; },
+    isOn: () => !!ref.current && !ref.current.muted,
+    toggle() { bind(); const el = ref.current; if (el) el.muted = !el.muted; },
+  };
+}

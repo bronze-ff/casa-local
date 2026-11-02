@@ -4,6 +4,7 @@ import { Icon } from '../../ui/Icon.jsx';
 import { Button, Status } from '../../ui/kit.jsx';
 import { MediaControls } from './MediaControls.jsx';
 import { MediaDialog, StageNote } from './MediaDialog.jsx';
+import { startMuted } from './media.js';
 import { attachMse, mseSupported } from './mse.js';
 import { useMediaGate } from './useMedia.js';
 
@@ -32,7 +33,7 @@ export function Live({ cameras, index, poster, move, close, rewind }) {
       el.src = `/api/cameras/${id}/live.mjpeg`;
       return () => { el.src = BLANK; };
     }
-    if (video.current) { video.current.muted = true; } // cada stream nasce mudo
+    startMuted(video.current); // cada stream nasce mudo, também ao reabrir a mesma câmera
     if (video.current) return attachMse(video.current, `/api/cameras/${id}/ws`, () => set({ status: 'live' }), () => set({ mjpeg: true }));
     return undefined;
   });

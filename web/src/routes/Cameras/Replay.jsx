@@ -5,6 +5,7 @@ import { Icon } from '../../ui/Icon.jsx';
 import { Banner, Button, Status } from '../../ui/kit.jsx';
 import { MediaControls } from './MediaControls.jsx';
 import { MediaDialog, StageNote } from './MediaDialog.jsx';
+import { startMuted } from './media.js';
 import { attachMse, mseSupported } from './mse.js';
 import { buildHits, clampSeek, clock, createSessionQueue, isOngoing, keyTarget, nextHit, percentAt, replayKey, stamp, timeAtX } from './replay.js';
 import { useMediaGate } from './useMedia.js';
@@ -71,7 +72,7 @@ export function Replay({ camera, start, from, to, offset, autoStart, close, goLi
   }, [started, anchor, camera.id, queue, resume]);
 
   // Só há stream com a busca iniciada, MSE suportado e id válido; antes disso a chave é undefined e nada abre.
-  useMediaGate(replayKey({ started, supported: mseSupported(), id: replayId }), (id) => (video.current ? (video.current.muted = true, attachMse(video.current, `/api/replays/${id}/ws`, () => setStatus('live'), () => setStatus('failed'), { replay: true, held: () => held.current, onEnd: () => setStatus('ended') })) : undefined));
+  useMediaGate(replayKey({ started, supported: mseSupported(), id: replayId }), (id) => (video.current ? (startMuted(video.current), attachMse(video.current, `/api/replays/${id}/ws`, () => setStatus('live'), () => setStatus('failed'), { replay: true, held: () => held.current, onEnd: () => setStatus('ended') })) : undefined));
 
   const position = anchor + played;
   useEffect(() => { // aba oculta: fecha o socket E a sessão no servidor e descarta abertura pendente; ao voltar, UMA abertura na posição em que parou (sem repetir comando sozinho)
