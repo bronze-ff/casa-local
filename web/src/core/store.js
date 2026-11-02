@@ -47,8 +47,18 @@ export function resultNotice(path, result) {
   return { kind: 'ok' };
 }
 
-/** Recusa comprovada ANTES de qualquer envio: o servidor respondeu 4xx. Sem resposta (0) ou 5xx/proxy não prova nada. */
-const rejectedBeforeSend = (error) => typeof error?.status === 'number' && error.status >= 400 && error.status < 500;
+/**
+ * Recusas que o backend garante ANTES de qualquer efeito em POST /api/scenes/:id/run (conferido em backend/server.py):
+ *   guard()        403 private_network_only, invalid_host, owner_only, invalid_origin, cross_site, invalid_token · 429 rate_limited
+ *   read_json()    411 length_required, 413 body_too_large, 415 unsupported_media, 400 invalid_request
+ *   roteamento     404 not_found (rota ou modo inexistente: modes.get falha antes do primeiro passo)
+ * Qualquer outro par (4xx sem code, code diferente, 409 genérico, 5xx/proxy, sem resposta) NÃO prova nada: fica desconhecido.
+ */
+const PRE_EFFECT_MODE_REJECTIONS = new Set([
+  '403:private_network_only', '403:invalid_host', '403:owner_only', '403:invalid_origin', '403:cross_site', '403:invalid_token',
+  '429:rate_limited', '411:length_required', '413:body_too_large', '415:unsupported_media', '400:invalid_request', '404:not_found',
+]);
+const rejectedBeforeSend = (error) => PRE_EFFECT_MODE_REJECTIONS.has(`${error?.status}:${error?.code}`);
 
 /** Como uma versão (snapshot ou recibo) se relaciona com a já aplicada. */
 function relationOf(applied, incoming) {
@@ -112,8 +122,9 @@ export function createStore({ bootstrap: readBootstrap, get, post, ApiError = Bu
     postIsNewest = false;
     if (reading) {
       if (reading.era === era) { reading.guards.push(isCurrent); return reading.promise; }
-      // A leitura em voo foi invalidada (bootstrap/reset): o resultado dela será descartado. Espera ela terminar e lê de novo.
-      return reading.promise.then(() => {}, () => {}).then(() => refresh({ force: true, isCurrent }));
+      // A leitura em voo foi invalidada (bootstrap/reset): o resultado dela será descartado. Espera ela terminar e lê de novo,
+      // mas só se ESTE chamador ainda é vigente: quem parou/ocultou nesse meio-tempo não abre tráfego novo.
+      return reading.promise.then(() => {}, () => {}).then(() => (isCurrent() ? refresh({ force: true, isCurrent }) : state.home));
     }
     const startEra = era;
     const startMutations = mutations;
