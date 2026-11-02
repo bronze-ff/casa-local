@@ -1,0 +1,58 @@
+{
+  "recordedAt": "2026-11-02T18:59:30.691190+00:00",
+  "incident": "AdGuard stopped by game-mode watchdog; conflicting manual DNS; disk pressure during Steam update",
+  "confirmedCodeCause": "Homelab.tick enumerated all running containers and stopped names outside KEEP_IN_GAME; casalocal-adguard was absent",
+  "previousDiagnosisCorrection": "Compose membership alone did not determine the watchdog stop set",
+  "manualDNSObserved": "regular /etc/resolv.conf pointed to 1.1.1.1; persistent NM DNS and applied DNS differed",
+  "directDNSProbe": {
+    "router": "responded",
+    "AdGuardLoopback": "responded",
+    "Quad9Bootstrap": "responded",
+    "CloudflareAtProbe": "timeout; not a claim of permanent unreachability"
+  },
+  "recovery": {
+    "hostDNS": "restored pre-AdGuard automatic DHCP IPv4/IPv6 DNS",
+    "resolvConf": "restored original /run/systemd/resolve/resolv.conf symlink",
+    "tailscaleSplitDNS": "retained; existing host resolves correctly",
+    "manualStateBackup": "private incident directory outside Git"
+  },
+  "codeFix": {
+    "keepInGame": [
+      "adguard",
+      "casalocal-adguard"
+    ],
+    "restoreExistingStoppedDNS": true,
+    "runningDNSNotRestarted": true,
+    "missingDNSNotCreated": true,
+    "composeStart": "explicit non-DNS services with --no-deps",
+    "offlineTests": 11,
+    "independentReview": "Crivo bounded code/offline PASS"
+  },
+  "deployment": {
+    "service": "casalocal.service",
+    "pid": 1381627,
+    "dnsContainerRunning": true,
+    "dnsContainerStartTimeUnchangedDuringDeploy": true,
+    "modeSwitchLiveTest": "not performed; existing user session/services preserved"
+  },
+  "performanceObservations": {
+    "ioPressureBeforeSomeAvg10": 81.27,
+    "ioPressureAfterSomeAvg10": 0.48,
+    "steamDiskWritesMiBInTwoSeconds": 237.63,
+    "steamActiveUpdate": "Counter-Strike 2 workshop content",
+    "userRequestedNotToPauseUpdate": true,
+    "updateCompletedByUserReport": true,
+    "causalLimit": "before/after samples support update as major contributor; not an exhaustive performance benchmark"
+  },
+  "BG3": {
+    "languagePreviouslyEnglish": true,
+    "userSelectedBrazilianPortuguese": true,
+    "installedLanguageVerified": true,
+    "runtimeLanguageVerified": "BrazilianPortuguese",
+    "runtimeReachedMenu": true,
+    "userReportedThreeAlertsNoLongerOccur": true,
+    "alertCause": "not isolated; mods unchanged between reported alerts and successful retry",
+    "userTestingGameplay": true
+  },
+  "secretsIncluded": false
+}

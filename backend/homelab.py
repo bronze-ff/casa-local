@@ -19,6 +19,7 @@ import csv
 import ctypes
 import io
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -59,7 +60,7 @@ SERVICES = [
 ]
 # Continuam no modo jogo: leves, e os avisos do celular dependem deles. O Jellyfin fica para a
 # Lorena assistir enquanto você joga.
-KEEP_IN_GAME = {"ntfy", "uptime-kuma", "diun", "dozzle", "opengym-api", "opengym-web", "jellyfin"}
+KEEP_IN_GAME = {"ntfy", "uptime-kuma", "diun", "dozzle", "opengym-api", "opengym-web", "jellyfin", "adguard", "casalocal-adguard"}
 HISTORY_EVERY, HISTORY_POINTS = 300, 288  # um ponto a cada 5 min, 24 h
 # Backup noturno do home lab (timer homelab-backup no WSL): configs dos serviços e o .env no HD.
 BACKUP_DIR = Path(os.environ.get("CASA_HOMELAB_BACKUPS", r"D:\Homelab\backups"))
@@ -73,6 +74,7 @@ WSL = shutil.which("wsl.exe") or r"C:\Windows\System32\wsl.exe"
 NVIDIA_SMI = shutil.which("nvidia-smi") or r"C:\Windows\System32\nvidia-smi.exe"
 TAILSCALE = shutil.which("tailscale") or r"C:\Program Files\Tailscale\tailscale.exe"
 DOCKER = ["docker"] if NATIVE else [WSL, "-d", DISTRO, "-u", "filippe", "--", "docker"]
+LOG = logging.getLogger(__name__)
 
 
 def run(args, timeout=60, cwd=None):
@@ -207,8 +209,45 @@ class Homelab:
             found[item.get("Names", "")] = {"state": item.get("State"), "status": item.get("Status")}
         return found
 
+    def restore_dns(self, containers=None):
+        """Religa somente o AdGuard existente e parado; nunca cria ou reinicia."""
+        if containers is None:
+            containers = self.read_containers()
+        if containers is None:
+            LOG.warning("Não foi possível consultar contêineres para restaurar DNS")
+            return
+        state = (containers or {}).get("casalocal-adguard", {}).get("state")
+        if state in {"exited", "created"}:
+            code, _ = self.run([*DOCKER, "start", "casalocal-adguard"], timeout=60)
+            if code != 0:
+                LOG.warning("Não foi possível iniciar o contêiner DNS existente")
+
+    def start_lab_services(self):
+        code, out = self.compose("config", "--services", timeout=60)
+        if code != 0 or not out.strip() or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", s) for s in out.splitlines()):
+            LOG.warning("Não foi possível enumerar os serviços do home lab; inicialização ignorada")
+            return False
+        services = sorted(set(out.split()) - {"adguard", "casalocal-adguard"})
+        if not services:
+            return True
+        if self.compose("up", "-d", "--no-deps", *services, timeout=300)[0] != 0:
+            time.sleep(10)
+            if self.compose("up", "-d", "--no-deps", *services, timeout=300)[0] != 0:
+                LOG.warning("Não foi possível iniciar os serviços do home lab")
+                return False
+        return True
+
     def runners(self, action):
         if NATIVE and os.path.isdir(RUNNERS):
+            if action == ["up", "-d"]:
+                code, out = self.run([*DOCKER, "compose", "config", "--services"], timeout=60, cwd=RUNNERS)
+                if code != 0 or not out.strip() or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", s) for s in out.splitlines()):
+                    LOG.warning("Não foi possível enumerar os runners; inicialização ignorada")
+                    return
+                services = sorted(set(out.split()) - {"adguard", "casalocal-adguard"})
+                if not services:
+                    return
+                action = [*action, "--no-deps", *services]
             self.run([*DOCKER, "compose", *action], timeout=120, cwd=RUNNERS)
 
     def reclaim(self):
@@ -223,7 +262,7 @@ class Homelab:
         if not isinstance(body, dict) or not set(body) <= {"mode", "auto", "restart"} or not body:
             raise AppError("Pedido inválido.")
         if "restart" in body:
-            if body["restart"] not in {s["id"] for s in SERVICES} | KEEP_IN_GAME:
+            if body["restart"] not in {s["id"] for s in SERVICES} | (KEEP_IN_GAME - {"adguard", "casalocal-adguard"}):
                 raise AppError("Serviço desconhecido.")
             if self.mode == "jogo" and body["restart"] not in KEEP_IN_GAME:
                 raise AppError("No modo jogo esse serviço fica parado.", 409, "game_mode")
@@ -270,10 +309,8 @@ class Homelab:
                         if self.distro_running():
                             break
                         time.sleep(2)
-                    # Logo após religar a distro o Docker ainda pode estar subindo: tenta mais uma vez.
-                    if self.compose("up", "-d", timeout=300)[0] != 0:
-                        time.sleep(10)
-                        self.compose("up", "-d", timeout=300)
+                    self.restore_dns()
+                    self.start_lab_services()
                     self.runners(["up", "-d"])
             finally:
                 with self.lock:
@@ -310,6 +347,8 @@ class Homelab:
             self.game_gone = None
         running = self.distro_running()
         containers = self.read_containers() if running else {}
+        if running and self.mode == "lab" and not self.busy.locked():
+            self.restore_dns(containers)
         stats = {"cpu": self.machine.cpu(), "gpu": self.machine.gpu(), "disks": self.machine.disks(), "wslGb": self.machine.wsl_memory()}
         try:
             from .health import machine
@@ -379,9 +418,10 @@ class Homelab:
 
         def loop():
             self.machine.cpu()  # primeira leitura de referência
+            self.restore_dns()
             # Ao subir (login), garante a stack ligada: containers parados à mão não voltam sozinhos.
             if not self.running_games():
-                self.compose("up", "-d", timeout=300)
+                self.start_lab_services()
             while not self.stop_event.is_set():
                 try:
                     # Relê a cada volta: o nome .ts.net pode mudar (máquina renomeada, login novo).

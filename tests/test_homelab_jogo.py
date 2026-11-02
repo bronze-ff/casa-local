@@ -23,6 +23,8 @@ class Runner:
         self.cwds.append(cwd)
         if "--running" in args:
             return 0, "homelab\n"
+        if "config" in args and "--services" in args:
+            return 0, "runner\nadguard\n" if cwd == homelab.RUNNERS else "radarr\nadguard\n"
         if "ps" in args:  # docker ps: um pesado acordou no modo jogo
             return 0, "\n".join(json.dumps({"Names": n, "State": "running"}) for n in ("radarr", "ntfy"))
         if "up" in args:
@@ -57,7 +59,8 @@ class GameModeTest(unittest.TestCase):
         finally:
             homelab.time.sleep = sleep
         ups = [c for c, d in zip(runner.calls, runner.cwds) if "up" in c and d != homelab.RUNNERS]
-        self.assertEqual(len(ups), 2)
+        expected = [*homelab.DOCKER, "compose", "up", "-d", "--no-deps", "radarr"]
+        self.assertEqual(ups, [expected, expected])
         self.assertEqual(lab.mode, "lab")
 
 
@@ -73,7 +76,9 @@ class GameModeTest(unittest.TestCase):
         finally:
             homelab.NATIVE, homelab.os.path.isdir, homelab.time.sleep = native, isdir, sleep
         runner_calls = [c for c, d in zip(runner.calls, runner.cwds) if d == homelab.RUNNERS]
-        self.assertEqual(runner_calls, [["docker", "compose", "stop"], ["docker", "compose", "up", "-d"]])
+        self.assertEqual(runner_calls, [["docker", "compose", "stop"],
+                                        ["docker", "compose", "config", "--services"],
+                                        ["docker", "compose", "up", "-d", "--no-deps", "runner"]])
 
 
 if __name__ == "__main__":
