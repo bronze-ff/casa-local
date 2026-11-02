@@ -2482,6 +2482,159 @@
     "restartRequired": false
   },
   "production": {
-    "published": false
+    "published": true,
+    "publishedAt": "2026-11-02T23:02:11.513661+00:00",
+    "url": "https://desktop-daa9sqh.tail634fb2.ts.net",
+    "build": "/assets/index-BHqBrtOB.js",
+    "mode": "local",
+    "configuredCount": 4,
+    "statusHTTP": 200,
+    "healthHTTP": 200,
+    "servicePIDBefore": "1381627",
+    "servicePIDAfter": "1381627",
+    "backendRestarted": false,
+    "smoke": {
+      "base": "https://desktop-daa9sqh.tail634fb2.ts.net",
+      "candidate": {
+        "js": "index-BHqBrtOB.js",
+        "css": "index-D0oyongp.css"
+      },
+      "cases": [
+        {
+          "route": "inicio",
+          "width": 390,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        },
+        {
+          "route": "luzes",
+          "width": 390,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        },
+        {
+          "route": "clima",
+          "width": 390,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        },
+        {
+          "route": "tv",
+          "width": 390,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        },
+        {
+          "route": "local",
+          "width": 390,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        },
+        {
+          "route": "cameras",
+          "width": 390,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        },
+        {
+          "route": "lab",
+          "width": 390,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        },
+        {
+          "route": "central",
+          "width": 390,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        },
+        {
+          "route": "inicio",
+          "width": 1280,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        },
+        {
+          "route": "luzes",
+          "width": 1280,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        },
+        {
+          "route": "clima",
+          "width": 1280,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        },
+        {
+          "route": "tv",
+          "width": 1280,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        },
+        {
+          "route": "local",
+          "width": 1280,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        },
+        {
+          "route": "cameras",
+          "width": 1280,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        },
+        {
+          "route": "lab",
+          "width": 1280,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        },
+        {
+          "route": "central",
+          "width": 1280,
+          "overflow": 0,
+          "mainCount": 1,
+          "js": true,
+          "css": true
+        }
+      ],
+      "blockedMethods": [],
+      "pageErrors": [],
+      "httpErrors": [],
+      "ok": true
+    },
+    "artifactMatchesVerifiedRelease": true,
+    "limits": "GET/HEAD only; WebSocket blocked; no device commands or physical-response claims"
   }
 }
