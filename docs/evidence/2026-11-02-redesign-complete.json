@@ -1,0 +1,2487 @@
+{
+  "date": "2026-11-02",
+  "scope": "Frontend remake: eight routes and Lab; no backend or device configuration changes",
+  "design": {
+    "tool": "Claude /design",
+    "model": "Opus 5.5",
+    "effort": "Medium",
+    "artifact": "https://claude.ai/artifact/2xXAzursABM1bcHqj2Q4oq",
+    "version": "1793651364-f3af",
+    "implementationModel": "Claude Sonnet 5.5"
+  },
+  "sourceBeforeEvidence": "66014c67019d8fe1aaea35cf2a608012c0adbcf9",
+  "build": {
+    "vite": "6.4.5",
+    "modules": 130,
+    "js": "index-BHqBrtOB.js",
+    "css": "index-D0oyongp.css",
+    "files": {
+      "apple-touch-icon.png": "7643a5d76b48275f804600b76c68cdf3efb3ca5c543d072f2c901fc7e3c5a437",
+      "favicon.svg": "a7a076ffb817659aaf9acb1b5268477e7c437d39e8ac41514c81c7220ba9af7f",
+      "icon-192.png": "c3637e5bf6e7a83d7bd906a0532f1f07b1b471af6eda0dc47a9a78c360f71c07",
+      "icon-512.png": "815c5376f49fe1a1b6e20b12f5fcf3e352c95d4737a9708994b06db719d9be69",
+      "icon.svg": "aacd398beac527f6f7f2b3be9af8240f34b64444db9e2df7f0692aa0f81c944b",
+      "manifest.webmanifest": "241ac2991393454094324ab7c7868012e88bd9c8642344241334da951f444583",
+      "sw.js": "15e98b8a5ec6a1e61449bf79ff2e7bd36457063b9ef38a55cb75e6377b2d7c4d",
+      "index.html": "fec7e39f54c2e9728880c32f97d5c507452f2afacf341d3fae2dcf82ff2a12ff",
+      "assets/index-D0oyongp.css": "479b1103e10ded730f1647dd8dbd2d0d58c909d4be434a10aa0736f607620f36",
+      "assets/Alert-KlvWCv1a.js": "fb62d8d0c9d769cf59fd53360108108fa8ed096411470e72d9eef996f1bd80a3",
+      "assets/Inicio-Dt2Ns5KL.js": "01b09f7e0fe950e04ec6288b0f44690c8dd20a6861fed6253c63c4083613efba",
+      "assets/Luzes-CnQqSQDO.js": "e4f36ea81d9128ab3c9f84529fa42730aadea68653203ae249f3ad3cb4d4789c",
+      "assets/Clima-BTkqbCw3.js": "17f502d4bf638e789a3a62945e1479f8e00bcc4d2ae5ffc31647d377b1153e17",
+      "assets/TV-B7FRMHRc.js": "6de3bed6ba8626c6db04504c1cda387e1a8e09f1d73ca43aa9e07b3982be0c54",
+      "assets/index-BHqBrtOB.js": "7a47deeca6361e3582390ff79044fd66434739c13b4d7700b1ba2ad5533a0e2c",
+      "assets/Local-fBKcqATG.js": "8683318a81186a277188dafdf1c593c662cf4d566503b34f987d36d1cf9aef34",
+      "assets/Cameras-CHhpckrS.js": "8b7420bfb2160aff0749e24cd7846c96c987fe18cd3522448c9751a0dc9e858d",
+      "assets/Lab-BHSjObci.js": "fbdc5e654af521e8d3ae4236ace49cd27be436fe8725bfd551646375684d6650",
+      "assets/frames-CN_qyHk0.js": "4dbb3c4afd9caebd8e2095459b7858b5b4d83516d527332627d9fea9a5090a18",
+      "assets/history-DkcGKIzU.js": "d73f7cdff77d5a6ffd1eb4ee01f70ef4c8a81fa5b3654c0baa554c8f1d32a5cb",
+      "assets/Central-C4P4SP9l.js": "2b3a5764a2d6dff2f3a1d8f38bd86a6b493ad9da4add857d9903e55d65310279",
+      "assets/actions-DV891zCn.js": "ec779565bc7a69489d67adc23afe0400e99b9cc852d1d1efbbe7e2c732068272",
+      "assets/format-rhg1OgV7.js": "cc8e94e8e35ec77ae3c1a4198e830e8eb6f4634f74702d6fd6244e8fdbe5768d"
+    },
+    "releaseDiffersFromMeasuredBuildOnlyByGeneratedServiceWorker": true
+  },
+  "tests": {
+    "executor": "Root",
+    "files": 49,
+    "tests": 357,
+    "pass": 357,
+    "fail": 0,
+    "skip": 0,
+    "log": "/tmp/casalocal-redesign-root-release-tests.tap"
+  },
+  "review": {
+    "warden": "Crivo",
+    "verdict": "Integrated bounded PASS, no remaining findings in executed scope",
+    "reports": [
+      "/tmp/crivo-redesign-20261102-r2/report.md",
+      "/tmp/crivo-redesign-20261102-r4/report.md"
+    ],
+    "fullscreenHintContrast": 13.984,
+    "limits": [
+      "API/POST/WebSocket/MSE fixtures; no real stream decoding or hardware commands",
+      "Not universal accessibility or real iPhone/Safari verification"
+    ]
+  },
+  "offline": {
+    "executor": "Root",
+    "routes": 8,
+    "errors": 0,
+    "posts": 0,
+    "cacheEntries": 23,
+    "apiCached": false,
+    "limits": "Offline shell/assets loading only; no offline physical command queue"
+  },
+  "performance": {
+    "verdict": "Mixed descriptive preview results accepted as explicit tradeoffs; no overall performance-improvement claim",
+    "samplesPerCase": 1,
+    "casesPerBuild": 16,
+    "comparisonSHA256": "889c3d4fe94bd4f83b0c71d07072abfa45f7855dd3db764380d60442aaf72f24",
+    "scriptSHA256": "2d2d8ce8ca635c3a60ccd7dfe30c3264b120eda094a9be9166320c194256c49a",
+    "baselineRepeated": false,
+    "excludedRun": "R3 incomplete 11/16 cases, interrupted for newly identified contrast repair; excluded from final comparison",
+    "cases": [
+      {
+        "id": "inicio-390x844",
+        "metrics": {
+          "requests": {
+            "baseline": 9,
+            "candidate": 14,
+            "difference": 5,
+            "percent": 55.55555555555556
+          },
+          "decodedBodyBytes": {
+            "baseline": 238948,
+            "candidate": 240584,
+            "difference": 1636,
+            "percent": 0.6846677938296198
+          },
+          "encodedBodyBytes": {
+            "baseline": 82910,
+            "candidate": 86355,
+            "difference": 3445,
+            "percent": 4.1551079483777595
+          },
+          "encodedTransferBytes": {
+            "baseline": 89250,
+            "candidate": 94377,
+            "difference": 5127,
+            "percent": 5.74453781512605
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 1.92500000000001,
+            "candidate": 2.4339999999999917,
+            "difference": 0.5089999999999817,
+            "percent": 26.44155844155735
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5011.593999999604,
+            "candidate": 5010.614000002533,
+            "difference": -0.9799999970709905,
+            "percent": -0.019554656603688724
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": 56472,
+            "candidate": 89256,
+            "difference": 32784,
+            "percent": 58.05354866128347
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2477360,
+            "candidate": 2443076,
+            "difference": -34284,
+            "percent": -1.3838925307585495
+          },
+          "domNodesEnd": {
+            "baseline": 290,
+            "candidate": 290,
+            "difference": 0,
+            "percent": 0
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 6,
+              "difference": 5,
+              "percent": 500
+            },
+            "decodedBodyBytes": {
+              "baseline": 192714,
+              "candidate": 198613,
+              "difference": 5899,
+              "percent": 3.061012692383532
+            },
+            "encodedTransferBytes": {
+              "baseline": 65009,
+              "candidate": 70647,
+              "difference": 5638,
+              "percent": 8.67264532603178
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      },
+      {
+        "id": "luzes-390x844",
+        "metrics": {
+          "requests": {
+            "baseline": 8,
+            "candidate": 10,
+            "difference": 2,
+            "percent": 25
+          },
+          "decodedBodyBytes": {
+            "baseline": 242399,
+            "candidate": 226713,
+            "difference": -15686,
+            "percent": -6.471148808369671
+          },
+          "encodedBodyBytes": {
+            "baseline": 82852,
+            "candidate": 79343,
+            "difference": -3509,
+            "percent": -4.235262878385555
+          },
+          "encodedTransferBytes": {
+            "baseline": 88001,
+            "candidate": 85151,
+            "difference": -2850,
+            "percent": -3.2385995613686207
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 6.038999999999996,
+            "candidate": 2.9799999999999964,
+            "difference": -3.0589999999999997,
+            "percent": -50.65408180162281
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5010.135000000446,
+            "candidate": 5003.491999999824,
+            "difference": -6.6430000006221235,
+            "percent": -0.13259123757386843
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": -319104,
+            "candidate": -345204,
+            "difference": -26100,
+            "percent": 8.179151624548735
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2401860,
+            "candidate": 2397188,
+            "difference": -4672,
+            "percent": -0.19451591683112254
+          },
+          "domNodesEnd": {
+            "baseline": 236,
+            "candidate": 282,
+            "difference": 46,
+            "percent": 19.491525423728813
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 2,
+              "candidate": 4,
+              "difference": 2,
+              "percent": 100
+            },
+            "decodedBodyBytes": {
+              "baseline": 199027,
+              "candidate": 187604,
+              "difference": -11423,
+              "percent": -5.739422289438116
+            },
+            "encodedTransferBytes": {
+              "baseline": 68156,
+              "candidate": 65817,
+              "difference": -2339,
+              "percent": -3.4318328540407306
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      },
+      {
+        "id": "clima-390x844",
+        "metrics": {
+          "requests": {
+            "baseline": 10,
+            "candidate": 12,
+            "difference": 2,
+            "percent": 20
+          },
+          "decodedBodyBytes": {
+            "baseline": 248927,
+            "candidate": 235028,
+            "difference": -13899,
+            "percent": -5.583564659518654
+          },
+          "encodedBodyBytes": {
+            "baseline": 85298,
+            "candidate": 82874,
+            "difference": -2424,
+            "percent": -2.841801683509578
+          },
+          "encodedTransferBytes": {
+            "baseline": 91986,
+            "candidate": 90216,
+            "difference": -1770,
+            "percent": -1.9242058574130847
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 2.4430000000000005,
+            "candidate": 2.0839999999999956,
+            "difference": -0.35900000000000487,
+            "percent": -14.695047073270764
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5011.15000000209,
+            "candidate": 5011.472999998659,
+            "difference": 0.3229999965697061,
+            "percent": 0.006445626184998882
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": 102148,
+            "candidate": 78432,
+            "difference": -23716,
+            "percent": -23.217292555899284
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2524612,
+            "candidate": 2498268,
+            "difference": -26344,
+            "percent": -1.0434870784104646
+          },
+          "domNodesEnd": {
+            "baseline": 310,
+            "candidate": 250,
+            "difference": -60,
+            "percent": -19.35483870967742
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 2,
+              "candidate": 4,
+              "difference": 2,
+              "percent": 100
+            },
+            "decodedBodyBytes": {
+              "baseline": 205023,
+              "candidate": 195387,
+              "difference": -9636,
+              "percent": -4.699960492237457
+            },
+            "encodedTransferBytes": {
+              "baseline": 70076,
+              "candidate": 68817,
+              "difference": -1259,
+              "percent": -1.796620811690165
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      },
+      {
+        "id": "tv-390x844",
+        "metrics": {
+          "requests": {
+            "baseline": 9,
+            "candidate": 11,
+            "difference": 2,
+            "percent": 22.22222222222222
+          },
+          "decodedBodyBytes": {
+            "baseline": 245603,
+            "candidate": 228907,
+            "difference": -16696,
+            "percent": -6.79796256560384
+          },
+          "encodedBodyBytes": {
+            "baseline": 83963,
+            "candidate": 80197,
+            "difference": -3766,
+            "percent": -4.485309005157034
+          },
+          "encodedTransferBytes": {
+            "baseline": 89883,
+            "candidate": 86772,
+            "difference": -3111,
+            "percent": -3.461166182704182
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 1.805000000000001,
+            "candidate": 1.8750000000000018,
+            "difference": 0.07000000000000073,
+            "percent": 3.8781163434903427
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5011.059000000387,
+            "candidate": 5011.045000002923,
+            "difference": -0.013999997463542968,
+            "percent": -0.0002793820121363945
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": 81632,
+            "candidate": 76972,
+            "difference": -4660,
+            "percent": -5.708545668365347
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2715068,
+            "candidate": 2485384,
+            "difference": -229684,
+            "percent": -8.459603958353897
+          },
+          "domNodesEnd": {
+            "baseline": 267,
+            "candidate": 305,
+            "difference": 38,
+            "percent": 14.232209737827715
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 2,
+              "candidate": 4,
+              "difference": 2,
+              "percent": 100
+            },
+            "decodedBodyBytes": {
+              "baseline": 202198,
+              "candidate": 189765,
+              "difference": -12433,
+              "percent": -6.148923332575
+            },
+            "encodedTransferBytes": {
+              "baseline": 69239,
+              "candidate": 66639,
+              "difference": -2600,
+              "percent": -3.75510911480524
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      },
+      {
+        "id": "local-390x844",
+        "metrics": {
+          "requests": {
+            "baseline": 9,
+            "candidate": 11,
+            "difference": 2,
+            "percent": 22.22222222222222
+          },
+          "decodedBodyBytes": {
+            "baseline": 259105,
+            "candidate": 245187,
+            "difference": -13918,
+            "percent": -5.371567511240617
+          },
+          "encodedBodyBytes": {
+            "baseline": 89235,
+            "candidate": 86372,
+            "difference": -2863,
+            "percent": -3.208382361181151
+          },
+          "encodedTransferBytes": {
+            "baseline": 95151,
+            "candidate": 92952,
+            "difference": -2199,
+            "percent": -2.311063467541066
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 1.7030000000000032,
+            "candidate": 1.6409999999999967,
+            "difference": -0.062000000000006494,
+            "percent": -3.6406341749856947
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5010.828999998921,
+            "candidate": 5005.763000001025,
+            "difference": -5.065999997896142,
+            "percent": -0.10110103533561479
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": 42416,
+            "candidate": 60640,
+            "difference": 18224,
+            "percent": 42.96491889852886
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2625728,
+            "candidate": 2705844,
+            "difference": 80116,
+            "percent": 3.051191898018378
+          },
+          "domNodesEnd": {
+            "baseline": 174,
+            "candidate": 171,
+            "difference": -3,
+            "percent": -1.7241379310344827
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 2,
+              "candidate": 4,
+              "difference": 2,
+              "percent": 100
+            },
+            "decodedBodyBytes": {
+              "baseline": 215709,
+              "candidate": 206054,
+              "difference": -9655,
+              "percent": -4.475937489859023
+            },
+            "encodedTransferBytes": {
+              "baseline": 74516,
+              "candidate": 72828,
+              "difference": -1688,
+              "percent": -2.265285307853347
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      },
+      {
+        "id": "cameras-390x844",
+        "metrics": {
+          "requests": {
+            "baseline": 10,
+            "candidate": 13,
+            "difference": 3,
+            "percent": 30
+          },
+          "decodedBodyBytes": {
+            "baseline": 263577,
+            "candidate": 251352,
+            "difference": -12225,
+            "percent": -4.638113340693612
+          },
+          "encodedBodyBytes": {
+            "baseline": 90189,
+            "candidate": 88246,
+            "difference": -1943,
+            "percent": -2.1543647229706506
+          },
+          "encodedTransferBytes": {
+            "baseline": 96872,
+            "candidate": 95941,
+            "difference": -931,
+            "percent": -0.9610620199851351
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 2.2189999999999985,
+            "candidate": 2.2090000000000027,
+            "difference": -0.00999999999999579,
+            "percent": -0.4506534474986839
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5005.570000001171,
+            "candidate": 5011.522000000696,
+            "difference": 5.95199999952456,
+            "percent": 0.11890753699425176
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": 106920,
+            "candidate": -339748,
+            "difference": -446668,
+            "percent": -417.7590722035166
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2745212,
+            "candidate": 2391844,
+            "difference": -353368,
+            "percent": -12.872157050165889
+          },
+          "domNodesEnd": {
+            "baseline": 174,
+            "candidate": 186,
+            "difference": 12,
+            "percent": 6.896551724137931
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 2,
+              "candidate": 5,
+              "difference": 3,
+              "percent": 150
+            },
+            "decodedBodyBytes": {
+              "baseline": 219877,
+              "candidate": 211915,
+              "difference": -7962,
+              "percent": -3.6211154418151965
+            },
+            "encodedTransferBytes": {
+              "baseline": 75166,
+              "candidate": 74746,
+              "difference": -420,
+              "percent": -0.5587632706276774
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      },
+      {
+        "id": "lab-390x844",
+        "metrics": {
+          "requests": {
+            "baseline": 10,
+            "candidate": 13,
+            "difference": 3,
+            "percent": 30
+          },
+          "decodedBodyBytes": {
+            "baseline": 255038,
+            "candidate": 241126,
+            "difference": -13912,
+            "percent": -5.454873391416181
+          },
+          "encodedBodyBytes": {
+            "baseline": 88830,
+            "candidate": 86353,
+            "difference": -2477,
+            "percent": -2.788472362940448
+          },
+          "encodedTransferBytes": {
+            "baseline": 95515,
+            "candidate": 94018,
+            "difference": -1497,
+            "percent": -1.5672930953253414
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 2.3920000000000052,
+            "candidate": 2.1950000000000025,
+            "difference": -0.19700000000000273,
+            "percent": -8.235785953177354
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5011.070000000473,
+            "candidate": 5011.695999997755,
+            "difference": 0.6259999972826336,
+            "percent": 0.012492341900683377
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": 191776,
+            "candidate": 190132,
+            "difference": -1644,
+            "percent": -0.8572501251460036
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2618872,
+            "candidate": 2693660,
+            "difference": 74788,
+            "percent": 2.855733308080731
+          },
+          "domNodesEnd": {
+            "baseline": 616,
+            "candidate": 563,
+            "difference": -53,
+            "percent": -8.603896103896105
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 2,
+              "candidate": 5,
+              "difference": 3,
+              "percent": 150
+            },
+            "decodedBodyBytes": {
+              "baseline": 208706,
+              "candidate": 199057,
+              "difference": -9649,
+              "percent": -4.623249930524278
+            },
+            "encodedTransferBytes": {
+              "baseline": 71175,
+              "candidate": 70189,
+              "difference": -986,
+              "percent": -1.3853178784685634
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      },
+      {
+        "id": "central-390x844",
+        "metrics": {
+          "requests": {
+            "baseline": 14,
+            "candidate": 15,
+            "difference": 1,
+            "percent": 7.142857142857142
+          },
+          "decodedBodyBytes": {
+            "baseline": 269098,
+            "candidate": 260907,
+            "difference": -8191,
+            "percent": -3.043872492549183
+          },
+          "encodedBodyBytes": {
+            "baseline": 92189,
+            "candidate": 90593,
+            "difference": -1596,
+            "percent": -1.7312260681860092
+          },
+          "encodedTransferBytes": {
+            "baseline": 101939,
+            "candidate": 100240,
+            "difference": -1699,
+            "percent": -1.6666830163136779
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 3.8639999999999923,
+            "candidate": 4.212000000000008,
+            "difference": 0.3480000000000154,
+            "percent": 9.006211180124641
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5011.248000002524,
+            "candidate": 5007.391999999527,
+            "difference": -3.8560000029974617,
+            "percent": -0.07694690031296633
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": 244436,
+            "candidate": 220048,
+            "difference": -24388,
+            "percent": -9.977253759675333
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2848620,
+            "candidate": 2804476,
+            "difference": -44144,
+            "percent": -1.5496626436660559
+          },
+          "domNodesEnd": {
+            "baseline": 762,
+            "candidate": 635,
+            "difference": -127,
+            "percent": -16.666666666666664
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 2,
+              "candidate": 4,
+              "difference": 2,
+              "percent": 100
+            },
+            "decodedBodyBytes": {
+              "baseline": 223487,
+              "candidate": 219965,
+              "difference": -3522,
+              "percent": -1.5759305910410897
+            },
+            "encodedTransferBytes": {
+              "baseline": 75255,
+              "candidate": 75240,
+              "difference": -15,
+              "percent": -0.019932230416583617
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      },
+      {
+        "id": "inicio-1280x900",
+        "metrics": {
+          "requests": {
+            "baseline": 9,
+            "candidate": 14,
+            "difference": 5,
+            "percent": 55.55555555555556
+          },
+          "decodedBodyBytes": {
+            "baseline": 238951,
+            "candidate": 240587,
+            "difference": 1636,
+            "percent": 0.6846591979108687
+          },
+          "encodedBodyBytes": {
+            "baseline": 82918,
+            "candidate": 86353,
+            "difference": 3435,
+            "percent": 4.142646952410815
+          },
+          "encodedTransferBytes": {
+            "baseline": 89253,
+            "candidate": 94380,
+            "difference": 5127,
+            "percent": 5.744344727908306
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 2.014000000000002,
+            "candidate": 2.214000000000001,
+            "difference": 0.19999999999999885,
+            "percent": 9.930486593843032
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5011.081000000559,
+            "candidate": 5010.500999997021,
+            "difference": -0.5800000035378616,
+            "percent": -0.011574348998505452
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": 56404,
+            "candidate": 87752,
+            "difference": 31348,
+            "percent": 55.57761860860931
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2491176,
+            "candidate": 2426100,
+            "difference": -65076,
+            "percent": -2.6122602337209413
+          },
+          "domNodesEnd": {
+            "baseline": 304,
+            "candidate": 311,
+            "difference": 7,
+            "percent": 2.302631578947368
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 6,
+              "difference": 5,
+              "percent": 500
+            },
+            "decodedBodyBytes": {
+              "baseline": 192714,
+              "candidate": 198613,
+              "difference": 5899,
+              "percent": 3.061012692383532
+            },
+            "encodedTransferBytes": {
+              "baseline": 65009,
+              "candidate": 70647,
+              "difference": 5638,
+              "percent": 8.67264532603178
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      },
+      {
+        "id": "luzes-1280x900",
+        "metrics": {
+          "requests": {
+            "baseline": 8,
+            "candidate": 10,
+            "difference": 2,
+            "percent": 25
+          },
+          "decodedBodyBytes": {
+            "baseline": 242402,
+            "candidate": 226716,
+            "difference": -15686,
+            "percent": -6.4710687205551105
+          },
+          "encodedBodyBytes": {
+            "baseline": 82845,
+            "candidate": 79346,
+            "difference": -3499,
+            "percent": -4.223550003017683
+          },
+          "encodedTransferBytes": {
+            "baseline": 88004,
+            "candidate": 85154,
+            "difference": -2850,
+            "percent": -3.238489159583655
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 5.888000000000004,
+            "candidate": 2.3070000000000035,
+            "difference": -3.581000000000001,
+            "percent": -60.81861413043475
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5005.498999998963,
+            "candidate": 5001.390999997966,
+            "difference": -4.108000000996981,
+            "percent": -0.08206973972021235
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": -332648,
+            "candidate": 92472,
+            "difference": 425120,
+            "percent": -127.7987542387148
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2388568,
+            "candidate": 2459244,
+            "difference": 70676,
+            "percent": 2.9589276922407066
+          },
+          "domNodesEnd": {
+            "baseline": 237,
+            "candidate": 303,
+            "difference": 66,
+            "percent": 27.848101265822784
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 2,
+              "candidate": 4,
+              "difference": 2,
+              "percent": 100
+            },
+            "decodedBodyBytes": {
+              "baseline": 199027,
+              "candidate": 187604,
+              "difference": -11423,
+              "percent": -5.739422289438116
+            },
+            "encodedTransferBytes": {
+              "baseline": 68156,
+              "candidate": 65817,
+              "difference": -2339,
+              "percent": -3.4318328540407306
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      },
+      {
+        "id": "clima-1280x900",
+        "metrics": {
+          "requests": {
+            "baseline": 10,
+            "candidate": 12,
+            "difference": 2,
+            "percent": 20
+          },
+          "decodedBodyBytes": {
+            "baseline": 248927,
+            "candidate": 235028,
+            "difference": -13899,
+            "percent": -5.583564659518654
+          },
+          "encodedBodyBytes": {
+            "baseline": 85298,
+            "candidate": 82869,
+            "difference": -2429,
+            "percent": -2.847663485662032
+          },
+          "encodedTransferBytes": {
+            "baseline": 91986,
+            "candidate": 90216,
+            "difference": -1770,
+            "percent": -1.9242058574130847
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 2.6060000000000043,
+            "candidate": 2.141999999999998,
+            "difference": -0.4640000000000062,
+            "percent": -17.805065234075418
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5001.021000000037,
+            "candidate": 5001.940999998624,
+            "difference": 0.919999998586718,
+            "percent": 0.018396243458819933
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": 125824,
+            "candidate": 87552,
+            "difference": -38272,
+            "percent": -30.41709053916582
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2491716,
+            "candidate": 2558040,
+            "difference": 66324,
+            "percent": 2.6617800744547133
+          },
+          "domNodesEnd": {
+            "baseline": 311,
+            "candidate": 271,
+            "difference": -40,
+            "percent": -12.861736334405144
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 2,
+              "candidate": 4,
+              "difference": 2,
+              "percent": 100
+            },
+            "decodedBodyBytes": {
+              "baseline": 205023,
+              "candidate": 195387,
+              "difference": -9636,
+              "percent": -4.699960492237457
+            },
+            "encodedTransferBytes": {
+              "baseline": 70076,
+              "candidate": 68817,
+              "difference": -1259,
+              "percent": -1.796620811690165
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      },
+      {
+        "id": "tv-1280x900",
+        "metrics": {
+          "requests": {
+            "baseline": 9,
+            "candidate": 11,
+            "difference": 2,
+            "percent": 22.22222222222222
+          },
+          "decodedBodyBytes": {
+            "baseline": 245603,
+            "candidate": 228907,
+            "difference": -16696,
+            "percent": -6.79796256560384
+          },
+          "encodedBodyBytes": {
+            "baseline": 83968,
+            "candidate": 80197,
+            "difference": -3771,
+            "percent": -4.4909965701219505
+          },
+          "encodedTransferBytes": {
+            "baseline": 89883,
+            "candidate": 86772,
+            "difference": -3111,
+            "percent": -3.461166182704182
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 2.145000000000001,
+            "candidate": 1.7040000000000042,
+            "difference": -0.44099999999999673,
+            "percent": -20.559440559440397
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5011.975000001257,
+            "candidate": 5011.789000000135,
+            "difference": -0.18600000112201087,
+            "percent": -0.0037111119094162324
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": 84556,
+            "candidate": 72808,
+            "difference": -11748,
+            "percent": -13.893750886986139
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2728940,
+            "candidate": 2466720,
+            "difference": -262220,
+            "percent": -9.608859117459527
+          },
+          "domNodesEnd": {
+            "baseline": 275,
+            "candidate": 337,
+            "difference": 62,
+            "percent": 22.545454545454547
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 2,
+              "candidate": 4,
+              "difference": 2,
+              "percent": 100
+            },
+            "decodedBodyBytes": {
+              "baseline": 202198,
+              "candidate": 189765,
+              "difference": -12433,
+              "percent": -6.148923332575
+            },
+            "encodedTransferBytes": {
+              "baseline": 69239,
+              "candidate": 66639,
+              "difference": -2600,
+              "percent": -3.75510911480524
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      },
+      {
+        "id": "local-1280x900",
+        "metrics": {
+          "requests": {
+            "baseline": 9,
+            "candidate": 11,
+            "difference": 2,
+            "percent": 22.22222222222222
+          },
+          "decodedBodyBytes": {
+            "baseline": 259105,
+            "candidate": 245187,
+            "difference": -13918,
+            "percent": -5.371567511240617
+          },
+          "encodedBodyBytes": {
+            "baseline": 89230,
+            "candidate": 86377,
+            "difference": -2853,
+            "percent": -3.197355149613359
+          },
+          "encodedTransferBytes": {
+            "baseline": 95151,
+            "candidate": 92952,
+            "difference": -2199,
+            "percent": -2.311063467541066
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 1.7950000000000048,
+            "candidate": 1.692000000000006,
+            "difference": -0.10299999999999887,
+            "percent": -5.738161559888501
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5009.687000001577,
+            "candidate": 5010.777999999846,
+            "difference": 1.0909999982686713,
+            "percent": 0.02177780764084319
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": 51748,
+            "candidate": 67636,
+            "difference": 15888,
+            "percent": 30.702635850660897
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2626748,
+            "candidate": 2703512,
+            "difference": 76764,
+            "percent": 2.9223968191847867
+          },
+          "domNodesEnd": {
+            "baseline": 175,
+            "candidate": 192,
+            "difference": 17,
+            "percent": 9.714285714285714
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 2,
+              "candidate": 4,
+              "difference": 2,
+              "percent": 100
+            },
+            "decodedBodyBytes": {
+              "baseline": 215709,
+              "candidate": 206054,
+              "difference": -9655,
+              "percent": -4.475937489859023
+            },
+            "encodedTransferBytes": {
+              "baseline": 74516,
+              "candidate": 72828,
+              "difference": -1688,
+              "percent": -2.265285307853347
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      },
+      {
+        "id": "cameras-1280x900",
+        "metrics": {
+          "requests": {
+            "baseline": 10,
+            "candidate": 13,
+            "difference": 3,
+            "percent": 30
+          },
+          "decodedBodyBytes": {
+            "baseline": 263577,
+            "candidate": 251352,
+            "difference": -12225,
+            "percent": -4.638113340693612
+          },
+          "encodedBodyBytes": {
+            "baseline": 90189,
+            "candidate": 88241,
+            "difference": -1948,
+            "percent": -2.159908636308197
+          },
+          "encodedTransferBytes": {
+            "baseline": 96872,
+            "candidate": 95941,
+            "difference": -931,
+            "percent": -0.9610620199851351
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 2.3099999999999996,
+            "candidate": 5.784999999999998,
+            "difference": 3.4749999999999988,
+            "percent": 150.4329004329004
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5011.417000001529,
+            "candidate": 5010.329000000638,
+            "difference": -1.0880000008910429,
+            "percent": -0.021710426430103718
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": 111744,
+            "candidate": -343628,
+            "difference": -455372,
+            "percent": -407.5136025200458
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2751788,
+            "candidate": 2348640,
+            "difference": -403148,
+            "percent": -14.650401847816767
+          },
+          "domNodesEnd": {
+            "baseline": 184,
+            "candidate": 207,
+            "difference": 23,
+            "percent": 12.5
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 2,
+              "candidate": 5,
+              "difference": 3,
+              "percent": 150
+            },
+            "decodedBodyBytes": {
+              "baseline": 219877,
+              "candidate": 211915,
+              "difference": -7962,
+              "percent": -3.6211154418151965
+            },
+            "encodedTransferBytes": {
+              "baseline": 75166,
+              "candidate": 74746,
+              "difference": -420,
+              "percent": -0.5587632706276774
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      },
+      {
+        "id": "lab-1280x900",
+        "metrics": {
+          "requests": {
+            "baseline": 10,
+            "candidate": 13,
+            "difference": 3,
+            "percent": 30
+          },
+          "decodedBodyBytes": {
+            "baseline": 255038,
+            "candidate": 241126,
+            "difference": -13912,
+            "percent": -5.454873391416181
+          },
+          "encodedBodyBytes": {
+            "baseline": 88830,
+            "candidate": 86348,
+            "difference": -2482,
+            "percent": -2.7941010919734324
+          },
+          "encodedTransferBytes": {
+            "baseline": 95515,
+            "candidate": 94018,
+            "difference": -1497,
+            "percent": -1.5672930953253414
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 2.8280000000000043,
+            "candidate": 2.604999999999996,
+            "difference": -0.2230000000000083,
+            "percent": -7.885431400283167
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5010.997999997926,
+            "candidate": 5011.572999999771,
+            "difference": 0.5750000018451829,
+            "percent": 0.011474760154472638
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": 200196,
+            "candidate": 186380,
+            "difference": -13816,
+            "percent": -6.901236787947811
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2625736,
+            "candidate": 2649672,
+            "difference": 23936,
+            "percent": 0.9115920260071843
+          },
+          "domNodesEnd": {
+            "baseline": 626,
+            "candidate": 584,
+            "difference": -42,
+            "percent": -6.7092651757188495
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 2,
+              "candidate": 5,
+              "difference": 3,
+              "percent": 150
+            },
+            "decodedBodyBytes": {
+              "baseline": 208706,
+              "candidate": 199057,
+              "difference": -9649,
+              "percent": -4.623249930524278
+            },
+            "encodedTransferBytes": {
+              "baseline": 71175,
+              "candidate": 70189,
+              "difference": -986,
+              "percent": -1.3853178784685634
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      },
+      {
+        "id": "central-1280x900",
+        "metrics": {
+          "requests": {
+            "baseline": 14,
+            "candidate": 15,
+            "difference": 1,
+            "percent": 7.142857142857142
+          },
+          "decodedBodyBytes": {
+            "baseline": 269098,
+            "candidate": 260907,
+            "difference": -8191,
+            "percent": -3.043872492549183
+          },
+          "encodedBodyBytes": {
+            "baseline": 92189,
+            "candidate": 90598,
+            "difference": -1591,
+            "percent": -1.7258024276215165
+          },
+          "encodedTransferBytes": {
+            "baseline": 101939,
+            "candidate": 100240,
+            "difference": -1699,
+            "percent": -1.6666830163136779
+          },
+          "rendererTaskDurationMs": {
+            "baseline": 3.4189999999999774,
+            "candidate": 4.673000000000011,
+            "difference": 1.2540000000000333,
+            "percent": 36.67739105001584
+          },
+          "actualIdleWindowMs": {
+            "baseline": 5010.579999998299,
+            "candidate": 5011.110999999801,
+            "difference": 0.5310000015015248,
+            "percent": 0.010597575560148826
+          },
+          "heapUsedDeltaBytes": {
+            "baseline": 188508,
+            "candidate": 205400,
+            "difference": 16892,
+            "percent": 8.96089290640185
+          },
+          "nodesDelta": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          },
+          "heapUsedEndBytes": {
+            "baseline": 2951784,
+            "candidate": 2801648,
+            "difference": -150136,
+            "percent": -5.086280025909755
+          },
+          "domNodesEnd": {
+            "baseline": 772,
+            "candidate": 656,
+            "difference": -116,
+            "percent": -15.025906735751295
+          },
+          "jsErrors": {
+            "baseline": 0,
+            "candidate": 0,
+            "difference": 0,
+            "percent": null
+          }
+        },
+        "groups": {
+          "js": {
+            "requests": {
+              "baseline": 2,
+              "candidate": 4,
+              "difference": 2,
+              "percent": 100
+            },
+            "decodedBodyBytes": {
+              "baseline": 223487,
+              "candidate": 219965,
+              "difference": -3522,
+              "percent": -1.5759305910410897
+            },
+            "encodedTransferBytes": {
+              "baseline": 75255,
+              "candidate": 75240,
+              "difference": -15,
+              "percent": -0.019932230416583617
+            }
+          },
+          "css": {
+            "requests": {
+              "baseline": 1,
+              "candidate": 1,
+              "difference": 0,
+              "percent": 0
+            },
+            "decodedBodyBytes": {
+              "baseline": 34131,
+              "candidate": 29838,
+              "difference": -4293,
+              "percent": -12.578008262283555
+            },
+            "encodedTransferBytes": {
+              "baseline": 8004,
+              "candidate": 7473,
+              "difference": -531,
+              "percent": -6.634182908545727
+            }
+          },
+          "fonts": {
+            "requests": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "decodedBodyBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            },
+            "encodedTransferBytes": {
+              "baseline": 0,
+              "candidate": 0,
+              "difference": 0,
+              "percent": null
+            }
+          }
+        },
+        "idleApiPolls": {
+          "baseline": {
+            "/api/state": 1
+          },
+          "candidate": {
+            "/api/state": 1
+          }
+        },
+        "blockedAttempts": {
+          "baseline": [],
+          "candidate": []
+        },
+        "jsErrors": {
+          "baseline": [],
+          "candidate": []
+        }
+      }
+    ],
+    "limits": [
+      "No p95/statistical significance/global CPU/FPS/physical latency claims",
+      "Preview config={} and fresh empty temporary data directory; no real streams/devices",
+      "More requests on every route; Inicio transfer +5.74%; other routes transfer lower",
+      "Idle renderer TaskDuration higher on some cases, including Cameras desktop; one sample is not evidence of sustained regression"
+    ]
+  },
+  "rollback": {
+    "backupDirectory": "/home/filippe/.local/state/casalocal/rollback/redesign-20261102-195321",
+    "completeOriginalDist": true,
+    "sourceArchive": true,
+    "backendReplaced": false,
+    "restartRequired": false
+  },
+  "production": {
+    "published": false
+  }
+}
