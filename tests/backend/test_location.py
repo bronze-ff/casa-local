@@ -1,4 +1,4 @@
-"""Localização pelo OwnTracks: recepção autenticada, lugares, eventos e acesso só do dono."""
+"""Localização pelo OwnTracks: várias pessoas, recepção autenticada, lugares, presença e acesso só do dono."""
 import base64
 import http.client
 import json
@@ -9,6 +9,7 @@ import time
 import unittest
 
 from backend.app import CasaApp
+from backend.config import dpapi
 from backend.location import LocationStore, distance
 from backend.models import AppError
 from backend.server import CasaServer
@@ -41,26 +42,30 @@ class StoreTests(unittest.TestCase):
     def tearDown(self):
         self.temporary.cleanup()
 
-    def point(self, lat, lon, dt=60, **extra):
+    def point(self, lat, lon, dt=60, person="maria-clara", **extra):
         self.clock.now += dt
-        return self.store.ingest({"_type": "location", "lat": lat, "lon": lon, "tst": self.clock.now, **extra})
+        return self.store.ingest({"_type": "location", "lat": lat, "lon": lon, "tst": self.clock.now, **extra}, person)
+
+    def person(self, person="maria-clara"):
+        return next(p for p in self.store.status()["people"] if p["id"] == person)
 
     def test_phone_config_uses_tailnet_url_and_random_password(self):
         otrc = self.phone["otrc"]
         self.assertEqual((otrc["mode"], otrc["url"], otrc["tid"], otrc["cmd"]), (3, URL + "/owntracks", "MC", True))
+        self.assertEqual((self.phone["person"], self.phone["username"]), ("maria-clara", "celular-maria-clara"))
         self.assertGreaterEqual(len(self.phone["password"]), 20)
         again = LocationStore(self.temporary.name, identity=lambda: (None, None), clock=self.clock)
         self.assertEqual(again.owner, OWNER)  # relido do arquivo DPAPI
         self.assertNotIn(self.phone["password"].encode(), Path(self.temporary.name, "localizacao.dpapi").read_bytes())
 
     def test_authorize_and_lockout(self):
-        self.store.authorize(basic("celular", self.phone["password"]), "127.0.0.1")
+        self.assertEqual(self.store.authorize(basic("celular-maria-clara", self.phone["password"]), "127.0.0.1"), "maria-clara")
         for _ in range(10):
             with self.assertRaises(AppError) as error:
-                self.store.authorize(basic("celular", "errada"), "127.0.0.1")
+                self.store.authorize(basic("celular-maria-clara", "errada"), "127.0.0.1")
             self.assertEqual(error.exception.status, 401)
         with self.assertRaises(AppError) as error:
-            self.store.authorize(basic("celular", self.phone["password"]), "127.0.0.1")
+            self.store.authorize(basic("celular-maria-clara", self.phone["password"]), "127.0.0.1")
         self.assertEqual(error.exception.status, 429)
 
     def test_places_send_regions_once_and_track_departure(self):
@@ -70,31 +75,32 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(reply[0]["action"], "setWaypoints")
         self.assertEqual([w["desc"] for w in reply[0]["waypoints"]["waypoints"]], ["Casa", "Ponto"])
         self.assertEqual(self.point(*HOME, acc=10), [])
-        self.assertEqual(self.store.status()["place"], "casa")
+        self.assertEqual(self.person()["place"], "casa")
         self.point(-23.5515, -46.63, acc=10)
-        status = self.store.status()
-        self.assertIsNone(status["place"])
-        self.assertEqual((status["leftAt"]["kind"], status["leftAt"]["place"]), ("saiu", "casa"))
-        self.assertEqual(status["places"][1]["id"], "ponto")
-        self.assertAlmostEqual(status["places"][1]["distance"], round(distance(-23.5515, -46.63, *STOP)), delta=1)
+        person = self.person()
+        self.assertIsNone(person["place"])
+        self.assertEqual((person["leftAt"]["kind"], person["leftAt"]["place"]), ("saiu", "casa"))
+        self.assertEqual(self.store.status()["places"][1]["id"], "ponto")
+        self.assertAlmostEqual(person["distances"]["ponto"], round(distance(-23.5515, -46.63, *STOP)), delta=1)
         self.point(*STOP, acc=10)
-        self.assertEqual([(e["kind"], e["place"]) for e in self.store.status()["events"]], [("saiu", "casa"), ("chegou", "ponto")])
+        events = self.store.status()["events"]
+        self.assertEqual([(e["kind"], e["place"], e["name"]) for e in events], [("saiu", "casa", "Maria Clara"), ("chegou", "ponto", "Maria Clara")])
 
     def test_app_transition_is_exact_and_deduplicated(self):
         self.store.save_place({"name": "Casa", "lat": HOME[0], "lon": HOME[1], "radius": 80})
         self.point(*HOME)
         exact = self.clock.now + 30
-        self.store.ingest({"_type": "transition", "event": "leave", "desc": "Casa", "tst": exact})
+        self.store.ingest({"_type": "transition", "event": "leave", "desc": "Casa", "tst": exact}, "maria-clara")
         self.point(-23.552, -46.63)
         events = self.store.status()["events"]
         self.assertEqual(len(events), 1)
         self.assertEqual((events[0]["tst"], events[0]["exact"]), (exact, True))
 
     def test_invalid_points_and_future_timestamps_are_ignored(self):
-        self.store.ingest({"_type": "location", "lat": 200, "lon": 0, "tst": self.clock.now})
-        self.store.ingest({"_type": "location", "lat": 1, "lon": 1, "tst": self.clock.now + 3600})
-        self.store.ingest({"_type": "card", "name": "x"})
-        self.assertIsNone(self.store.status()["last"])
+        self.store.ingest({"_type": "location", "lat": 200, "lon": 0, "tst": self.clock.now}, "maria-clara")
+        self.store.ingest({"_type": "location", "lat": 1, "lon": 1, "tst": self.clock.now + 3600}, "maria-clara")
+        self.store.ingest({"_type": "card", "name": "x"}, "maria-clara")
+        self.assertIsNone(self.person()["last"])
 
     def test_history_expires_after_48h(self):
         self.point(*HOME)
@@ -107,6 +113,51 @@ class StoreTests(unittest.TestCase):
                     {"name": "X", "lat": 91, "lon": 0, "radius": 50}, {"name": "X", "lat": 0, "lon": 0, "radius": 50, "extra": 1}):
             with self.assertRaises(AppError):
                 self.store.save_place(bad)
+
+
+    def test_two_people_regions_presence_and_events(self):
+        joao = self.store.setup("João")
+        self.assertEqual(self.store.authorize(basic(joao["username"], joao["password"]), "x"), "joao")
+        self.store.save_place({"name": "Casa", "lat": HOME[0], "lon": HOME[1], "radius": 80})
+        self.assertIsNone(self.store.presence())  # ninguém mandou posição ainda
+        self.assertEqual(self.point(*HOME)[0]["action"], "setWaypoints")
+        self.assertEqual(self.point(*HOME, person="joao")[0]["action"], "setWaypoints")  # cada celular recebe as regiões
+        self.assertTrue(self.store.presence())
+        self.point(*STOP)
+        self.assertTrue(self.store.presence(), "João ainda está em casa")
+        seen = []
+        self.store.listeners.append(seen.append)
+        self.point(*STOP, person="joao")
+        self.assertFalse(self.store.presence(), "casa vazia: os dois fora")
+        self.assertEqual((seen[0]["person"], seen[0]["name"], seen[0]["kind"]), ("joao", "João", "saiu"))
+        self.store.rename("joao", "João Pedro")
+        self.assertEqual([p["name"] for p in self.store.status()["people"]], ["Maria Clara", "João Pedro"])
+        self.store.remove_person("joao")
+        self.assertEqual([p["id"] for p in self.store.status()["people"]], ["maria-clara"])
+        with self.assertRaises(AppError):
+            self.store.authorize(basic(joao["username"], joao["password"]), "x")
+
+    def test_renew_password_and_limits(self):
+        old = self.phone["password"]
+        renewed = self.store.setup("Maria", person="maria-clara")
+        self.assertNotEqual(renewed["password"], old)
+        self.assertEqual(self.person()["name"], "Maria")
+        for name in ("B", "C", "D"):
+            self.store.setup(name)
+        with self.assertRaises(AppError):
+            self.store.setup("E")
+        with self.assertRaises(AppError):
+            self.store.phone_config("ninguem")
+
+    def test_old_single_person_files_migrate(self):
+        folder = Path(self.temporary.name) / "antigo"
+        folder.mkdir()
+        old = {"owner": OWNER, "name": "Ela", "username": "celular", "password": "segredo-antigo-123", "url": URL, "places": [], "waypointsSent": 1}
+        (folder / "localizacao.dpapi").write_bytes(dpapi(json.dumps(old).encode()))
+        (folder / "localizacao-historico.dpapi").write_bytes(dpapi(json.dumps({"points": [{"lat": 1, "lon": 2, "tst": self.clock.now}], "events": []}).encode()))
+        store = LocationStore(folder, identity=lambda: (OWNER, URL), clock=self.clock)
+        self.assertEqual(store.authorize(basic("celular", "segredo-antigo-123"), "x"), "ela")  # o celular antigo continua valendo
+        self.assertEqual(store.status()["people"][0]["last"]["lat"], 1)
 
 
 class LocationHTTPTests(unittest.TestCase):
@@ -144,16 +195,16 @@ class LocationHTTPTests(unittest.TestCase):
     def test_phone_posts_with_password_but_cannot_see_panel(self):
         her = {"Tailscale-User-Login": "ela@example.com"}
         status, reply = self.request("POST", "/owntracks", {"_type": "location", "lat": HOME[0], "lon": HOME[1], "tst": int(time.time())},
-                                     {**her, "Authorization": basic("celular", self.password)})
+                                     {**her, "Authorization": basic("celular-ela", self.password)})
         self.assertEqual((status, reply), (200, []))
-        self.assertEqual(self.request("POST", "/owntracks", {"_type": "location"}, {**her, "Authorization": basic("celular", "x")})[0], 401)
+        self.assertEqual(self.request("POST", "/owntracks", {"_type": "location"}, {**her, "Authorization": basic("celular-ela", "x")})[0], 401)
         for path in ("/api/location", "/api/state", "/api/cameras", "/"):
             self.assertEqual(self.request("GET", path, headers=her)[0], 403, path)
         self.assertEqual(self.request("GET", "/api/location")[0], 403)  # sem identidade pelo .ts.net
 
     def test_owner_sees_location(self):
-        self.location.ingest({"_type": "location", "lat": HOME[0], "lon": HOME[1], "tst": int(time.time())})
+        self.location.ingest({"_type": "location", "lat": HOME[0], "lon": HOME[1], "tst": int(time.time())}, "ela")
         status, result = self.request("GET", "/api/location", headers={"Tailscale-User-Login": OWNER})
         self.assertEqual(status, 200)
-        self.assertEqual(result["last"]["lat"], HOME[0])
+        self.assertEqual(result["people"][0]["last"]["lat"], HOME[0])
         self.assertNotIn("password", json.dumps(result))

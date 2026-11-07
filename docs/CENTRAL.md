@@ -1,16 +1,79 @@
-# Central: saúde, rotinas, movimento, TVs e gasto do ar
+# Central: saúde, modos, rotinas, movimento, TVs e gasto do ar
 
 Tudo roda no PC de casa, na rede local, sem nuvem. Os dados ficam em `.data` (fora do Git).
 
+## Modos (aba Central; botões na aba Luzes e no menu da bandeja)
+
+- Um modo diz o que fazer em cada aparelho: **não mexer**, **desligar/apagar** ou **ligar** com um
+  ajuste (cor e brilho das luzes; temperatura, modo e ventilação do ar). Ex.: Cheguei, Leitura,
+  Filme, Sair de casa.
+- O ar pode **manter se já estiver ligado** (ligado pelo celular antes de chegar). O painel sabe o
+  estado pelo último comando dele; se alguém usou o controle original, ele não sabe.
+- As luzes vão primeiro, o ar por último. Até 12 modos. Arquivo: `.data/modos.json`; na primeira vez
+  nasce das três cenas antigas (Cinema, Boa noite, Cheguei), com os nomes de `scenes.json`.
+- Um modo usado por uma rotina não pode ser apagado (troque a ação da rotina antes).
+
 ## Rotinas (aba Central)
 
-- Horário fixo por dia da semana: "desligar o ar às 6h30 nos dias úteis", "cena Boa noite às 23h".
-- Ações disponíveis: ligar ou desligar o ar, acender ou apagar luzes, rodar uma cena. Usam o mesmo
+- **Num horário**, por dia da semana: "desligar o ar às 6h30 nos dias úteis", "modo Boa noite às 23h".
+- **Num lugar** (localização do celular, lugares da aba Local): ao **sair** ou **chegar**, com faixa
+  de horário opcional. Ex.: sair da academia entre 17h e 21h → modo Cheguei. Só reage a transições
+  recentes (até 10 min; a fila antiga do celular não liga nada fora de hora) e não repete em menos
+  de 30 min (o GPS às vezes oscila na borda do lugar).
+- Ações: rodar um modo, ou ações avulsas (ligar/desligar o ar, acender/apagar luzes). Usam o mesmo
   caminho e a mesma validação dos botões do painel.
-- Se o servidor estava parado na hora marcada, a rotina ainda roda se ele voltar em até 5 minutos.
+- Se o servidor estava parado na hora marcada, a rotina de horário ainda roda se ele voltar em até
+  5 minutos.
 - Nenhuma rotina vem pronta. Arquivo: `.data/rotinas.json`.
 - **Desligar em…** (aba Clima ou menu da bandeja): timer de uma vez para desligar o ar em 30 min,
   1, 2 ou 4 h.
+
+## Lab: home lab e modo jogo (aba Lab e menu da bandeja)
+
+- O home lab roda neste PC num Debian do WSL2 (`homelab`) com Docker: Jellyfin, Jellyseerr,
+  Radarr, Sonarr, Prowlarr, Bazarr, qBittorrent, Filebrowser, FlareSolverr e openGym. A instalação
+  está no repositório Homelab (`WSL.md`).
+- A aba mostra cada serviço (rodando ou parado, com link), CPU, memória, GPU (temperatura, uso e
+  VRAM pelo `nvidia-smi`), espaço dos discos e a memória da VM do WSL. Feita para olhar pelo celular.
+- **Modo jogo:** para os containers, encerra a tarefa `CasaLocal-homelab` (que mantém a distro ligada)
+  e roda `wsl --shutdown`, devolvendo toda a RAM do WSL. Ao sair, liga a tarefa e roda `docker compose up -d`.
+  Entrar leva ~20 s e sair ~15 s.
+- **Automático** (ligado por padrão): com `cs2.exe` aberto entra sozinho e volta 2 min depois que
+  o jogo fecha. Se o modo jogo foi ligado à mão, só sai à mão. Não sobrevive a um reinício: ao subir,
+  o servidor garante a stack ligada. Preferências em `.data/homelab.json`.
+- O status dos containers só é lido com a distro ligada, porque `wsl -d` a ligaria de novo no meio do jogo.
+- **Modo jogo (atualizado):** param só os pesados (mídia, downloads, Frigate) e o cache do Linux é
+  esvaziado para o Windows retomar a memória. ntfy, Uptime Kuma, Vaultwarden, Diun, Dozzle e openGym
+  continuam, então os avisos de câmera chegam no celular durante a partida.
+- **Frigate:** por padrão liga só com você fora de casa (localização num lugar "Casa"); sem
+  localização fica desligado. "Sempre" ou "Nunca" na aba Lab. Custa ~2 GB de memória, meia CPU e
+  ~25% da GPU com 4 câmeras.
+- Histórico de 24 h (CPU, memória, temperatura da GPU) e botão para reiniciar cada serviço.
+
+## Localização de várias pessoas (aba Local)
+
+- Até 4 pessoas, cada uma com o próprio celular (OwnTracks), login e QR. Os lugares são os mesmos
+  para todas. No próprio iPhone, "Abrir no OwnTracks" configura sem precisar ler o QR.
+- **Presença da casa:** alguém num lugar chamado **Casa** → em casa; todos com posição e fora → casa
+  vazia; sem posição de alguém → não se sabe. É o que liga o Frigate "fora de casa" e o som dos avisos.
+- Rotinas por lugar podem valer para qualquer pessoa ou só para uma ("Filippe sair do Serviço").
+- Arquivos da versão de uma pessoa migram sozinhos (o celular antigo continua com o mesmo login).
+
+## Avisos no celular (ntfy) e Atalhos da Siri (aba Central)
+
+- O ntfy roda no home lab (`https://<host>.ts.net:10000`). No iPhone: app **ntfy**, servidor padrão
+  apontando para esse endereço e assinatura dos tópicos (Tailscale ligado):
+  - `casa-pessoas`: o Frigate viu pessoa ou carro, com o nome se reconheceu o rosto e a foto marcada;
+  - `casa-cameras`: movimento do DVR nas câmeras com sino (ou em todas), com foto e link para a gravação;
+  - `casa-sistema`: verificação da Central que falhou ou voltou, serviço do home lab que parou fora do
+    modo jogo, disco quase cheio, GPU quente, Uptime Kuma e atualizações (Diun);
+  - `casa-casa`: chegadas, saídas e rotinas executadas.
+- **Modo ausente:** com a localização num lugar chamado "Casa", câmera e pessoas chegam sem som; fora,
+  com som. Rosto conhecido com você em casa chega quase mudo.
+- Cada tópico liga e desliga na Central; **Testar** manda um aviso em cada um.
+- **Atalhos da Siri:** a Central mostra a chave e a URL de cada modo. O atalho faz `POST` com
+  `Authorization: Bearer <chave>`, aceito só nas rotas de ação (modos, aparelhos, modo jogo), e a
+  proteção de rede privada e de dono no Tailscale continua valendo. "Trocar a chave" invalida a antiga.
 
 ## Gasto do ar (aba Central e rodapé do Clima)
 
@@ -25,8 +88,21 @@ Sem tomada medidora: conta as horas em que o painel deixou o ar ligado × potên
   as mesmas credenciais que o go2rtc já usa (lidas do `go2rtc.yaml` deste PC); nada é copiado.
 - Disparos seguidos da mesma câmera (até 90 s) viram um evento só, com uma foto do momento.
 - Histórico de 48 h em `.data/movimento/`.
-- Para receber aviso no Windows, escolha a câmera no filtro e toque em **Avisar**. A bandeja fica
-  laranja com o número de eventos novos até você abrir o filtro Movimento.
+- Para receber aviso, escolha a câmera no filtro e toque em **Avisar**. Câmeras com aviso passam
+  para o começo da lista e da grade.
+- Movimento numa câmera com aviso: a bandeja (notebook e PC de casa) mostra uma **janela de alerta**
+  acima do relógio com a foto, a câmera e o horário (**Ver gravação** abre o replay no ponto;
+  **Ao vivo**), além da notificação do Windows. O alerta some sozinho em 25 s e não rouba o foco.
+  Menu da bandeja › **Testar aviso** mostra os dois.
+- **Onde avisar** (em Movimento › Todas): cada computador com a bandeja tem sua regra:
+  **Monitoradas** (segue o sino de cada câmera), **Só estas** (câmeras escolhidas para aquele
+  computador) ou **Nenhuma**. Com **Segurar com jogo ou vídeo em tela cheia**, o alerta espera e
+  chega num resumo quando a tela cheia acaba. Dá para pausar por 1 h, 4 h ou até reativar, aqui ou
+  no menu da bandeja › **Avisos neste computador**. A bandeja se apresenta sozinha (id aleatório em
+  `%LOCALAPPDATA%\CasaLocalBandeja\aparelho.json`); a regra fica em `.data/avisos-dispositivos.json`.
+- A contagem fica por câmera: cada botão de câmera mostra quantos movimentos novos teve, os eventos
+  ganham a marca **Novo**, e abrir a câmera zera só a contagem dela (em Todas há "Marcar tudo como
+  visto").
 
 ## Replay das gravações (aba Câmeras)
 

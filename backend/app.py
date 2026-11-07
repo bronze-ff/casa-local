@@ -10,7 +10,8 @@ import time
 from . import adapters
 from .config import DATA_DIR, load_config, save_config, validate_config
 from .ir_codes import climate_summary, origin_of
-from .models import AC_EXTRA_KEYS, AppError, INVENTORY, SCENES, SCENE_COMMANDS, TV_KEYS, VERSION, now, validate_command
+from .modes import Modes
+from .models import AC_EXTRA_KEYS, AppError, INVENTORY, TV_KEYS, VERSION, now, validate_command
 
 
 class CasaApp:
@@ -18,7 +19,8 @@ class CasaApp:
         if mode not in {"preview", "local"}:
             raise ValueError("Invalid mode")
         self.mode, self.data_dir = mode, Path(data_dir)
-        self.scenes = self._load_scene_names()
+        # Modos editáveis (antigas cenas); na prévia ficam à parte, em .data/previa.
+        self.modes = Modes(self.data_dir if mode == "local" else self.data_dir / "previa")
         self.config = validate_config(config) if config is not None else load_config(self.data_dir) if mode == "local" else {}
         self.csrf_token = secrets.token_urlsafe(32)
         self.lock = threading.RLock()
@@ -90,29 +92,6 @@ class CasaApp:
         except (OSError, ValueError, AppError, AttributeError):
             pass
 
-    def _load_scene_names(self):
-        """Nomes personalizados das cenas, só desta instalação (.data/scenes.json, fora do Git).
-
-        Formato: {"boa-noite": {"name": "...", "description": "..."}}. Só troca textos; os
-        comandos de cada cena continuam os de SCENE_COMMANDS.
-        """
-        scenes = deepcopy(SCENES)
-        try:
-            custom = json.loads((self.data_dir / "scenes.json").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return scenes
-        if not isinstance(custom, dict):
-            return scenes
-        for scene in scenes:
-            override = custom.get(scene["id"])
-            if not isinstance(override, dict):
-                continue
-            for field in ("name", "description"):
-                value = override.get(field)
-                if isinstance(value, str) and 1 <= len(value.strip()) <= 60:
-                    scene[field] = value.strip()
-        return scenes
-
     def _climate_summary(self, schema):
         # O cadastro só muda no aprendizado/importação (troca do objeto), então a identidade basta.
         cached = getattr(self, "_climate_cache", None)
@@ -123,7 +102,7 @@ class CasaApp:
 
     def snapshot(self, bootstrap=False):
         with self.lock:
-            result = {"mode": self.mode, "devices": deepcopy(self.devices), "scenes": deepcopy(self.scenes), "recentActions": list(self.recent), "hub": {"name": "Casa Local", "connection": "preview" if self.mode == "preview" else "local", "status": "preview" if self.mode == "preview" else "ready", "message": "Prévia: nenhum comando físico" if self.mode == "preview" else "Servidor privado · configuração pelo terminal", "configuredCount": len(self.config), "version": VERSION}}
+            result = {"mode": self.mode, "devices": deepcopy(self.devices), "scenes": self.modes.public(), "recentActions": list(self.recent), "hub": {"name": "Casa Local", "connection": "preview" if self.mode == "preview" else "local", "status": "preview" if self.mode == "preview" else "ready", "message": "Prévia: nenhum comando físico" if self.mode == "preview" else "Servidor privado · configuração pelo terminal", "configuredCount": len(self.config), "version": VERSION}}
             for device in result["devices"]:
                 item = self.config.get(device["id"])
                 if item and item["adapter"] == "ir":
@@ -225,12 +204,21 @@ class CasaApp:
         return {"state": self.snapshot(), "learned": key if device_id == "tv-quarto" or key == "off" or key in AC_EXTRA_KEYS else label}
 
     def scene(self, scene_id):
-        if scene_id not in SCENE_COMMANDS:
-            raise AppError("Cena não encontrada.", 404, "not_found")
+        """Aplica um modo: luzes primeiro, o ar por último. O ar com "manter se ligado" não é tocado
+        quando o painel sabe que ele já está ligado (ex.: ligado pelo celular antes de chegar)."""
+        mode = self.modes.get(scene_id)
         results = []
-        for device_id, values in SCENE_COMMANDS[scene_id]:
+        for device_id, step in sorted(mode["steps"].items(), key=lambda item: item[0] == "ar-quarto"):
+            values = {k: v for k, v in step.items() if k != "keepIfOn"}
+            if step.get("keepIfOn"):
+                with self.lock:
+                    device = next((d for d in self.devices if d["id"] == device_id), None)
+                    already = device is not None and device["state"].get("power") is True
+                if already:
+                    results.append({"deviceId": device_id, "status": "skipped", "message": "Já estava ligado; mantido como está."})
+                    continue
             try:
-                result = self.command(device_id, {"action": "set", "values": values})
+                result = self.command(device_id, {"action": "set", "values": values}, origin=f"Modo {mode['name']}")
                 results.append({"deviceId": device_id, **result["command"]})
             except AppError as error:
                 results.append({"deviceId": device_id, "status": "failed", "code": error.code, "message": str(error)})

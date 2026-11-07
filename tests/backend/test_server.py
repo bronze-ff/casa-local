@@ -79,6 +79,26 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(len(result[1]["results"]), 3)
         self.assertFalse(result[1]["state"]["devices"][0]["state"]["power"])
 
+    def test_modes_routes_and_routine_guard(self):
+        body = {"name": "Leitura", "icon": "book", "steps": {"quarto-luz": {"power": True, "brightness": 50, "colorHex": "#FFD6A0"}}}
+        status, result, _ = self.request("POST", "/api/modes", body)
+        self.assertEqual(status, 200)
+        mode = next(m for m in result["state"]["scenes"] if m["name"] == "Leitura")
+        self.assertEqual(self.request("POST", f"/api/scenes/{mode['id']}/run", {})[1]["status"], "preview")
+        routine = {"name": "Ler", "days": [0], "time": "21:00", "action": {"type": "scene", "id": mode["id"]}}
+        self.assertEqual(self.request("POST", "/api/routines", routine)[0], 200)
+        self.assertEqual(self.request("POST", f"/api/modes/{mode['id']}/remove", {})[0], 409)
+        self.assertEqual(self.request("POST", "/api/modes/nao-existe/remove", {})[0], 404)
+        self.assertEqual(self.request("POST", "/api/modes", {**body, "steps": {}})[0], 400)
+
+    def test_alert_devices_routes(self):
+        rule = self.request("POST", "/api/alert-devices/hello", {"id": "0123456789abcdef", "name": "Notebook", "busy": False})[1]
+        self.assertEqual(rule["mode"], "watched")
+        self.assertEqual(self.request("POST", "/api/alert-devices/0123456789abcdef", {"mode": "none"})[1]["devices"][0]["mode"], "none")
+        self.assertEqual(self.request("GET", "/api/alert-devices")[1]["devices"][0]["name"], "Notebook")
+        self.assertEqual(self.request("POST", "/api/alert-devices/0123456789abcdef/remove", {})[1]["devices"], [])
+        self.assertEqual(self.request("POST", "/api/alert-devices/hello", {"id": "0123456789abcdef"}, headers={"X-Casa-Token": "errado"})[0], 403)
+
     def test_unknown_resource_and_commands_rejected(self):
         self.assertEqual(self.request("POST", "/api/devices/mystery/commands", {"action": "set", "values": {"power": True}})[0], 404)
         self.assertEqual(self.request("POST", "/api/scenes/mystery/run", {})[0], 404)

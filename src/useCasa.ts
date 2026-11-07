@@ -75,7 +75,7 @@ export function useCasa() {
       const next = value.state;
       if (next && Array.isArray(next.devices) && Array.isArray(next.scenes)) setData(next);
       setError('');
-      if (value.status === 'partial') announce('Cena incompleta. Confira as falhas em Últimas ações.');
+      if (value.status === 'partial') announce('Modo incompleto. Confira as falhas em Últimas ações.');
       else if (success) announce(data?.mode === 'preview' ? `${success} · somente na prévia` : success);
       else if (value.command?.message) announce(value.command.message);
       else if (typeof value.message === 'string') announce(value.message);
@@ -90,7 +90,7 @@ export function useCasa() {
   }, [announce, connect, data?.mode]);
   const command = (id: string, values: Record<string, unknown>) => send(id, `/api/devices/${encodeURIComponent(id)}/commands`, {action: 'set', values});
   const key = (id: string, keyName: string) => send(id, `/api/devices/${encodeURIComponent(id)}/commands`, {action: 'key', key: keyName});
-  const scene = (id: string, name: string) => send(id, `/api/scenes/${encodeURIComponent(id)}/run`, {}, `${name} aplicada`);
+  const scene = (id: string, name: string) => send(id, `/api/scenes/${encodeURIComponent(id)}/run`, {}, `Modo ${name} aplicado`);
   const discover = () => send('discovery', '/api/discovery', {});
   // Aprender um botão do controle original: a central espera até 25 s pelo sinal, então o
   // navegador espera mais que isso antes de desistir.

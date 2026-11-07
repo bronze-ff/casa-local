@@ -10,8 +10,11 @@ export type Device = {
 };
 export type CasaState = {
   mode: 'preview' | 'local'; devices: Device[];
-  scenes: {id: string; name: string; description: string}[];
+  scenes: Mode[];
   recentActions: {id: string; message: string; createdAt: string; name: string; status: string}[];
   hub?: {name?: string; [key: string]: unknown};
 };
 export type Bootstrap = CasaState & {csrfToken: string};
+export type ModeStep = {power: boolean; brightness?: number; colorHex?: string; temperature?: number; mode?: string; fan?: string; keepIfOn?: boolean};
+/** Modo da casa (antiga cena): o que fazer em cada aparelho; aparelho ausente = não mexer. */
+export type Mode = {id: string; name: string; icon: string; description: string; devices: string[]; steps: Record<string, ModeStep>};
