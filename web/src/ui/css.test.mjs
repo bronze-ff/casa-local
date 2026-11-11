@@ -52,5 +52,5 @@ test('overlay: <dialog> na camada superior; sheet ancorado na base no celular; p
 test('layout por largura: rail 92 px no tablet, sidebar no desktop/wide, bandeja compacta', () => {
   assert.match(shell, /\.app\.tablet \{ grid-template-columns: var\(--rail-w\) minmax\(0, 1fr\)/);
   assert.match(shell, /\.app\.desktop, \.app\.wide \{ grid-template-columns: var\(--side-w\) minmax\(0, 1fr\)/);
-  assert.match(shell, /\.trayicons \{[^}]*repeat\(8/);
+  assert.match(shell, /\.trayicons \{[^}]*repeat\(6/);
 });

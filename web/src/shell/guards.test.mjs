@@ -89,7 +89,7 @@ test('Boundary: falha vira aviso com role=alert e botão; não recarrega sozinho
   assert.match(t.renderToStaticMarkup(t.React.createElement(t.Boundary, null, t.React.createElement('i', null, 'ok'))), /<i>ok<\/i>/);
 });
 
-test('navegação por layout: oito destinos em tablet/desktop/wide/bandeja; celular tem 4 abas + Mais e o menu fechado não deixa nada no Tab', opts, () => {
+test('navegação por layout: oito destinos em tablet/desktop/wide; bandeja e celular têm 5 abas + Mais e o menu fechado não deixa nada no Tab', opts, () => {
   const count = (html, pattern) => (html.match(pattern) || []).length;
   for (const layout of ['tablet', 'desktop', 'wide']) {
     const html = setup({ home: HOME, layout }).render({});
@@ -97,12 +97,14 @@ test('navegação por layout: oito destinos em tablet/desktop/wide/bandeja; celu
     assert.match(html, /aria-label="Seções"/);
   }
   const tray = setup({ home: HOME, layout: 'tray', search: '?tray=1' }).render({});
-  assert.equal(count(tray, /class="ib" href="#\//g), 8, 'bandeja: oito ícones de rota');
+  assert.equal(count(tray, /class="ib" href="#\//g), 5, 'bandeja: cinco ícones de rota');
+  assert.match(tray, /<button type="button" class="ib" aria-label="Mais" aria-haspopup="dialog"/);
+  assert.ok(!/href="#\/local"|href="#\/lab"/.test(tray), 'bandeja: "Mais" só tem conteúdo quando aberto');
   const mobile = setup({ home: HOME, layout: 'mobile' }).render({});
-  assert.equal(count(mobile, /<a class="navi"/g), 4);
+  assert.equal(count(mobile, /<a class="navi"/g), 5);
   assert.match(mobile, /<button type="button" class="navi" aria-haspopup="dialog"/);
   assert.match(mobile, /class="tabbar"/);
-  assert.ok(!/href="#\/tv"|href="#\/lab"/.test(mobile), 'o menu "Mais" só tem conteúdo quando aberto');
+  assert.ok(!/href="#\/local"|href="#\/lab"/.test(mobile), 'o menu "Mais" só tem conteúdo quando aberto');
 });
 
 test('prévia: faixa explícita e selo; rede local é o padrão; sem conexão aparece no selo', opts, () => {

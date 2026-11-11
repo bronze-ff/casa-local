@@ -52,7 +52,7 @@ test('os componentes de vídeo usam .media-stage; as páginas de layout seguem e
     assert.match(source, /className="media-stage"/, file);
     assert.doesNotMatch(source, /className="stage"/, `${file} não usa .stage de layout para o vídeo`);
   }
-  assert.equal((read('routes/Cameras/Live.jsx').match(/className="media-stage"/g) || []).length, 2, 'Live e FrameView');
+  assert.equal((read('routes/Cameras/Live.jsx').match(/className="media-stage"/g) || []).length, 1, 'só o ao vivo');
   for (const file of ['routes/Clima/Clima.jsx', 'routes/Local/Local.jsx', 'routes/TV/TV.jsx', 'routes/Lab/Lab.jsx']) assert.match(read(file), /className="stage two"/, file);
   assert.doesNotMatch(read('routes/Cameras/Cameras.jsx'), /className="stage/, 'a grade de câmeras não usa a classe da moldura');
 });

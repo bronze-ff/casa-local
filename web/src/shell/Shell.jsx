@@ -7,7 +7,7 @@ import { Overlay } from '../ui/Overlay.jsx';
 import { Banner, Empty, IconButton, Skeleton, Status, ToastProvider } from '../ui/kit.jsx';
 import Boundary from './Boundary.jsx';
 import { ShellContext } from './context.js';
-import { DESTINATIONS, MOBILE_TABS, MORE, SIDEBAR, connectionOf, mobileTabActive } from './nav.js';
+import { DESTINATIONS, MAIN, MORE, connectionOf, mobileTabActive } from './nav.js';
 import { skipToContent } from './skip.js';
 import { LABEL } from './theme-logic.js';
 import { useTheme } from './theme.js';
@@ -82,7 +82,8 @@ export default function Shell({ route, layout, tray, registry = {} }) {
           {(layout === 'tablet' || layout === 'desktop' || layout === 'wide') && (
             <aside className="side">
               <div className="brand"><span className="mk"><Icon name="home" size={18} /></span><span className="navi-t">Casa</span></div>
-              <nav className="nav" aria-label="Seções">{SIDEBAR.map((name) => <NavLink key={name} name={name} route={route} />)}</nav>
+              <nav className="nav" aria-label="Seções">{MAIN.map((name) => <NavLink key={name} name={name} route={route} />)}</nav>
+              <nav className="nav minor" aria-label="Outras seções">{MORE.map((name) => <NavLink key={name} name={name} route={route} size={18} />)}</nav>
               <div className="foot">{chip}{themeButton}</div>
             </aside>
           )}
@@ -91,7 +92,8 @@ export default function Shell({ route, layout, tray, registry = {} }) {
             {layout === 'tray' && (
               <header className="tray-head">
                 <nav className="trayicons" aria-label="Seções">
-                  {SIDEBAR.map((name) => <a key={name} className="ib" href={hrefFor(name)} aria-label={DESTINATIONS[name].title} aria-current={route.name === name ? 'page' : undefined}><Icon name={DESTINATIONS[name].icon} /></a>)}
+                  {MAIN.map((name) => <a key={name} className="ib" href={hrefFor(name)} aria-label={DESTINATIONS[name].title} aria-current={route.name === name ? 'page' : undefined}><Icon name={DESTINATIONS[name].icon} /></a>)}
+                  <button type="button" className="ib" aria-label="Mais" aria-haspopup="dialog" aria-current={mobileTabActive(route.name) === 'mais' ? 'page' : undefined} onClick={() => setMore(true)}><Icon name="more" /></button>
                 </nav>
                 <div className="row">{chip}{browser && <button type="button" className="btn s" onClick={() => window.pywebview.api.open_browser(window.location.hash.replace(/^#\/?/, ''))}><Icon name="ext" />Abrir no navegador</button>}</div>
               </header>
@@ -105,15 +107,17 @@ export default function Shell({ route, layout, tray, registry = {} }) {
           {layout === 'mobile' && (
             <>
               <nav className="tabbar" aria-label="Seções">
-                {MOBILE_TABS.map((name) => <NavLink key={name} name={name} route={route} size={22} />)}
+                {MAIN.map((name) => <NavLink key={name} name={name} route={route} size={22} />)}
                 <button type="button" className="navi" aria-haspopup="dialog" aria-current={mobileTabActive(route.name) === 'mais' ? 'page' : undefined} onClick={() => setMore(true)}>
                   <Icon name="more" size={22} /><span className="navi-t">Mais</span>
                 </button>
               </nav>
-              <Overlay open={more} onClose={() => setMore(false)} title="Mais" kind="sheet">
-                <nav className="col" aria-label="Mais seções">{MORE.map((name) => <NavLink key={name} name={name} route={route} onClick={() => setMore(false)} />)}</nav>
-              </Overlay>
             </>
+          )}
+          {(layout === 'mobile' || layout === 'tray') && (
+            <Overlay open={more} onClose={() => setMore(false)} title="Mais" kind="sheet">
+              <nav className="col" aria-label="Mais seções">{MORE.map((name) => <NavLink key={name} name={name} route={route} onClick={() => setMore(false)} />)}</nav>
+            </Overlay>
           )}
         </div>
       </ShellContext.Provider>

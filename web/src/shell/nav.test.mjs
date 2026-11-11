@@ -13,10 +13,11 @@ test('as oito rotas são alcançáveis em todos os layouts (inclusive o celular 
   assert.deepEqual([...SIDEBAR].sort(), [...ROUTE_NAMES].sort());
 });
 
-test('celular: rota fora das quatro abas marca "Mais"', () => {
+test('celular e bandeja: rota fora das cinco abas marca "Mais"', () => {
   assert.equal(mobileTabActive('cameras'), 'cameras');
   assert.equal(mobileTabActive('lab'), 'mais');
-  assert.equal(mobileTabActive('tv'), 'mais');
+  assert.equal(mobileTabActive('tv'), 'tv');
+  assert.equal(mobileTabActive('central'), 'mais');
 });
 
 test('guarda #oculto: dormente em qualquer modo, sem montar nada', () => {

@@ -94,39 +94,7 @@ test('leitura: carregando e erro sem dado', opts, () => {
   assert.match(t.render(t.load(t.src('routes/Lab/Lab.jsx')).default), /Sem conexão com o home lab[\s\S]*Falha \(500\)\./);
 });
 
-test('rede: varredura é botão manual, nada é varrido ao abrir; grupos, topologia nomeada e detalhes em diálogo fechado', opts, () => {
-  const posts = [];
-  const html = render({ posts });
-  assert.equal(posts.length, 0);
-  assert.match(html, /Varrer agora/);
-  assert.match(html, /2 conectados · varrida há 1 min · 1 vigiado sem resposta/);
-  assert.match(html, /aria-label="Aparelhos novos"/);
-  assert.match(html, /aria-label="Aparelhos vigiados"/);
-  assert.match(html, /role="group" aria-label="Esquema da rede de casa"/);
-  assert.equal(count(html, /class="node (ok|warn|bad)"/g), 3);
-  assert.match(html, /aria-label="Celular da Lorena: conectado\. Abrir detalhes"/);
-  assert.match(html, /aria-label="Impressora: sem resposta\. Abrir detalhes"/);
-  assert.match(html, /aria-label="Aparelho sem nome: conectado, novo\. Abrir detalhes"/);
-  assert.match(html, /<span>Celular da Lorena<\/span>/, 'nome por extenso no nó');
-  assert.match(html, /O esquema não mostra a conexão real/);
-  assert.ok(!html.includes('ov-box'), 'detalhe só existe com o diálogo aberto');
-  assert.match(html, />É meu</);
-  assert.match(render({ net: NET({ devices: [] }) }), /Nenhum aparelho visto ainda\./);
-  assert.match(render({ net: NET({ learningUntil: now() + 3600 }) }), /Aprendendo a rede até/);
-  assert.match(render({ net: NET({ error: 'Sem rede.' }) }), /Sem rede\. Tento de novo em 15 min\./);
-});
-
-test('detalhe do aparelho: nome, é meu, vigia e remoção só depois da confirmação', opts, () => {
-  const t = setupRoute({});
-  const { DeviceDetail } = t.load(t.src('routes/Lab/Network.jsx'));
-  const d = { id: 'bbbbbbbbbbbb', label: 'Aparelho sem nome', known: false, watched: false, online: true, ip: '1.2.3.4', mac: 'cc:dd', firstSeen: now() - 90 };
-  const html = t.renderBare(t.h(DeviceDetail, { d, act: async () => null, busy: false, blocked: false, onDone() {} }));
-  assert.match(html, />É meu</);
-  assert.match(html, /Nome do aparelho/);
-  assert.match(html, /role="switch"[^>]*>.*Avisar se sumir da rede/s);
-  assert.match(html, /aria-label="Remover Aparelho sem nome da lista"/);
-  assert.ok(!/Remover mesmo/.test(html));
-  const blocked = t.renderBare(t.h(DeviceDetail, { d, act: async () => null, busy: false, blocked: true, onDone() {} }));
-  assert.match(blocked, /disabled="" aria-disabled="true"[^>]*><svg[^>]*>.*?<\/svg>É meu/);
-  assert.match(blocked, /Sem conexão com o painel\./);
+test('rede: a lista de aparelhos da rede não aparece mais no Lab', opts, () => {
+  const html = render();
+  assert.ok(!/Varrer agora|Esquema da rede de casa|Aparelhos vigiados/.test(html));
 });

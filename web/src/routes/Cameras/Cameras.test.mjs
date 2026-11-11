@@ -134,13 +134,11 @@ test('ao vivo: moldura com nome e canal, estado, "Rever 1 min", anterior/próxim
   assert.match(t.bare(t.h(Live, { ...props, cameras: [CAMS[0]] })), /disabled=""[^>]*aria-label="Câmera anterior"/);
 });
 
-test('bandeja: só quadro ampliado, sem WebSocket nem MJPEG nem replay', opts, () => {
+test('bandeja: abre o mesmo ao vivo do navegador, com "Rever 1 min"', opts, () => {
   const t = setupCameras({ polls: polls(), layout: 'tray' });
-  const { FrameView } = t.mod('Cameras/Live.jsx');
-  const html = t.bare(t.h(FrameView, { title: 'Externa 1', sub: 'Canal 1', src: 'blob:q', close() {} }));
-  assert.match(html, /aria-label="Quadro: Externa 1"/);
-  assert.match(html, /alt="Quadro de Externa 1"/);
-  assert.match(html, /“Abrir no navegador”/);
-  assert.ok(!/<video|live\.mjpeg/.test(html));
-  assert.match(t.bare(t.h(FrameView, { title: 'X', sub: 'y', src: null, close() {} })), /Sem imagem/);
+  const { Live } = t.mod('Cameras/Live.jsx');
+  const html = t.bare(t.h(Live, { cameras: CAMS, index: 0, poster: 'blob:p', move() {}, close() {}, rewind() {} }));
+  assert.match(html, /aria-label="Ao vivo: Externa 1"/);
+  assert.match(html, /Rever 1 min/);
+  assert.equal(t.mod('Cameras/Live.jsx').FrameView, undefined, 'o quadro parado da bandeja acabou');
 });

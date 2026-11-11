@@ -87,10 +87,11 @@ test('API: alvo do elemento recebe requestFullscreen; iPhone cai no vídeo; sem 
   assert.equal(fullscreenElement({}), null);
 });
 
-test('regra de CSS: em tela cheia o alvo é preto e a moldura enche o espaço, sem o teto de 54dvh', () => {
+test('regra de CSS: em tela cheia o alvo é preto e a moldura segue 16:9 limitada pela altura da tela, sem o teto de 54dvh', () => {
   const css = readFileSync(new URL('./cameras.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   assert.match(css, /\.media-box:fullscreen\s*\{[^}]*background:\s*#000/);
-  assert.match(css, /\.media-box:fullscreen \.media-stage\s*\{[^}]*max-height:\s*none/);
+  assert.match(css, /\.media-box:fullscreen \.media-stage\s*\{[^}]*max-height:\s*calc\(100dvh - 120px\)[^}]*16 \/ 9/);
+  assert.match(css, /\.media \{[^}]*object-fit:\s*fill/, 'o quadro anamórfico do DVR preenche a moldura 16:9');
   assert.match(css, /\.media-box:-webkit-full-screen\s*\{/, 'prefixo do Safari antigo');
 });
 
@@ -104,9 +105,8 @@ const contrast = (a, b) => { const [hi, lo] = [luminance(a), luminance(b)].sort(
 test('tela cheia: o aviso (.hint) tem contraste >= 4,5:1 sobre o preto, nos dois seletores; o tema claro herdado reprovaria; fora da tela cheia nada muda', () => {
   const css = readFileSync(new URL('./cameras.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const themeMut = readFileSync(new URL('../../ui/theme.css', import.meta.url), 'utf8').match(/--mut:\s*(#[0-9A-Fa-f]{6})/)[1];
-  assert.equal(themeMut.toUpperCase(), '#665B50');
+  assert.equal(themeMut.toUpperCase(), '#55615C');
   assert.ok(contrast(themeMut, '#000000') < 4.5, `o --mut do tema claro sobre preto é ${contrast(themeMut, '#000000').toFixed(3)}:1 (reprova, defeito original)`);
-  assert.ok(Math.abs(contrast(themeMut, '#000000') - 3.177) < 0.01);
   for (const selector of ['.media-box:fullscreen .hint', '.media-box:-webkit-full-screen .hint']) {
     const body = css.match(new RegExp(`${selector.replace(/[.:\-]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1];
     assert.ok(body, `regra de ${selector}`);

@@ -4,8 +4,7 @@ import { fmtAgo } from '../../core/format.js';
 import { hrefFor } from '../../core/route.js';
 import { Icon } from '../../ui/Icon.jsx';
 import { Banner, Button, IconButton, Segmented, Skeleton } from '../../ui/kit.jsx';
-import { useShell } from '../../shell/context.js';
-import { FrameView, Live } from './Live.jsx';
+import { Live } from './Live.jsx';
 import { Motion } from './Motion.jsx';
 import { Replay } from './Replay.jsx';
 import { FILTERS, parseCameraParam, visibleCameras } from './motion.js';
@@ -27,12 +26,10 @@ function Tile({ camera, frame, moving, bell, onOpen }) {
 /**
  * Câmeras: grade de quadros parados com idade, ao vivo (MSE com MJPEG de reserva), replay do DVR, movimento e avisos por computador.
  * Ao abrir só LÊ. Tudo que escreve (visto, sino, avisos, sessão de replay) é toque do usuário. Aba oculta, troca de rota e
- * desmontagem fecham sockets, vídeo e URLs. Na bandeja: só quadro e foto, sem WebSocket nem replay.
+ * desmontagem fecham sockets, vídeo e URLs. A bandeja tem o mesmo ao vivo e o mesmo replay do navegador.
  */
 export default function Cameras({ param = '' }) {
-  const shell = useShell();
   const { home, homeAt, stateError } = useHome();
-  const tray = shell?.layout === 'tray';
   const preview = home?.mode === 'preview';
   const cams = usePoll(preview ? null : '/api/cameras', 30000);
   const motion = usePoll('/api/motion', 15000);
@@ -40,7 +37,6 @@ export default function Cameras({ param = '' }) {
   const [liveId, setLiveId] = useState(null);
   const [replay, setReplay] = useState(null);
   const [alertsOpen, setAlertsOpen] = useState(false);
-  const [snap, setSnap] = useState(null);
   const [tick, setTick] = useState(0);
   const handled = useRef('');
 
@@ -59,11 +55,10 @@ export default function Cameras({ param = '' }) {
     const action = parseCameraParam(param, all);
     if (!action) return;
     if (action.type === 'replay') {
-      if (tray) return;
       setLiveId(null);
       setReplay({ ...replayWindow(all.find((c) => c.id === action.id), { start: action.start, end: null }, offset), autoStart: false });
     } else if (action.type === 'avisos') { setLiveId(null); setFilter('movimento'); setAlertsOpen(true); } else { setFilter('todas'); setLiveId(action.id); }
-  }, [param, cams.data, motion.data, motion.error, all, offset, tray]);
+  }, [param, cams.data, motion.data, motion.error, all, offset]);
 
   const leave = () => { if (param) window.location.hash = hrefFor('cameras'); };
   const closeLive = () => { setLiveId(null); leave(); };
@@ -73,7 +68,7 @@ export default function Cameras({ param = '' }) {
   const openEvent = (event) => {
     const camera = all.find((c) => c.id === event.camera);
     if (!camera) return;
-    if (tray) { if (event.photo) setSnap({ camera, src: `/api/motion/${event.id}.jpg` }); } else setReplay({ ...replayWindow(camera, event, offset), autoStart: true });
+    setReplay({ ...replayWindow(camera, event, offset), autoStart: true });
   };
   if (!home) return <div className="col" role="status"><Skeleton height={28} width="30%" /><Skeleton height={300} /></div>;
   const newest = Math.max(0, ...shown.map((c) => frames[c.id]?.at ?? 0));
@@ -103,10 +98,8 @@ export default function Cameras({ param = '' }) {
           </>
         ) : null}
       </section>
-      {index >= 0 && tray && <FrameView title={shown[index].name} sub={`Canal ${shown[index].id.replace('cam', '')}`} src={frames[liveId]?.url} close={closeLive} />}
-      {snap && <FrameView title={snap.camera.name} sub="Foto do movimento" src={snap.src} close={() => setSnap(null)} />}
-      {index >= 0 && !tray && <Live cameras={shown} index={index} poster={frames[liveId]?.url} move={move} close={closeLive} rewind={rewind} />}
-      {replay && !tray && <Replay key={`${replay.camera.id}-${replay.start}`} {...replay} close={closeReplay} goLive={() => { const id = replay.camera.id; setReplay(null); setFilter('todas'); setLiveId(id); }} />}
+      {index >= 0 && <Live cameras={shown} index={index} poster={frames[liveId]?.url} move={move} close={closeLive} rewind={rewind} />}
+      {replay && <Replay key={`${replay.camera.id}-${replay.start}`} {...replay} close={closeReplay} goLive={() => { const id = replay.camera.id; setReplay(null); setFilter('todas'); setLiveId(id); }} />}
     </div>
   );
 }

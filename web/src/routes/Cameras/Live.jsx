@@ -72,13 +72,3 @@ export function Live({ cameras, index, poster, move, close, rewind }) {
   );
 }
 
-/** Bandeja: sem WebSocket nem MJPEG, só um quadro ampliado (o ao vivo abre no navegador). */
-export function FrameView({ title, sub, src, close }) {
-  const [broken, setBroken] = useState(false);
-  return (
-    <MediaDialog label={`Quadro: ${title}`} title={title} sub={sub} onClose={close}>
-      <div className="media-stage">{src && !broken ? <img className="media" src={src} alt={`Quadro de ${title}`} onError={() => setBroken(true)} /> : <StageNote icon="alert"><span>Sem imagem.</span></StageNote>}</div>
-      <p className="hint">Para ver ao vivo, use “Abrir no navegador” no topo da bandeja.</p>
-    </MediaDialog>
-  );
-}

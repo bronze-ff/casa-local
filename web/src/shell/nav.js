@@ -10,18 +10,19 @@ export const DESTINATIONS = {
   lab: { title: 'Lab', icon: 'lab' },
   central: { title: 'Central', icon: 'central' },
 };
-/** Barra lateral, rail e ícones da bandeja: as oito, sempre. */
-export const SIDEBAR = ['', 'luzes', 'clima', 'tv', 'local', 'cameras', 'lab', 'central'];
-/** Barra inferior do celular: quatro destinos + "Mais", que abre as outras quatro. */
-export const MOBILE_TABS = ['', 'luzes', 'clima', 'cameras'];
-export const MORE = ['tv', 'local', 'lab', 'central'];
+/** As cinco telas do dia a dia, na mesma ordem em todo layout. */
+export const MAIN = ['', 'cameras', 'clima', 'luzes', 'tv'];
+/** O resto fica atrás de "Mais" (celular e bandeja) ou num grupo menor no fim da barra lateral. */
+export const MORE = ['local', 'lab', 'central'];
+export const SIDEBAR = [...MAIN, ...MORE];
+export const MOBILE_TABS = MAIN;
 
-export const mobileTabActive = (name) => (MOBILE_TABS.includes(name) ? name : 'mais');
+export const mobileTabActive = (name) => (MAIN.includes(name) ? name : 'mais');
 
 /** Destinos alcançáveis por navegação em cada layout (para provar que nenhuma rota some em nenhum tamanho). */
 export function reachable(layout) {
   if (layout === 'mobile') return [...MOBILE_TABS, ...MORE];
-  return [...SIDEBAR]; // tablet, desktop, wide e bandeja listam as oito
+  return [...SIDEBAR]; // os outros layouts alcançam as oito pela barra lateral ou por "Mais"
 }
 
 /**

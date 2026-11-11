@@ -1,5 +1,6 @@
-/* Tokens do painel. Claro quente e escuro carvão, os dois com os MESMOS nomes semânticos.
-   Texto ≥ 4,5:1 sobre as superfícies; borda de controle (--ctl) ≥ 3:1; --line só separa. Conferido por theme.test.mjs. */
+/* Tokens do painel: "Sala de Monitores". Escuro quase preto de guarita e claro cinza frio, os dois com os MESMOS nomes
+   semânticos. Acento único verde de sinal. Texto ≥ 4,5:1 sobre as superfícies; borda de controle (--ctl) ≥ 3:1; --line só
+   separa. Conferido por theme.test.mjs. */
 :root {
   --font: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
@@ -7,58 +8,58 @@
   --hit: 44px;
   --ease: cubic-bezier(.2, .7, .2, 1);
 
-  --bg: #F2EDE5; --sf: #FBF8F3; --sf2: #EAE3D8;
-  --line: #D8CEC0; --ctl: #857868;
-  --ink: #201B16; --mut: #665B50;
-  --acc: #B3263F; --acc-ink: #FFFFFF; --acc-soft: #F6D9DE;
+  --bg: #ECEFED; --sf: #F8FAF9; --sf2: #E1E6E3;
+  --line: #CBD3CF; --ctl: #73807B;
+  --ink: #141A18; --mut: #55615C;
+  --acc: #0B6B40; --acc-ink: #FFFFFF; --acc-soft: #D5EFE2;
   --info: #1D6A85; --info-soft: #DCEBF0;
   --ok: #2D6A36; --ok-soft: #E1EEDD;
   --warn: #845400; --warn-soft: #F6E8C9;
   --div: #6B3FA0; --div-soft: #ECE3F5;
   --err: #B3261E; --err-soft: #FADCD8;
-  --sim: #5E564E; --sim-soft: #E6E0D7;
+  --sim: #56605C; --sim-soft: #E3E8E5;
   --focus: #155E9E;
   --glow: #F3B55A;
-  --sh: 0 1px 2px rgba(60, 40, 20, .08), 0 8px 24px rgba(60, 40, 20, .08);
-  --sh-up: 0 2px 4px rgba(60, 40, 20, .10), 0 16px 40px rgba(60, 40, 20, .14);
-  --wash: linear-gradient(180deg, #F6F1E9 0%, #EFE9DF 100%);
+  --sh: 0 1px 2px rgba(20, 40, 30, .08), 0 8px 24px rgba(20, 40, 30, .08);
+  --sh-up: 0 2px 4px rgba(20, 40, 30, .10), 0 16px 40px rgba(20, 40, 30, .14);
+  --wash: linear-gradient(180deg, #F1F4F2 0%, #E8ECE9 100%);
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="claro"]) { /* escuro por preferência do sistema */
-    --bg: #1B1917; --sf: #24211E; --sf2: #2D2925;
-    --line: #3E3832; --ctl: #857A6D;
-    --ink: #F2ECE4; --mut: #ADA294;
-    --acc: #FF6F86; --acc-ink: #1B1917; --acc-soft: #4A2630;
-    --info: #7CC3DA; --info-soft: #1F3640;
-    --ok: #8FD19B; --ok-soft: #1E3322;
-    --warn: #E9C26E; --warn-soft: #3B3017;
-    --div: #C7A6F0; --div-soft: #35294A;
-    --err: #F49388; --err-soft: #432522;
-    --sim: #B9AFA3; --sim-soft: #343028;
+    --bg: #0B0D0C; --sf: #141817; --sf2: #1D2322;
+    --line: #2A3230; --ctl: #6F7C78;
+    --ink: #E8ECEA; --mut: #9AA6A2;
+    --acc: #39D98A; --acc-ink: #06120C; --acc-soft: #12382A;
+    --info: #7CC3DA; --info-soft: #17313A;
+    --ok: #8FD19B; --ok-soft: #16301F;
+    --warn: #E9C26E; --warn-soft: #3A3016;
+    --div: #C7A6F0; --div-soft: #2F2742;
+    --err: #FF8A7C; --err-soft: #45211D;
+    --sim: #AEB6B3; --sim-soft: #262C2B;
     --focus: #8EC7FF;
     --glow: #F3B55A;
-    --sh: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 24px rgba(0, 0, 0, .30);
-    --sh-up: 0 2px 4px rgba(0, 0, 0, .40), 0 16px 40px rgba(0, 0, 0, .45);
-    --wash: linear-gradient(180deg, #211E1B 0%, #1B1917 100%);
+    --sh: 0 1px 2px rgba(0, 0, 0, .40), 0 8px 24px rgba(0, 0, 0, .35);
+    --sh-up: 0 2px 4px rgba(0, 0, 0, .45), 0 16px 40px rgba(0, 0, 0, .50);
+    --wash: linear-gradient(180deg, #111514 0%, #0B0D0C 100%);
     color-scheme: dark;
   }
 }
 :root[data-theme="escuro"] {
-  --bg: #1B1917; --sf: #24211E; --sf2: #2D2925;
-  --line: #3E3832; --ctl: #857A6D;
-  --ink: #F2ECE4; --mut: #ADA294;
-  --acc: #FF6F86; --acc-ink: #1B1917; --acc-soft: #4A2630;
-  --info: #7CC3DA; --info-soft: #1F3640;
-  --ok: #8FD19B; --ok-soft: #1E3322;
-  --warn: #E9C26E; --warn-soft: #3B3017;
-  --div: #C7A6F0; --div-soft: #35294A;
-  --err: #F49388; --err-soft: #432522;
-  --sim: #B9AFA3; --sim-soft: #343028;
+  --bg: #0B0D0C; --sf: #141817; --sf2: #1D2322;
+  --line: #2A3230; --ctl: #6F7C78;
+  --ink: #E8ECEA; --mut: #9AA6A2;
+  --acc: #39D98A; --acc-ink: #06120C; --acc-soft: #12382A;
+  --info: #7CC3DA; --info-soft: #17313A;
+  --ok: #8FD19B; --ok-soft: #16301F;
+  --warn: #E9C26E; --warn-soft: #3A3016;
+  --div: #C7A6F0; --div-soft: #2F2742;
+  --err: #FF8A7C; --err-soft: #45211D;
+  --sim: #AEB6B3; --sim-soft: #262C2B;
   --focus: #8EC7FF;
   --glow: #F3B55A;
-  --sh: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 24px rgba(0, 0, 0, .30);
-  --sh-up: 0 2px 4px rgba(0, 0, 0, .40), 0 16px 40px rgba(0, 0, 0, .45);
-  --wash: linear-gradient(180deg, #211E1B 0%, #1B1917 100%);
+  --sh: 0 1px 2px rgba(0, 0, 0, .40), 0 8px 24px rgba(0, 0, 0, .35);
+  --sh-up: 0 2px 4px rgba(0, 0, 0, .45), 0 16px 40px rgba(0, 0, 0, .50);
+  --wash: linear-gradient(180deg, #111514 0%, #0B0D0C 100%);
   color-scheme: dark;
 }

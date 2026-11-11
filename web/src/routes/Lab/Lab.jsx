@@ -6,11 +6,10 @@ import { Banner, Skeleton } from '../../ui/kit.jsx';
 import { guarded } from '../guard.js';
 import { GameMode } from './GameMode.jsx';
 import { Machine } from './Machine.jsx';
-import { Network } from './Network.jsx';
 import { Services } from './Services.jsx';
 import { FAST, SETTLE_MS, SLOW, pollEvery } from './lab.js';
 
-/** Lab: modo do PC (manual/automático), máquina, serviços e rede. Abrir a tela só LÊ; escritas só por toque, com a casa conectada. */
+/** Lab: modo do PC (manual/automático), máquina e serviços. Abrir a tela só LÊ; escritas só por toque, com a casa conectada. */
 export default function Lab() {
   const { home, stateError } = useHome();
   const [every, setEvery] = useState(SLOW);
@@ -55,7 +54,7 @@ export default function Lab() {
       {offline && <Banner kind="info" icon="eye">{preview ? 'Prévia: o home lab roda só no PC de casa; os controles ficam desligados.' : 'O home lab não está ativo neste servidor: os controles ficam desligados.'}</Banner>}
       {s.wsl === false && !offline && <Banner kind="warn" icon="alert">A máquina Linux (WSL) está desligada, por isso os serviços aparecem parados.</Banner>}
       <div className="stage two">
-        <div className="col"><Machine s={s} /><Network offline={offline} blockedReason={connection} /></div>
+        <Machine s={s} />
         <GameMode s={s} blocked={blocked || poll.stale} reason={reason} send={send} />
       </div>
       <Services s={s} blocked={blocked || poll.stale} reason={reason} send={send} here={here} />
