@@ -101,7 +101,7 @@ export function Replay({ camera, start, from, to, offset, autoStart, close, goLi
       </div>
       <MediaControls key={replayId || 'sem-sessao'} video={video} stage={box} />
       </div>
-      {ongoing && status !== 'ended' && <Button variant="s" onClick={goLive}><Status kind="ok">Movimento ainda acontecendo</Status>Ver ao vivo</Button>}
+      {ongoing && status !== 'ended' && <p><Status kind="ok">Movimento ainda acontecendo</Status></p>}
       {motion.stale && <Banner kind="warn" icon="off">Sem conexão para ler os movimentos. As marcas mostram o último dado conhecido.</Banner>}
       <Timeline from={from} to={upper} now={position} hits={hits} seek={seek} />
       <div className="row" style={{ justifyContent: 'center' }} role="group" aria-label="Controle da gravação">

@@ -107,7 +107,7 @@ export default function Cameras({ param = '' }) {
       {stateError && <Banner kind="warn" icon="off" title="Sem conexão com o PC de casa">Mostrando o último dado conhecido, {fmtAgo(homeAt)}. Visto, sinos e avisos ficam bloqueados.</Banner>}
       <section className="card col" aria-label="Câmeras">
         <div className="row sp wrap">
-          <h2 className="h2">Câmeras{all.length ? ` · ${all.length}` : ''}</h2>
+          <h2 className="h2">{all.length ? `${all.length} câmeras` : 'Câmeras'}</h2>
           {!preview && available && filter !== 'movimento' && <IconButton icon="refresh" label="Atualizar imagens agora" onClick={() => setTick((n) => n + 1)} />}
         </div>
         <Segmented label="Filtrar câmeras" value={filter} onChange={setFilter} options={FILTERS.map(([value, text]) => ({ value, label: value === 'movimento' && motion.data?.unseen ? `${text} (${motion.data.unseen})` : text }))} />

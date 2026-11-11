@@ -114,3 +114,4 @@ dialog.ov::backdrop { background: rgba(5, 8, 7, .62); }
 .more { border-top: 1px solid var(--line); }
 .more summary { min-height: var(--hit); display: flex; align-items: center; cursor: pointer; font-weight: 600; color: var(--mut); }
 .more[open] summary { margin-bottom: 10px; }
+.seg button:focus-visible { outline-offset: -3px; }

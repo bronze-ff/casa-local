@@ -93,8 +93,7 @@ export function LightObject({ device, large, blocked = false }) {
   const toggle = guarded(blocked || offline, () => run(`/api/devices/${device.id}/commands`, { action: 'set', values: { power: !lit } }));
   return (
     <section className={`obj ${lit ? 'warm' : ''} ${large ? 'big' : 'small'} col`} aria-label={device.name}>
-      <div className="row sp wrap"><span className="cap">Luz</span><span className="row"><Confidence kind={kind} /><CommandState command={command} /></span></div>
-      <h2 className="h2">{device.name}</h2>
+      <div className="row sp wrap"><h2 className="h2">{device.name}</h2><span className="row"><Confidence kind={kind} /><CommandState command={command} /></span></div>
       <div className="obj-main">
         <div className="col tight grow">
           <span className={`num ${large ? 'xl' : 'm'}${view.known && lit ? '' : ' word'}`} aria-live="polite">{view.known && lit ? <>{device.state.brightness ?? '—'}<span className="u">%</span></> : view.value}</span>
@@ -115,8 +114,7 @@ export function ClimateObject({ device }) {
   const kind = confidenceOf(device, command);
   return (
     <section className="obj col" aria-label={device.name}>
-      <div className="row sp wrap"><span className="cap">Ar · infravermelho</span><span className="row"><Confidence kind={kind} /><CommandState command={command} /></span></div>
-      <h2 className="h2">{device.name}</h2>
+      <div className="row sp wrap"><h2 className="h2">{device.name}</h2><span className="row"><Confidence kind={kind} /><CommandState command={command} /></span></div>
       <div className="row climate-row">
         <div className={`ring${device.state?.power == null ? ' unk' : ''}`} aria-hidden="true"><span className="num l">{view.value}</span></div>
         <div className="col tight grow">
