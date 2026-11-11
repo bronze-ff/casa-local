@@ -109,3 +109,8 @@ dialog.ov::backdrop { background: rgba(20, 14, 8, .55); }
 .draft .box.dirty { background: transparent; border: 2px dashed var(--info); }
 .draft .box.dirty .v { color: var(--info); }
 @media (max-width: 420px) { .draft .pair { grid-template-columns: 1fr; } }
+
+/* O que é raro (aprender, cadastro, explicações) fica fechado atrás de um resumo */
+.more { border-top: 1px solid var(--line); }
+.more summary { min-height: var(--hit); display: flex; align-items: center; cursor: pointer; font-weight: 600; color: var(--mut); }
+.more[open] summary { margin-bottom: 10px; }

@@ -117,6 +117,7 @@ export default function Cameras({ param = '' }) {
         )}
         {filter === 'movimento' || preview ? <Motion cameras={all} motion={motion} onOpen={openEvent} openAlerts={alertsOpen} blocked={blocked} /> : cams.data && available ? (
           <>
+            <div className="cam-split">
             {featured && (
               <div className="spot">
                 <Tile hero camera={featured} frame={frames[featured.id]} moving={movingNow.has(featured.id)} bell={(motion.data?.notify ?? []).includes(featured.id)} onOpen={() => setLiveId(featured.id)} />
@@ -128,6 +129,7 @@ export default function Cameras({ param = '' }) {
               </div>
             )}
             <div className="mosaic">{shown.filter((c) => c !== featured).map((c) => <Tile key={c.id} camera={c} frame={frames[c.id]} moving={movingNow.has(c.id)} bell={(motion.data?.notify ?? []).includes(c.id)} onOpen={() => setLiveId(c.id)} />)}</div>
+            </div>
             <p className="sub" role="status">{shown.length} de {all.length} · {newest ? `Quadros parados · atualizado ${fmtAgo(newest)}` : 'Atualização automática dos quadros'}. Vídeo só ao abrir uma câmera.</p>
           </>
         ) : null}

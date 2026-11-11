@@ -35,17 +35,23 @@ export function Infrared({ device, preview }) {
         <div className="col tight"><span className="cap">{(device.name || 'TV do quarto').toLowerCase()}</span><span className="num m">{power == null ? '—' : power ? 'ligada' : 'desligada'}</span></div>
         <span className="row"><Confidence kind={kind} /><CommandState command={command} /></span>
       </div>
-      <p className="sub">{device.configured ? 'Controle por infravermelho · Geonav. O estado real da TV não é confirmado: o sinal sai e o efeito não é visto.' : 'Central IR não configurada. Configure-a no PC de casa.'}</p>
+      {!device.configured && <p className="sub">Central IR não configurada. Configure-a no PC de casa.</p>}
       {preview && <Banner kind="info" icon="eye">Prévia: nenhum sinal é enviado.</Banner>}
       {device.connection === 'offline' && <Banner kind="err" icon="alert">Central IR sem conexão.</Banner>}
       {learning && <Banner kind="info" icon="radio" title="Modo Aprender">{capturing ? `Gravando ${LABELS[capturing]}: aperte esse botão no controle original em até 25 s, apontando para a central. Aguarde a conclusão.` : 'Toque em um botão abaixo. Depois aperte o mesmo botão no controle original, apontando para a central, em até 25 s.'}</Banner>}
       <Remote send={send} disabled={busy || unavailable} keys={device.irKeys} learning={learning} />
+      <details className="more" open={learning || undefined}>
+      <summary>Aprender e códigos</summary>
+      <div className="col">
+      {device.configured && <p className="sub">Controle por infravermelho · Geonav. O estado real da TV não é confirmado: o sinal sai e o efeito não é visto.</p>}
       <Button variant={learning ? 'p' : 's'} icon="plus" aria-pressed={learning ? 'true' : 'false'} disabled={busy || unavailable} reason={preview ? 'Aprender fica desativado na prévia.' : 'A central IR não está disponível.'} onClick={() => setLearning((old) => !old)}>{learning ? 'Sair de Aprender' : 'Aprender botões'}</Button>
       <details className="codes">
         <summary>Códigos do controle · {learnedCount(origins)} aprendidos</summary>
         <ul className="list-plain rows">{IR_KEYS.map((key) => <li key={key}><span className="grow">{LABELS[key]}</span><span className="sub">{originText(origins[key])}</span></li>)}</ul>
       </details>
       <p className="hint">Códigos genéricos e perfis precisam ser testados na TV. Aprender substitui o código daquele botão. Tecla desabilitada: sem código; use Aprender.</p>
+      </div>
+      </details>
     </section>
   );
 }
