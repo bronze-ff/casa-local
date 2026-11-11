@@ -54,7 +54,7 @@ test('index.html: fundo do boot e cor do tema nos tokens novos, claro e escuro, 
 
 test('boot: bandeja é sempre Noite antes de pintar; painel normal não mexe no tema; o som salvo é inicializado uma vez', () => {
   const calls = [];
-  for (const [search, theme] of [['?tray=1', 'noite'], ['?tray=1&alerta=1', 'noite'], ['', undefined], ['?outra=1', undefined]]) {
+  for (const [search, theme] of [['?tray=1', 'escuro'], ['?tray=1&alerta=1', 'escuro'], ['', undefined], ['?outra=1', undefined]]) {
     const root = { dataset: {} };
     prepareBoot({ search, root, init: () => calls.push(search) });
     assert.equal(root.dataset.theme, theme, search);

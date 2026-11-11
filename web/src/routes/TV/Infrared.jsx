@@ -32,7 +32,7 @@ export function Infrared({ device, preview }) {
   return (
     <section className="obj col" aria-label="Controle IR">
       <div className="row sp wrap">
-        <div className="col tight"><span className="cap">{(device.name || 'TV do quarto').toLowerCase()}</span><span className="num m">{power == null ? '—' : power ? 'ligada' : 'desligada'}</span></div>
+        <div className="col tight"><h2 className="h2">{device.name || 'TV do quarto'}</h2><span className="sub">{power == null ? '—' : power ? 'ligada' : 'desligada'}</span></div>
         <span className="row"><Confidence kind={kind} /><CommandState command={command} /></span>
       </div>
       {!device.configured && <p className="sub">Central IR não configurada. Configure-a no PC de casa.</p>}

@@ -49,7 +49,7 @@ export default function Inicio() {
   );
   const head = (
     <header className="row sp wrap inicio-head">
-      <div className="col tight"><span className="cap">{day} · <span className="mono">{time}</span></span>{!tray && <h2 className="h1">{greetingFor(now)}</h2>}</div>
+      <div className="col tight">{!tray && <h2 className="h1">{greetingFor(now)}</h2>}<span className="sub">{day} · <span className="mono">{time}</span></span></div>
       <Presence location={location.data} compact={tray} />
     </header>
   );
@@ -61,7 +61,7 @@ export default function Inicio() {
         {banners}
         {head}
         {!preview && <LastMotion motion={motion} cameraNames={names} compact />}
-        {climates.map((d) => <ClimateObject key={d.id} device={d} />)}
+        {climates.map((d) => <ClimateObject key={d.id} device={d} blocked={blocked} />)}
         {lights.map((d) => <LightObject key={d.id} device={d} blocked={blocked} />)}
         <Modes scenes={home.scenes} devices={devices} blocked={blocked} />
         <OtherDevices devices={others} />
@@ -78,7 +78,7 @@ export default function Inicio() {
       <div className="inicio-grid">
         <div className="objs">
           {lights.map((d, i) => <LightObject key={d.id} device={d} large={i === 0} blocked={blocked} />)}
-          {climates.map((d) => <ClimateObject key={d.id} device={d} />)}
+          {climates.map((d) => <ClimateObject key={d.id} device={d} blocked={blocked} />)}
         </div>
         <aside className="col side-col">
           <OtherDevices devices={others} />

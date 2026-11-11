@@ -7,8 +7,8 @@
 .steps li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
 .inicio-grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); align-items: start; }
 @media (min-width: 1000px) { .inicio-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); } }
-.inicio.wide .inicio-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr); }
-.inicio.wide .cams { grid-column: 3; grid-row: 1 / span 2; }
+.inicio.wide .inicio-grid { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); }
+.inicio.wide .cams { grid-column: 1; grid-row: 1 / span 2; }
 /* Objetos: colunas pela LARGURA REAL (auto-fit), altura natural (nada de card esticado vazio) e cada card é container: o que
    está dentro responde à largura do próprio card, não à da janela. O card grande ocupa a linha inteira. */
 .objs { display: grid; gap: 20px; align-items: start; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }

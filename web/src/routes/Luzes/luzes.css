@@ -10,3 +10,4 @@
 .swatch:disabled { opacity: .5; cursor: not-allowed; }
 .picker { display: grid; gap: 12px; }
 .lights-pick { display: flex; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 560px) { .lamp { width: 96px; height: 96px; } .lamp .bulb { width: 44px; height: 44px; } }

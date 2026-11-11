@@ -56,3 +56,4 @@
 .hour-scale span:last-child { right: 0; transform: none; }
 .app.mobile section.card[aria-label="Câmeras"], .app.tray section.card[aria-label="Câmeras"] { padding: 0; border: 0; background: none; box-shadow: none; }
 @media (min-width: 1100px) { .spot { position: sticky; top: 16px; } }
+@media (max-width: 560px) { .media-dialog .back-t { display: none; } .media-dialog .back { padding: 0; min-width: var(--hit); } }

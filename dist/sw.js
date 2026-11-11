@@ -1,5 +1,5 @@
-const CACHE_NAME = "casa-local-9b78fff6861a";
-const PRE_CACHE = ["/","/apple-touch-icon.png","/assets/Alert-XI2jZw2I.js","/assets/Cameras-lk-IK1Qm.js","/assets/Central-TkKylRXT.js","/assets/Clima-CUivuZg_.js","/assets/Inicio-TPoJWV-R.js","/assets/Lab-D5Cttd1F.js","/assets/Local-B5fSmLFF.js","/assets/Luzes-C9lRkl2Q.js","/assets/TV-A35L8jKG.js","/assets/actions-B6kgGJNb.js","/assets/format-rhg1OgV7.js","/assets/frames-CN_qyHk0.js","/assets/history-DkcGKIzU.js","/assets/index-BZibXWoW.css","/assets/index-CW3UCxTh.js","/favicon.svg","/icon-192.png","/icon-512.png","/icon.svg","/index.html","/manifest.webmanifest"];
+const CACHE_NAME = "casa-local-c99506b351ff";
+const PRE_CACHE = ["/","/apple-touch-icon.png","/assets/Alert-RNDs249s.js","/assets/Cameras-CN5ujVTN.js","/assets/Central-CYNIV1h6.js","/assets/Clima-DrtoMuvM.js","/assets/Inicio-Cmnimyk2.js","/assets/Lab-DvrsvB36.js","/assets/Local-DJ3tsjER.js","/assets/Luzes-QqZKhq7J.js","/assets/TV-BNwpxhBZ.js","/assets/actions-D-8hJXcH.js","/assets/format-rhg1OgV7.js","/assets/frames-CN_qyHk0.js","/assets/history-DkcGKIzU.js","/assets/index-BvQIw7aH.css","/assets/index-CyA_PgE2.js","/favicon.svg","/icon-192.png","/icon-512.png","/icon.svg","/index.html","/manifest.webmanifest"];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(PRE_CACHE)).then(() => self.skipWaiting()));
 });

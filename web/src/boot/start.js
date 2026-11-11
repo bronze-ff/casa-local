@@ -2,10 +2,10 @@
 import { readTray } from '../core/route.js';
 import { initSound } from '../routes/Central/sound.js';
 
-/** A bandeja é sempre Noite (antes de pintar, para não piscar o tema do sistema). Liga o som SÓ se o usuário já tinha ligado. */
+/** A bandeja é sempre escura (antes de pintar, para não piscar o tema do sistema). Liga o som SÓ se o usuário já tinha ligado. */
 export function prepareBoot({ search, root, init = initSound }) {
   const tray = readTray(search);
-  if (tray) root.dataset.theme = 'noite';
+  if (tray) root.dataset.theme = 'escuro';
   init();
   return tray;
 }

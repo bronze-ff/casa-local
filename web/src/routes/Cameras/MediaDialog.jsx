@@ -17,7 +17,7 @@ export function MediaDialog({ label, title, sub, onClose, onKeyDown, actions, ch
     <dialog ref={ref} className="media-dialog" aria-label={label} onCancel={(event) => { event.preventDefault(); onClose(); }} onKeyDown={onKeyDown}>
       <div className="col">
         <div className="row wrap">
-          <button type="button" className="btn s" onClick={onClose}><Icon name="back" />Voltar</button>
+          <button type="button" className="btn s back" aria-label="Voltar" onClick={onClose}><Icon name="back" /><span className="back-t">Voltar</span></button>
           <div className="grow col tight"><strong>{title}</strong><span className="sub">{sub}</span></div>
           {actions}
         </div>

@@ -29,7 +29,7 @@ export function NetworkTV({ tv, preview, reload }) {
   return (
     <section className="card col" aria-label={name}>
       <div className="row sp wrap">
-        <div className="col tight"><span className="cap">{tv.model || 'Samsung'} · {tv.paired ? 'pareada' : 'não pareada'}</span><h3 className="h2">{name}</h3></div>
+        <div className="col tight"><h3 className="h2">{name}</h3><span className="sub">{tv.model || 'Samsung'} · {tv.paired ? 'pareada' : 'não pareada'}</span></div>
         <span className={`st ${tv.power === 'on' ? 'ok' : tv.power === 'standby' ? 'sent' : 'off'}`}><i className="dot" aria-hidden="true" />{networkState(tv.power)}</span>
       </div>
       {silent && <Banner kind="warn" icon="off">A TV não responde na rede. Pode estar desligada ou sem conexão. Ligar pela rede pode não funcionar em Wi-Fi.</Banner>}

@@ -108,10 +108,12 @@ dialog.ov::backdrop { background: rgba(5, 8, 7, .62); }
 .draft .box { border-radius: var(--r-l); padding: 14px 16px; background: var(--sf2); }
 .draft .box.dirty { background: transparent; border: 2px dashed var(--info); }
 .draft .box.dirty .v { color: var(--info); }
-@media (max-width: 420px) { .draft .pair { grid-template-columns: 1fr; } }
+@media (max-width: 340px) { .draft .pair { grid-template-columns: 1fr; } }
 
 /* O que é raro (aprender, cadastro, explicações) fica fechado atrás de um resumo */
 .more { border-top: 1px solid var(--line); }
 .more summary { min-height: var(--hit); display: flex; align-items: center; cursor: pointer; font-weight: 600; color: var(--mut); }
 .more[open] summary { margin-bottom: 10px; }
 .seg button:focus-visible { outline-offset: -3px; }
+.draft .pair .box { padding: 10px 14px; }
+.draft .pair .num.l { font-size: 30px; }

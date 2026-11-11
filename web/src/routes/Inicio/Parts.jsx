@@ -108,8 +108,13 @@ export function LightObject({ device, large, blocked = false }) {
 }
 
 /** Ar como objeto: temperatura ESTIMADA (último comando enviado), nunca leitura. */
-export function ClimateObject({ device }) {
+export function ClimateObject({ device, blocked = false }) {
   const command = useCommand(device.id);
+  const [run, busy] = useAction();
+  const power = device.state?.power;
+  const offline = device.connection !== 'online';
+  const noOff = power === true && !!device.irClimate && !device.irClimate.off; // desligar ainda não foi aprendido
+  const toggle = guarded(blocked || offline || noOff, () => run(`/api/devices/${device.id}/commands`, { action: 'set', values: { power: !power } }));
   const view = deviceView(device);
   const kind = confidenceOf(device, command);
   return (
@@ -121,6 +126,7 @@ export function ClimateObject({ device }) {
           <span className="sub">{view.sub || 'sem último envio'}</span>
           <p className="hint">O ar não informa o que faz. Este número é o último comando enviado, não uma leitura.</p>
         </div>
+        {power != null && <IconButton icon="power" className={`big round ${power ? 'on' : ''}`} size={26} label={power ? 'Desligar o ar' : 'Ligar o ar'} aria-pressed={power ? 'true' : 'false'} disabled={blocked || busy || offline || noOff} onClick={toggle} />}
       </div>
       <a className="btn s" href={hrefFor('clima')}>Abrir Clima</a>
     </section>

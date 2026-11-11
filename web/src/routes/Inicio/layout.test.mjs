@@ -157,7 +157,9 @@ test('árvore real: grid-column/grid-row só alcançam o CARD grande; o IconButt
   const tree = inicioTree();
   const all = walk(tree);
   const hero = all.find((el) => el.tag === 'section' && el.classes.includes('obj') && el.classes.includes('big'));
-  const power = all.filter((el) => el.tag === 'button' && el.classes.includes('ib') && el.classes.includes('big'));
+  const big = all.filter((el) => el.tag === 'button' && el.classes.includes('ib') && el.classes.includes('big'));
+  assert.equal(big.length, 3, 'um botão de ligar por luz e um do ar, todos com a classe big');
+  const power = big.filter((el) => !el.parent.classes.includes('climate-row')); // o do ar mora na linha do anel, não no .obj-main
   assert.ok(hero && hero.parent.classes.includes('objs'), 'card grande é filho direto de .objs');
   assert.equal(power.length, 2, 'um botão de ligar por luz, ambos com a classe big');
   assert.ok(power.every((el) => el.parent.parent.classes.includes('obj-main') || el.parent.classes.includes('obj-main')), 'o botão mora dentro do grid .obj-main');
