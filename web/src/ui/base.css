@@ -43,3 +43,7 @@ html:has(dialog[open]) { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* O que o navegador desenha também é do painel: seleção, cursor de texto, barras de rolagem e controles nativos. */
+::selection { background: var(--acc); color: var(--acc-ink); }
+html { scrollbar-color: var(--ctl) transparent; caret-color: var(--acc); accent-color: var(--acc); }

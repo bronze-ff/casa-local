@@ -46,6 +46,6 @@
 .alert { display: grid; grid-template-columns: 150px minmax(0, 1fr); min-height: 176px; background: var(--sf); color: var(--ink); }
 .alert-photo { background: #101413; display: grid; place-items: center; overflow: hidden; }
 .alert-photo img { width: 100%; height: 100%; object-fit: cover; }
-.alert-nophoto { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #e9dfd2; font-size: 13px; }
+.alert-nophoto { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #D5DBD8; font-size: 13px; }
 .alert-body { display: flex; flex-direction: column; justify-content: space-between; gap: 12px; padding: 14px 16px; }
 @media (max-width: 380px) { .alert { grid-template-columns: 1fr; } .alert-photo { height: 140px; } }

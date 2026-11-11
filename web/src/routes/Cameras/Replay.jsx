@@ -29,11 +29,8 @@ export function Timeline({ from, to, now, hits, seek }) {
         {hits.map(([s, e], i) => <i key={i} className="tl-hit" style={{ left: `${percentAt(s, from, to)}%`, width: `max(4px, ${percentAt(e, from, to) - percentAt(s, from, to)}%)` }} />)}
         <b className="tl-now" style={{ left: `${percentAt(preview ?? now, from, to)}%` }}>{preview !== null && <em className="mono">{clock(preview)}</em>}</b>
       </div>
-      <div className="row wrap sp mono sub">
-        <span>{clock(from)}</span>
-        <Button variant="s" icon="next" disabled={next === undefined} reason="Não há outro movimento nesta janela." onClick={() => next !== undefined && seek(next - 3)}>{next === undefined ? 'Sem outro movimento' : `Próximo movimento ${clock(next)}`}</Button>
-        <span>{clock(to)}</span>
-      </div>
+      <div className="row sp mono sub"><span>{clock(from)}</span><span>{clock(to)}</span></div>
+      <Button variant="s" icon="next" disabled={next === undefined} reason="Não há outro movimento nesta janela." onClick={() => next !== undefined && seek(next - 3)}>{next === undefined ? 'Sem outro movimento' : <>Próximo movimento <span className="mono">{clock(next)}</span></>}</Button>
     </div>
   );
 }
@@ -104,7 +101,7 @@ export function Replay({ camera, start, from, to, offset, autoStart, close, goLi
       </div>
       <MediaControls key={replayId || 'sem-sessao'} video={video} stage={box} />
       </div>
-      {ongoing && status !== 'ended' && <Button variant="s" onClick={goLive}><Status kind="part">Movimento ainda acontecendo</Status>Ver ao vivo</Button>}
+      {ongoing && status !== 'ended' && <Button variant="s" onClick={goLive}><Status kind="ok">Movimento ainda acontecendo</Status>Ver ao vivo</Button>}
       {motion.stale && <Banner kind="warn" icon="off">Sem conexão para ler os movimentos. As marcas mostram o último dado conhecido.</Banner>}
       <Timeline from={from} to={upper} now={position} hits={hits} seek={seek} />
       <div className="row" style={{ justifyContent: 'center' }} role="group" aria-label="Controle da gravação">

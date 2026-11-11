@@ -42,3 +42,8 @@
 .meters.hist > div { display: flex; flex-direction: column; gap: 4px; }
 .spark { width: 100%; height: 32px; }
 .spark polyline { fill: none; stroke: var(--info); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.presence .chip { text-decoration: none; min-height: 52px; padding: 6px 14px 6px 8px; border-radius: var(--r-m); }
+.inicio.tray .inicio-head { flex-wrap: nowrap; align-items: center; }
+.inicio.tray .presence { flex: none; flex-direction: row; flex-wrap: nowrap; }
+.inicio.tray .presence .chip { min-height: var(--hit); padding: 0 8px; border-radius: var(--r-pill); }
+.ring.unk { border-color: var(--ctl); }

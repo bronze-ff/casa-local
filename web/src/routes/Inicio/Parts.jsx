@@ -35,9 +35,9 @@ export function Presence({ location, compact }) {
     <ul className="list-plain presence" aria-label="Pessoas">
       {people.map((p) => (
         <li key={p.id}>
-          <a className="chip" href={hrefFor('local')}>
+          <a className="chip" href={hrefFor('local')} aria-label={compact ? p.name : undefined}>
             <span className="avatar" aria-hidden="true">{(p.name || '?').slice(0, 1).toUpperCase()}</span>
-            <span className="col tight"><b>{p.name}</b>{!compact && <span className="sub">{whereIs(p, location.places, fmtAgo)}</span>}</span>
+            {!compact && <span className="col tight"><b>{p.name}</b><span className="sub">{whereIs(p, location.places, fmtAgo)}</span></span>}
           </a>
         </li>
       ))}
@@ -118,7 +118,7 @@ export function ClimateObject({ device }) {
       <div className="row sp wrap"><span className="cap">Ar · infravermelho</span><span className="row"><Confidence kind={kind} /><CommandState command={command} /></span></div>
       <h2 className="h2">{device.name}</h2>
       <div className="row climate-row">
-        <div className="ring" aria-hidden="true"><span className="num l">{view.value}</span></div>
+        <div className={`ring${device.state?.power == null ? ' unk' : ''}`} aria-hidden="true"><span className="num l">{view.value}</span></div>
         <div className="col tight grow">
           <span className="sub">{view.sub || 'sem último envio'}</span>
           <p className="hint">O ar não informa o que faz. Este número é o último comando enviado, não uma leitura.</p>

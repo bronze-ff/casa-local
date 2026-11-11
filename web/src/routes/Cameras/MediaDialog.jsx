@@ -20,7 +20,6 @@ export function MediaDialog({ label, title, sub, onClose, onKeyDown, actions, ch
           <button type="button" className="btn s" onClick={onClose}><Icon name="back" />Voltar</button>
           <div className="grow col tight"><strong>{title}</strong><span className="sub">{sub}</span></div>
           {actions}
-          <button type="button" className="ib" aria-label="Fechar" onClick={onClose}><Icon name="close" /></button>
         </div>
         {children}
       </div>

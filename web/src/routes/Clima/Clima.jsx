@@ -100,7 +100,7 @@ export default function Clima() {
       <div className="stage two">
         <section className="obj warm col" aria-label="Temperatura do ar">
           <div className="row sp wrap">
-            <span className="cap">{learning ? 'Estado a gravar' : `Ar do quarto · ${labelOf(MODES, state.mode)?.toLowerCase() || '—'} · ${labelOf(FANS, state.fan)?.toLowerCase() || '—'}`}</span>
+            <span className="cap">{learning ? 'Estado a gravar' : ['Ar do quarto', labelOf(MODES, state.mode)?.toLowerCase(), labelOf(FANS, state.fan)?.toLowerCase()].filter(Boolean).join(' · ')}</span>
             <span className="row"><Confidence kind={kind} /><CommandState command={command} /></span>
           </div>
           <Dial label="Temperatura do ar" unit=" graus" min={17} max={30} values={learning ? undefined : available} value={templess || temp == null ? null : temp} disabled={busy || locked || templess}

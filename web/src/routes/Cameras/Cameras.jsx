@@ -24,6 +24,8 @@ function Tile({ camera, frame, moving, bell, onOpen, hero }) {
 }
 
 const REWIND = [1, 5, 10, 30];
+/** Marcas da régua da última hora: posição em % e rótulo (30, 10 e 5 min atrás; a de 5 min não tem rótulo, não cabe ao lado de "agora"). */
+const TICKS = [[50, '30 min'], [83.33, '10 min'], [91.67, '']];
 
 /** Última hora da câmera em destaque: cada movimento é um trecho com o comprimento da sua duração; tocar revê. */
 function HourStrip({ events, camera, offset, onOpen }) {
@@ -33,12 +35,14 @@ function HourStrip({ events, camera, offset, onOpen }) {
   return (
     <div className="hour" role="group" aria-label={`Movimento na última hora: ${camera.name}`}>
       <div className="hour-track">
+        {TICKS.map(([left]) => <span key={left} className="hour-tick" style={{ left: `${left}%` }} aria-hidden="true" />)}
         {recent.map((e) => {
           const left = percentAt(e.start, from, now);
           return <button key={e.id} type="button" className="hour-hit" style={{ left: `${left}%`, width: `max(6px, ${percentAt(e.end ?? now, from, now) - left}%)` }} aria-label={`Rever o movimento das ${fmtTime(e.start)}`} onClick={() => onOpen(e)} />;
         })}
       </div>
-      <div className="row sp"><span className="cap">há 1 h</span><span className="cap">{recent.length ? `${recent.length} ${recent.length > 1 ? 'movimentos' : 'movimento'}` : 'sem movimento'}</span><span className="cap">agora</span></div>
+      <div className="hour-scale" aria-hidden="true"><span>1 h</span>{TICKS.map(([left, label]) => <span key={left} style={{ left: `${left}%` }}>{label}</span>)}<span>agora</span></div>
+      <p className="sub">{recent.length ? `${recent.length} ${recent.length > 1 ? 'movimentos' : 'movimento'} na última hora. Toque num trecho para rever.` : 'Sem movimento na última hora.'}</p>
     </div>
   );
 }
