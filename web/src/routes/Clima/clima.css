@@ -13,3 +13,6 @@
 .extras .extra { min-height: 64px; justify-content: flex-start; text-align: left; }
 .timers { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 420px) { .timers { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.more { border-top: 1px solid var(--line); }
+.more summary { min-height: var(--hit); display: flex; align-items: center; cursor: pointer; font-weight: 600; color: var(--mut); }
+.more[open] summary { margin-bottom: 10px; }

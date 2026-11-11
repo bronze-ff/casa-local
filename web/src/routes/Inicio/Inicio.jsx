@@ -9,7 +9,7 @@ import { WideCameras } from './Wide.jsx';
 import { ambientOf, greetingFor } from './view.js';
 
 /**
- * Início: aparelhos como objetos (luz e ar protagonistas), presença e modos numa faixa, relógio secundário.
+ * Início: resumo da casa. O último movimento das câmeras abre a tela; logo abaixo, ar e luzes a um toque e os modos.
  * Tudo é dado real do servidor; nada é simulado fora da prévia. Layouts: celular/tablet/desktop em uma coluna que se abre,
  * tela larga com quadros parados das câmeras, bandeja compacta.
  */
@@ -60,11 +60,11 @@ export default function Inicio() {
       <div className="col inicio tray">
         {banners}
         {head}
-        <Modes scenes={home.scenes} devices={devices} blocked={blocked} />
-        {lights.map((d) => <LightObject key={d.id} device={d} blocked={blocked} />)}
-        {climates.map((d) => <ClimateObject key={d.id} device={d} />)}
-        <OtherDevices devices={others} />
         {!preview && <LastMotion motion={motion} cameraNames={names} compact />}
+        {climates.map((d) => <ClimateObject key={d.id} device={d} />)}
+        {lights.map((d) => <LightObject key={d.id} device={d} blocked={blocked} />)}
+        <Modes scenes={home.scenes} devices={devices} blocked={blocked} />
+        <OtherDevices devices={others} />
         <LabCard lab={lab} compact blocked={blocked} />
       </div>
     );
@@ -73,6 +73,7 @@ export default function Inicio() {
     <div className={`col inicio ${wide ? 'wide' : ''}`}>
       {banners}
       {head}
+      {!preview && !wide && <LastMotion motion={motion} cameraNames={names} />}
       <Modes scenes={home.scenes} devices={devices} blocked={blocked} />
       <div className="inicio-grid">
         <div className="objs">
@@ -82,7 +83,6 @@ export default function Inicio() {
         <aside className="col side-col">
           <OtherDevices devices={others} />
           {summary.length > 0 && <ul className="list-plain summary" aria-label="Resumo do ambiente">{summary.map(([label, value]) => <li key={label}><span className="cap">{label}</span><b>{value}</b></li>)}</ul>}
-          {!preview && !wide && <LastMotion motion={motion} cameraNames={names} />}
           <LabCard lab={lab} blocked={blocked} history={wide ? history : undefined} />
           <RecentActions actions={home.recentActions} />
         </aside>

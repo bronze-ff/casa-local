@@ -1,5 +1,5 @@
 /* Câmeras: mosaico de quadros parados, moldura de vídeo, linha do tempo. Nada anima; só imagens e o vídeo em si. */
-.mosaic { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.mosaic { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); }
 .tile { position: relative; display: block; width: 100%; aspect-ratio: 16 / 10; padding: 0; border: 0; border-radius: var(--r-l); overflow: hidden; background: #101413; color: #fff; cursor: pointer; }
 .tile img { width: 100%; height: 100%; object-fit: cover; }
 .lb.bell-mov { top: 10px; left: 10px; background: var(--acc); color: var(--acc-ink); }
@@ -31,4 +31,15 @@
 .alert-devices summary { min-height: 48px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .device { border-top: 1px solid var(--line); padding-top: 12px; }
 .tile .lb { position: absolute; padding: 4px 10px; border-radius: var(--r-pill); background: rgba(20, 16, 12, .86); color: #fff; font-size: 12.5px; font-weight: 650; }
-.tile .tl-ab { top: 10px; left: 10px; } .tile .tr-ab { top: 10px; right: 10px; } .tile .bl-ab { bottom: 10px; left: 10px; }
+.tile .tl-ab { top: 10px; left: 10px; } .tile .tr-ab { top: 10px; right: 10px; } .tile .bl-ab { bottom: 10px; left: 10px; max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Destaque, última hora e grade densa (no fim do arquivo: css.test.mjs lê as regras de cima em pares). */
+.spot { display: flex; flex-direction: column; gap: 12px; }
+.tile[data-hero] { aspect-ratio: 16 / 9; }
+.hour-track { position: relative; height: var(--hit); border-radius: var(--r-s); background: var(--sf2); border: 1px solid var(--line); overflow: hidden; }
+.hour-hit { position: absolute; top: 0; bottom: 0; padding: 0; border: 0; border-radius: 3px; background: var(--acc); box-shadow: 0 0 0 1px var(--sf2); cursor: pointer; }
+.hour .cap { white-space: nowrap; }
+.rewind { display: grid; grid-template-columns: auto repeat(4, minmax(0, 1fr)); gap: 8px; align-items: center; }
+.rewind .chip { justify-content: center; padding: 0 6px; white-space: nowrap; }
+.mosaic .tile { border-radius: var(--r-m); }
+.mosaic .tile .lb { font-size: 11.5px; padding: 3px 8px; }
+.mosaic .tile .tl-ab, .mosaic .tile .bell-mov { top: 6px; left: 6px; } .mosaic .tile .tr-ab { top: 6px; right: 6px; } .mosaic .tile .bl-ab { bottom: 6px; left: 6px; }

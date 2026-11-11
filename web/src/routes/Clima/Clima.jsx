@@ -119,7 +119,6 @@ export default function Clima() {
           <p className="sub" style={{ textAlign: 'center' }}>
             {learning ? 'Gravando: o ar não recebe nada até você tocar em Gravar.' : unknown ? 'Estado estimado desconhecido' : state.power ? 'Ligado · estimado' : 'Desligado · estimado'} · {device.updatedAt ? `último envio ${fmtAgo(device.updatedAt)}` : 'sem envio recente'}
           </p>
-          <p className="hint">O ar não confirma o que recebeu por infravermelho. Usar o controle original deixa o painel diferente do aparelho.</p>
           {noSignal && <Banner kind="warn" icon="alert">Nenhuma temperatura aprendida para este modo e ventilação. Use Aprender para gravar os sinais.</Banner>}
           {templess && <Banner kind="warn" icon="alert">Neste modo o controle não envia temperatura; o próprio ar decide. Para escolher, use Resfriar ou Aquecer.</Banner>}
           {!learning && (unknown
@@ -138,6 +137,10 @@ export default function Clima() {
             <Button variant="s" icon="fan" aria-haspopup="dialog" onClick={() => setSheet('extras')}>Funções extras</Button>
             <Button variant="s" icon="clock" aria-haspopup="dialog" onClick={() => setSheet('timer')}>{timer ? `Desliga às ${fmtTime(timer.at)}` : 'Timer'}</Button>
           </div>
+          <details className="more" open={learning || undefined}>
+          <summary>Aprender e detalhes</summary>
+          <div className="col">
+          <p className="hint">O ar não confirma o que recebeu por infravermelho. Usar o controle original deixa o painel diferente do aparelho.</p>
           {learning && (
             <div className="col">
               <Button variant="p" busy={!!waiting} disabled={!canLearn} reason="Não é possível gravar agora." onClick={() => learn({ state: { power: true, ...draft } }, `${draft.temperature} °C · ${labelOf(MODES, draft.mode)} · ${labelOf(FANS, draft.fan)}`)}>Gravar ligar neste estado</Button>
@@ -149,6 +152,8 @@ export default function Clima() {
           {ir && <p className="hint">Cadastro: {Object.entries(ir.origins || {}).map(([origin, count]) => `${count} ${origin}`).join(' · ') || 'sem sinais'}. {ir.calibrated ? 'Quadros calibrados.' : 'Perfil ainda não confirmado olhando o ar.'}</p>}
           <Button variant={learning ? 'p' : 's'} icon="plus" aria-pressed={learning ? 'true' : 'false'} disabled={busy || (!canLearn && !learning)} reason="Aprender só funciona no modo local, com a central IR conectada." onClick={() => { setLearning((old) => !old); setLearned(''); }}>{learning ? 'Sair de Aprender' : 'Aprender'}</Button>
           <EnergyCard energy={energy} preview={preview} />
+          </div>
+          </details>
         </div>
       </div>
 

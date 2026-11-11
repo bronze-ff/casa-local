@@ -10,10 +10,11 @@ export function replayWindow(camera, event, offset, nowSec = Date.now() / 1000) 
   return { camera, start: event.start - 10, from, to, offset };
 }
 
-/** "Rever 1 min": começa 1 min atrás, olhando de 5 min atrás até 5 s atrás. */
-export function rewindWindow(camera, offset, nowSec = Date.now() / 1000) {
+/** "Rever N min": começa N min atrás; a janela vai de pelo menos 5 min atrás (ou 2 min antes do início) até 5 s atrás. */
+export function rewindWindow(camera, offset, nowSec = Date.now() / 1000, minutes = 1) {
   const now = nowSec + offset;
-  return { camera, start: now - 60, from: now - 300, to: now - 5, offset };
+  const back = minutes * 60;
+  return { camera, start: now - back, from: now - Math.max(300, back + 120), to: now - 5, offset };
 }
 
 /** Trechos com movimento dentro da janela; evento em andamento termina "agora". */

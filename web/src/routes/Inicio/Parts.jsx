@@ -155,7 +155,7 @@ export function LastMotion({ motion, cameraNames, compact }) {
       <div className="row sp"><h2 className="h2">Último movimento</h2><a className="btn g" href={hrefFor('cameras')}>Câmeras</a></div>
       {motion.stale && <p className="sub">Sem conexão com as câmeras. Mostrando o último dado conhecido.</p>}
       {!latest ? <p className="sub">{motion.data ? 'Nenhum movimento registrado.' : 'Lendo as câmeras…'}</p> : (
-        <a className="fr" href={hrefFor('cameras', latest.camera)} style={{ height: compact ? 96 : 170 }} aria-label={`Movimento em ${name}, ${fmtTime(latest.start)}`}>
+        <a className="fr" href={hrefFor('cameras', latest.camera)} style={{ height: compact ? 170 : 300 }} aria-label={`Movimento em ${name}, ${fmtTime(latest.start)}`}>
           {latest.photo && <img src={`/api/motion/${latest.id}.jpg`} alt="" />}
           <span className="lb tl-ab">{name}</span>
           <span className="lb bl-ab">foto, não vídeo · {fmtTime(latest.start)} · {latest.count}×</span>

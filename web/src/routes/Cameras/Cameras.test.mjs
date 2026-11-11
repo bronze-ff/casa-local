@@ -23,7 +23,9 @@ test('grade: um botão por câmera com nome, sino das avisadas e selo de movimen
   assert.ok(!/<video/.test(html), 'a grade nunca carrega vídeo');
   assert.match(html, /aria-label="Atualizar imagens agora"/);
   assert.match(html, /4 de 4/);
-  assert.ok(html.indexOf('Interna 1') < html.indexOf('Externa 1'), 'câmera com sino vem primeiro');
+  assert.equal(count(html, /class="tile" data-hero="true"/g), 1, 'uma câmera em destaque');
+  assert.match(html, /aria-label="Movimento na última hora: [^"]+"/);
+  for (const m of [1, 5, 10, 30]) assert.match(html, new RegExp(`>${m} min<`), 'atalhos de rever');
 });
 
 test('estados: carregando, sem go2rtc, sem conexão, prévia e erro; cada um explica e não inventa câmera', opts, () => {
