@@ -6,7 +6,7 @@
 .dial .trk, .dial .val { fill: none; stroke-width: 14; stroke-linecap: round; }
 .dial .trk { stroke: var(--ctl); stroke-width: 3; }
 .dial .val { stroke: var(--acc); }
-.dial .thumb { fill: var(--sf); stroke: var(--ink); stroke-width: 3; transition: transform .08s linear; }
+.dial .thumb { fill: var(--acc); stroke: rgba(0, 0, 0, .25); stroke-width: 1.5; transition: transform .08s linear; }
 .dial-read { position: absolute; inset: 22%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 4px; pointer-events: none; }
 .dial-read .num sup { font-size: .4em; vertical-align: top; position: relative; top: .15em; }
 .step { width: 72px; height: 72px; border-radius: 36px; }

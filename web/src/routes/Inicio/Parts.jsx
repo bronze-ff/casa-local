@@ -65,9 +65,12 @@ export function Modes({ scenes = [], devices = [], limit, blocked = false }) {
   const partial = last?.result?.status === 'partial';
   return (
     <section className="col" aria-label="Modos">
-      <div className="row wrap modes">
+      <div className="modes">
         {shown.map((scene) => (
-          <Button key={scene.id} variant="s" icon={ICON_NAMES.includes(scene.icon) ? scene.icon : 'sun'} busy={running === scene.id} disabled={blocked || (!!running && running !== scene.id)} reason={blocked ? 'Sem conexão com o painel.' : 'Outro modo está rodando.'} onClick={() => start(scene)}>{scene.name}</Button>
+          <Button key={scene.id} variant="s" className="scene" busy={running === scene.id} disabled={blocked || (!!running && running !== scene.id)} reason={blocked ? 'Sem conexão com o painel.' : 'Outro modo está rodando.'} onClick={() => start(scene)}>
+            <span className="scene-ic" aria-hidden="true"><Icon name={ICON_NAMES.includes(scene.icon) ? scene.icon : 'sun'} size={18} /></span>
+            <span className="scene-t"><b>{scene.name}</b><span className="sub">{running === scene.id ? 'aplicando…' : scene.description || 'modo da casa'}</span></span>
+          </Button>
         ))}
       </div>
       {last && (
@@ -117,19 +120,49 @@ export function ClimateObject({ device, blocked = false }) {
   const toggle = guarded(blocked || offline || noOff, () => run(`/api/devices/${device.id}/commands`, { action: 'set', values: { power: !power } }));
   const view = deviceView(device);
   const kind = confidenceOf(device, command);
+  const temp = device.state?.temperature;
+  const numeric = power === true && temp != null;
   return (
-    <section className="obj col" aria-label={device.name}>
-      <div className="row sp wrap"><h2 className="h2">{device.name}</h2><span className="row"><Confidence kind={kind} /><CommandState command={command} /></span></div>
+    <section className="obj col climate-obj" aria-label={device.name}>
+      <div className="row sp wrap"><div className="col tight"><h2 className="h2">{device.name}</h2><span className="sub">{view.sub || 'sem último envio'}</span></div><span className="row"><Confidence kind={kind} /><CommandState command={command} /></span></div>
       <div className="row climate-row">
-        <div className={`ring${device.state?.power == null ? ' unk' : ''}`} aria-hidden="true"><span className="num l">{view.value}</span></div>
+        <div className={`ring${device.state?.power == null ? ' unk' : ''}`} aria-hidden="true">
+          <Arc fraction={numeric || temp != null ? (temp - 16) / 14 : 0} dim={!numeric} />
+          <span className="ring-read"><span className="sub">{numeric ? 'Ar em' : 'Ar'}</span><span className={`num ${numeric ? 'l' : 'word'}`}>{view.value}</span>{temp != null && !numeric && <span className="sub">último {temp}°</span>}</span>
+        </div>
         <div className="col tight grow">
-          <span className="sub">{view.sub || 'sem último envio'}</span>
           <p className="hint">O ar não informa o que faz. Este número é o último comando enviado, não uma leitura.</p>
         </div>
         {power != null && <IconButton icon="power" className={`big round ${power ? 'on' : ''}`} size={26} label={power ? 'Desligar o ar' : 'Ligar o ar'} aria-pressed={power ? 'true' : 'false'} disabled={blocked || busy || offline || noOff} onClick={toggle} />}
       </div>
       <a className="btn s" href={hrefFor('clima')}>Abrir Clima</a>
     </section>
+  );
+}
+
+/** Arco de 270° do dial (só desenho; o comando de temperatura mora em Clima). fraction de 0 a 1. */
+export function Arc({ fraction = 0, dim = false }) {
+  const f = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0));
+  const r = 52; const sweep = 2 * Math.PI * r * 0.75; const full = 2 * Math.PI * r;
+  const angle = ((135 + 270 * f) * Math.PI) / 180;
+  return (
+    <svg viewBox="0 0 120 120" className={`arc${dim ? ' dim' : ''}`}>
+      <circle className="trk" cx="60" cy="60" r={r} strokeDasharray={`${sweep} ${full}`} transform="rotate(135 60 60)" />
+      <circle className="ticks" cx="60" cy="60" r={r - 9} strokeDasharray="1 5.2" transform="rotate(135 60 60)" />
+      {f > 0 && <circle className="val" cx="60" cy="60" r={r} strokeDasharray={`${sweep * f} ${full}`} transform="rotate(135 60 60)" />}
+      {f > 0 && <circle className="knob" cx={60 + r * Math.cos(angle)} cy={60 + r * Math.sin(angle)} r="5.5" />}
+    </svg>
+  );
+}
+
+/** Data e hora em dois blocos grandes, como num relógio de parede. */
+export function Tiles({ now }) {
+  const weekday = now.toLocaleDateString('pt-BR', { weekday: 'long' });
+  return (
+    <div className="clocks">
+      <div className="clock"><span className="num">{now.getDate()}</span><span className="sub">{weekday}</span></div>
+      <div className="clock"><span className="num">{now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span><span className="sub">agora</span></div>
+    </div>
   );
 }
 

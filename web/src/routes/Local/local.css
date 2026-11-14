@@ -1,6 +1,6 @@
 /* Local: mapa protagonista, pessoas e lugares em cartões. Nada anima. */
 .map { position: relative; width: 100%; aspect-ratio: 5 / 3; overflow: hidden; border-radius: var(--r-l); background: var(--sf2); border: 1px solid var(--line); }
-.map img { position: absolute; max-width: none; height: auto; filter: grayscale(.85) sepia(.25) brightness(.95); }
+.map img { position: absolute; max-width: none; height: auto; filter: grayscale(1) contrast(.92) brightness(.92); }
 .map svg { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; }
 .map svg.pick { cursor: crosshair; }
 .map .m-place { fill: var(--info); fill-opacity: .14; stroke: var(--info); stroke-dasharray: 5 4; }

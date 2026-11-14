@@ -212,7 +212,7 @@ def main(kind, url, target):
     query = "?tray=1&alerta=1" if alert else "?tray=1"
     window = webview.create_window(
         "Casa · Alerta" if alert else "Casa Local", f"{url}/{query}#{target}", js_api=Api(), width=width, height=height, x=x, y=y,
-        frameless=True, easy_drag=False, on_top=True, resizable=False, focus=not alert, background_color="#1C1B18",
+        frameless=True, easy_drag=False, on_top=True, resizable=False, focus=not alert, background_color="#2E2E2D",
     )
     window.events.shown += on_shown
     window.events.loaded += on_loaded

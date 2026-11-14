@@ -2,8 +2,8 @@
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body {
-  margin: 0; min-height: 100dvh; background: var(--bg) var(--wash) fixed; color: var(--ink);
-  font: 400 15.5px/1.45 var(--font); -webkit-font-smoothing: antialiased;
+  margin: 0; min-height: 100dvh; background: var(--bg); background-image: var(--page); background-attachment: fixed; color: var(--ink);
+  font: 450 15.5px/1.45 var(--font); -webkit-font-smoothing: antialiased; font-feature-settings: "ss01";
 }
 h1, h2, h3, h4, p, figure { margin: 0; }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -28,11 +28,12 @@ html:has(dialog[open]) { overflow: hidden; }
 /* Texto */
 .mut { color: var(--mut); }
 .mono { font-family: var(--mono); font-size: .92em; }
-.cap { font-size: 12px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--mut); }
-.h1 { font-size: 30px; line-height: 1.1; font-weight: 700; letter-spacing: -.02em; }
-.h2 { font-size: 18px; line-height: 1.25; font-weight: 650; }
+.cap { font-size: 11.5px; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; color: var(--mut); }
+.h1 { font-size: clamp(30px, 3.2vw, 42px); line-height: 1.08; font-weight: 600; letter-spacing: -.025em; }
+.h2 { font-size: 18px; line-height: 1.25; font-weight: 600; letter-spacing: -.01em; }
 .sub { font-size: 13.5px; color: var(--mut); }
-.num { font-weight: 300; letter-spacing: -.035em; line-height: .95; font-variant-numeric: tabular-nums; font-stretch: 112%; }
+.eyebrow { font-size: 14px; font-weight: 500; color: var(--mut); }
+.num { font-weight: 500; letter-spacing: -.03em; line-height: .95; font-variant-numeric: tabular-nums; }
 .num.xl { font-size: clamp(72px, 12vw, 128px); }
 .num.l { font-size: clamp(48px, 7vw, 80px); }
 .num.m { font-size: 40px; }

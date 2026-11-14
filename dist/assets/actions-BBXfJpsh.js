@@ -1,0 +1,1 @@
+import{p as l,r as u,y as i,z as f}from"./index-CvZM1IFO.js";function p(){const s=l(),[o,r]=u.useState(!1);return[u.useCallback(async(e,c,n)=>{r(!0);try{const t=await i.run(e,c),a=f(e,t);return a.kind==="warn"?s(a.text,"warn"):n&&s(n),t}catch(t){return s(t.message,"error"),null}finally{r(!1)}},[s]),o]}export{p as u};

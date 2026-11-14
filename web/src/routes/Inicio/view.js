@@ -25,6 +25,20 @@ export function deviceView(d) {
   return { value: '—', known: false, off: true };
 }
 
+/** Linha-resumo do cabeçalho: contagens honestas e, à parte, os aparelhos sem conexão (viram link de atenção). */
+export function headlineOf(devices = []) {
+  const parts = [`${devices.length} ${devices.length === 1 ? 'aparelho' : 'aparelhos'}`];
+  const lights = devices.filter((d) => d.kind === 'light' && !isOffline(d) && d.state?.power != null);
+  if (lights.length) { const lit = lights.filter((d) => d.state.power === true).length; parts.push(`${lit} ${lit === 1 ? 'luz acesa' : 'luzes acesas'}`); }
+  const ar = devices.find((d) => d.kind === 'climate' && d.state?.power === true);
+  if (ar) parts.push(`ar em ${ar.state.temperature ?? '—'}°`);
+  return { parts, offline: devices.filter(isOffline) };
+}
+
+/** Filtros da grade de aparelhos do Início. */
+export const DEVICE_FILTERS = [['tudo', 'Tudo'], ['luzes', 'Luzes'], ['ar', 'Ar'], ['tv', 'TV'], ['lab', 'Home lab']];
+export const showsIn = (filter, kind) => filter === 'tudo' || (filter === 'luzes' && kind === 'light') || (filter === 'ar' && kind === 'climate') || (filter === 'tv' && kind === 'tv') || (filter === 'lab' && kind === 'lab');
+
 /** Resumo do ambiente só com o último estado conhecido; infravermelho aparece como estimado. */
 export function ambientOf(devices = []) {
   const lights = devices.filter((d) => d.kind === 'light');

@@ -24,8 +24,13 @@ test('movimento: nada anima com "menos movimento"; sem keyframes; transições s
   }
 });
 
-test('sem desfoque pesado nem 3D decorativo', () => {
-  assert.ok(!/backdrop-filter|filter:\s*blur|perspective|rotate3d|translate3d/.test(all));
+test('vidro: todo backdrop-filter tem o par -webkit- (Safari) e não há 3D decorativo', () => {
+  assert.ok(!/perspective|rotate3d|translate3d/.test(all), 'sem 3D');
+  const plain = [...all.matchAll(/(?<!-webkit-)backdrop-filter:\s*([^;}]+)/g)].map((m) => m[1].trim());
+  const prefixed = [...all.matchAll(/-webkit-backdrop-filter:\s*([^;}]+)/g)].map((m) => m[1].trim());
+  assert.ok(plain.length > 0, 'o desenho Vidro usa desfoque de fundo');
+  assert.deepEqual(prefixed.sort(), plain.sort(), 'cada backdrop-filter tem o mesmo valor com -webkit-');
+  assert.match(theme, /--blur:\s*\d+px/, 'intensidade do vidro num token só');
 });
 
 test('foco visível de 3 px e utilitário só-leitor-de-tela', () => {

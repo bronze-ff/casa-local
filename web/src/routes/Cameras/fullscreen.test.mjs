@@ -105,7 +105,7 @@ const contrast = (a, b) => { const [hi, lo] = [luminance(a), luminance(b)].sort(
 test('tela cheia: o aviso (.hint) tem contraste >= 4,5:1 sobre o preto, nos dois seletores; o tema claro herdado reprovaria; fora da tela cheia nada muda', () => {
   const css = readFileSync(new URL('./cameras.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const themeMut = readFileSync(new URL('../../ui/theme.css', import.meta.url), 'utf8').match(/--mut:\s*(#[0-9A-Fa-f]{6})/)[1];
-  assert.equal(themeMut.toUpperCase(), '#55615C');
+  assert.equal(themeMut.toUpperCase(), '#545451');
   assert.ok(contrast(themeMut, '#000000') < 4.5, `o --mut do tema claro sobre preto é ${contrast(themeMut, '#000000').toFixed(3)}:1 (reprova, defeito original)`);
   for (const selector of ['.media-box:fullscreen .hint', '.media-box:-webkit-full-screen .hint']) {
     const body = css.match(new RegExp(`${selector.replace(/[.:\-]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1];
