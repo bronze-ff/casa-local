@@ -20,11 +20,15 @@ for line in sys.stdin:
 class BandejaTest(unittest.TestCase):
     def test_popup_cabe_na_area_de_trabalho_e_o_alerta_fica_no_canto(self):
         work = (0, 0, 1920, 1040)
-        self.assertEqual(casa_janela.window_rect("popup", work, 1.0), (440, 760, 1920 - 440 - 12, 1040 - 760 - 12))
+        # Popup do tamanho de um tablet em pé (880x1000).
+        self.assertEqual(casa_janela.window_rect("popup", work, 1.0), (880, 1000, 1920 - 880 - 12, 1040 - 1000 - 12))
         self.assertEqual(casa_janela.window_rect("alerta", work, 1.0), (390, 176, 1920 - 390 - 12, 1040 - 176 - 12))
         # Tela baixa (150% de escala): o popup encolhe para não passar da área de trabalho.
         width, height, x, y = casa_janela.window_rect("popup", (0, 0, 1920, 900), 1.5)
-        self.assertEqual((width, height, y), (440, 576, 600 - 576 - 12))
+        self.assertEqual((width, height, y), (880, 576, 600 - 576 - 12))
+        # Tela estreita: a largura também encolhe (abaixo de 760 o painel usa o layout compacto da bandeja).
+        width, height, x, y = casa_janela.window_rect("popup", (0, 0, 1280, 720), 1.5)
+        self.assertEqual((width, height, x), (829, 456, 853 - 829 - 12))
 
     def test_endereco_do_navegador_nao_leva_tray_e_valida_o_alvo(self):
         base = "http://127.0.0.1:8787"

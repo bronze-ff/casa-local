@@ -23,9 +23,10 @@ export function parseHash(hash = '', names = ROUTE_NAMES) {
 
 export const hrefFor = (name, param) => `#/${name}${param ? `/${param}` : ''}`;
 
-/** mobile < 760 (tabbar) · tablet 760–1099 (rail) · desktop 1100–1599 (sidebar) · wide ≥ 1600. A bandeja é sempre 'tray'. */
+/** mobile < 760 (tabbar) · tablet 760–1099 (rail) · desktop 1100–1599 (sidebar) · wide ≥ 1600.
+ *  A bandeja abre do tamanho de um tablet e usa o layout 'tablet'; estreita (tela pequena ou o alerta) cai em 'tray'. */
 export function layoutFor(width, tray) {
-  if (tray) return 'tray';
+  if (tray) return width >= 760 ? 'tablet' : 'tray';
   if (width < 760) return 'mobile';
   if (width < 1100) return 'tablet';
   return width < 1600 ? 'desktop' : 'wide';

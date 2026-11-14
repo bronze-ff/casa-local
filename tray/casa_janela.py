@@ -18,16 +18,19 @@ import time
 import webbrowser
 
 MARGIN = 12
-SIZES = {"popup": (440, 760), "alerta": (390, 176)}
+# O popup abre do tamanho de um tablet em pé (o painel usa o layout de tablet a partir de 760 px de largura);
+# em tela pequena encolhe até caber e, abaixo de 760, o painel cai sozinho no layout compacto da bandeja.
+SIZES = {"popup": (880, 1000), "alerta": (390, 176)}
 ALERT_SECONDS = 25  # o alerta some sozinho
 
 
 def window_rect(kind, work, scale):
     """(largura, altura, x, y) em pixels lógicos, no canto inferior direito da área de trabalho."""
     width, height = SIZES[kind]
-    _, _, right, bottom = work
+    left, top, right, bottom = work
     if kind == "popup":
-        height = min(height, round(bottom / scale) - 2 * MARGIN)
+        width = min(width, round((right - left) / scale) - 2 * MARGIN)
+        height = min(height, round((bottom - top) / scale) - 2 * MARGIN)
     return width, height, round(right / scale) - width - MARGIN, round(bottom / scale) - height - MARGIN
 
 

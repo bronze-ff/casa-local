@@ -96,7 +96,7 @@ Uma família, **Urbanist**, de `@fontsource/urbanist` (pesos 400, 500, 600, 700)
 
 ## Layout
 
-Decidido pela largura em `core/route.js`: celular até 759 px (barra inferior de vidro com cinco destinos e "Mais"), tablet de 760 a 1099 px (trilho de 92 px + barra superior), mesa de 1100 a 1599 px (barra lateral de 264 px), tela larga a partir de 1600 px. Na mesa e no tablet a página tem 16 px de respiro em volta (`--gap`) e o conteúdo mora num painel de vidro com canto de 30 px. A bandeja (440×760, `tray/casa_janela.py`, fundo `#2E2E2D`) tem seis ícones numa pílula de vidro no topo.
+Decidido pela largura em `core/route.js`: celular até 759 px (barra inferior de vidro com cinco destinos e "Mais"), tablet de 760 a 1099 px (trilho de 92 px + barra superior), mesa de 1100 a 1599 px (barra lateral de 264 px), tela larga a partir de 1600 px. Na mesa e no tablet a página tem 16 px de respiro em volta (`--gap`) e o conteúdo mora num painel de vidro com canto de 30 px. A bandeja abre do tamanho de um tablet em pé (880×1000, `tray/casa_janela.py`, fundo `#2E2E2D`, encolhe para caber na área de trabalho) e usa o layout de tablet, com "Abrir no navegador" na barra superior; abaixo de 760 px de largura cai no layout compacto (seis ícones numa pílula de vidro no topo). No celular, o cabeçalho de vidro fica preso no topo ao rolar, a barra inferior é uma pílula flutuante 10 px acima da área segura, e os filtros do Início ficam numa linha que rola de lado.
 
 ## Elevation & Depth
 
@@ -150,7 +150,8 @@ Enviando, confirmado (só com recibo do aparelho), enviado sem confirmação, se
 
 - **Contraste sobre o vidro:** os testes calculam contraste sobre as superfícies opacas equivalentes; sobre o vidro real depende do fundo (`--page`). Conferido a olho nos dois temas, não medido.
 - **Bordas de controle:** botões e chips usam o fio do vidro (`--glass-line`), abaixo de 3:1; são identificáveis pelo texto e pelo fundo. `--ctl` continua nos tracejados (vazio, simulado).
-- **Ícones do app:** `web/public` ainda traz os ícones do mundo anterior.
+- **Ícones do app (resolvido em 14/11/2026):** círculo claro (`--acc`) com a casa do ícone `home` em `--acc-ink`, sobre cinza quente com um brilho fraco de `--glow`; é a mesma marca da barra lateral. `web/public/icon.svg` e `favicon.svg` à mão; os PNG saem de `scripts/gerar-icones.py`. Na bandeja do Windows a casa é cheia, com a porta vazada, porque o contorno some a 16 px (`glyph_house` em `tray/casa_tray.py`).
+- **Testes que já falhavam:** no Linux (Docker `node:24-slim`) passam 350 de 356; 5 testes de renderização do Início e do Shell (presença, movimento, Lab, objetos protagonistas, `#alerta`) falham desde o commit do desenho Vidro (`a5c2010`).
 - **Testes de renderização (SSR):** com `CASA_WEB_ROOT` apontando para `web/`, 77 testes de SSR falham neste ambiente também no código anterior ao redesign (ex.: "Missing getServerSnapshot"); não são regressão deste desenho.
 
 ## Arquivos

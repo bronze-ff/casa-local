@@ -73,9 +73,10 @@
 .ring.unk .ticks { display: none; }
 .ring-read { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; max-width: 70%; }
 .ring-read .num.l { font-size: 44px; }
-.ring-read .num.word { font-size: 22px; }
+/* Palavra no centro do dial ("desligado") nunca quebra no meio: encolhe com o anel. */
+.ring-read .num.word { font-size: 22px; white-space: nowrap; overflow-wrap: normal; }
 .climate-obj .climate-row .grow { flex-basis: 100%; text-align: center; }
-@container obj (max-width: 300px) { .ring { width: 136px; height: 136px; } .ring .num.l { font-size: 34px; } }
+@container obj (max-width: 300px) { .ring { width: 150px; height: 150px; } .ring .num.l { font-size: 36px; } .ring-read { max-width: 78%; } .ring-read .num.word { font-size: 18px; } }
 
 /* Coluna lateral informativa */
 .rows li { display: flex; align-items: center; gap: 12px; min-height: 52px; border-bottom: 1px solid var(--glass-line); }
@@ -98,3 +99,14 @@
 .inicio.tray .inicio-head { flex-wrap: nowrap; align-items: center; }
 .inicio.tray .presence { flex: none; flex-direction: row; flex-wrap: nowrap; }
 .inicio.tray .presence .chip { min-height: var(--hit); padding: 0 8px; }
+
+/* Celular: filtros numa linha que rola de lado (o polegar alcança todos sem quebrar em duas linhas), cartões com menos
+   respiro interno e valores em palavra ("desligada") no tamanho de leitura, sem empurrar o nome do aparelho. */
+.app.mobile .filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -16px; padding: 2px 16px; scroll-padding-inline: 16px; scroll-snap-type: x proximity; }
+.app.mobile .filters::-webkit-scrollbar { display: none; }
+.app.mobile .filters .chip { flex: none; scroll-snap-align: start; }
+.app.mobile .obj.big { padding: 20px; }
+.app.mobile .modes { gap: 10px; }
+.app.mobile .rows li { gap: 10px; padding-block: 6px; }
+.app.mobile .rows .num.s { font-size: 19px; }
+.app.mobile .inicio-head .h1 { font-size: 34px; }

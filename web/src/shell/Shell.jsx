@@ -154,11 +154,13 @@ export default function Shell({ route, layout, tray, registry = {} }) {
                 <Search devices={home?.devices || []} />
                 <span className="grow" />
                 {chip}
+                {tray && browser && <IconButton icon="ext" label="Abrir no navegador" onClick={() => window.pywebview.api.open_browser(window.location.hash.replace(/^#\/?/, ''))} />}
                 {themeButton}
                 <a className="me" href={hrefFor('local')} aria-label="Pessoas e lugares">{(location.data?.people?.[0]?.name || 'Casa').slice(0, 1).toUpperCase()}</a>
               </header>
             )}
-            {mode === 'preview' && <Banner kind="info" icon="eye" title="Prévia">Esta casa está em modo de prévia: nada é enviado nem alterado nos aparelhos.</Banner>}
+            {/* No celular e na bandeja estreita o selo de conexão já diz "Prévia"; cada tela traz o próprio aviso. */}
+            {mode === 'preview' && roomy && <Banner kind="info" icon="eye" title="Prévia">Esta casa está em modo de prévia: nada é enviado nem alterado nos aparelhos.</Banner>}
             {layout === 'tray' && (
               <header className="tray-head">
                 <nav className="trayicons" aria-label="Seções">

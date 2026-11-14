@@ -40,8 +40,10 @@ test('foco visível de 3 px e utilitário só-leitor-de-tela', () => {
 
 test('tabbar fixa reserva espaço no fim do conteúdo (não cobre o último item) e respeita a área segura', () => {
   assert.match(shell, /\.tabbar \{[^}]*position: fixed/);
-  assert.match(shell, /\.app\.mobile \.page \{[^}]*padding: 14px 16px calc\(var\(--tab-h\) \+ env\(safe-area-inset-bottom\) \+ 24px\)/);
-  assert.match(shell, /min-height: calc\(var\(--tab-h\) \+ env\(safe-area-inset-bottom\)\)/);
+  // A pílula flutua 10 px acima da área segura e tem --tab-h de altura: o fim da página reserva os dois e mais um respiro.
+  assert.match(shell, /\.tabbar \{[^}]*bottom: calc\(10px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(shell, /\.tabbar \{[^}]*min-height: var\(--tab-h\)/);
+  assert.match(shell, /\.app\.mobile \.page \{[^}]*padding: 18px 16px calc\(var\(--tab-h\) \+ env\(safe-area-inset-bottom\) \+ 40px\)/);
 });
 
 test('overlay: <dialog> na camada superior; sheet ancorado na base no celular; painel lateral só ≥ 1100 px; ações presas ao pé', () => {

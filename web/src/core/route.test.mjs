@@ -30,7 +30,7 @@ test('as oito rotas são alcançáveis e o link antigo vira o novo formato', () 
   assert.equal(hrefFor(old.name, old.param), '#/clima/quarto');
 });
 
-test('layout: mobile, tablet, desktop, wide; a bandeja é sempre tray', () => {
+test('layout: mobile, tablet, desktop, wide; a bandeja larga é tablet e a estreita é tray', () => {
   assert.equal(layoutFor(390, null), 'mobile');
   assert.equal(layoutFor(759, null), 'mobile');
   assert.equal(layoutFor(768, null), 'tablet');
@@ -38,5 +38,8 @@ test('layout: mobile, tablet, desktop, wide; a bandeja é sempre tray', () => {
   assert.equal(layoutFor(1280, null), 'desktop');
   assert.equal(layoutFor(1599, null), 'desktop');
   assert.equal(layoutFor(1600, null), 'wide');
-  assert.equal(layoutFor(1920, 'popup'), 'tray');
+  assert.equal(layoutFor(880, 'popup'), 'tablet');
+  assert.equal(layoutFor(1920, 'popup'), 'tablet');
+  assert.equal(layoutFor(440, 'popup'), 'tray');
+  assert.equal(layoutFor(390, 'alerta'), 'tray');
 });

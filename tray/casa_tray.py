@@ -47,38 +47,24 @@ DEFAULT_RULE = {"mode": "watched", "cameras": [], "game": True, "pausedUntil": 0
 HOTKEY_ID, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, WM_HOTKEY = 1, 0x1, 0x2, 0x4000, 0x0312
 
 
-# Casa do ícone do app, na grade 16x16 do design (design/icone/grade-16.txt); a porta fica vazada
-# porque na bandeja o vermelho é só de alerta. Cada célula vale 4 px nos 64 px do ícone.
-HOUSE_GRID = (
-    "................",
-    "................",
-    "................",
-    ".......##.......",
-    "......####......",
-    ".....######.....",
-    "....########....",
-    "...##########...",
-    "..############..",
-    "...##########...",
-    "...####..####...",
-    "...####..####...",
-    "...####..####...",
-    "...####..####...",
-    "................",
-    "................",
-)
-LCD_BG, LCD_FG = (21, 21, 19), (241, 234, 215)
+# Ícone do app no desenho "Vidro" (o mesmo de web/public/favicon.svg): placa cinza quente, círculo claro e a casa escura
+# do ícone "home" do painel (grade 24). Na bandeja a casa é cheia, com a porta vazada: o contorno some a 16 px.
+TILE, DISC, INK = (46, 46, 45), (245, 245, 243), (38, 38, 37)
+HOUSE_FILL = ((12, 3.2), (21, 11.6), (18.4, 11.6), (18.4, 19.4), (5.6, 19.4), (5.6, 11.6), (3, 11.6))
+HOUSE_DOOR = ((10.2, 13.6), (13.8, 19.4))
 
 
 def glyph_house():
-    image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    s = 256  # desenha grande e reduz para 64: borda lisa
+    image = Image.new("RGBA", (s, s), (0, 0, 0, 0))
     pen = ImageDraw.Draw(image)
-    pen.rounded_rectangle((0, 0, 63, 63), radius=12, fill=LCD_BG)
-    for y, row in enumerate(HOUSE_GRID):
-        for x, cell in enumerate(row):
-            if cell == "#":
-                pen.rectangle((x * 4, y * 4, x * 4 + 3, y * 4 + 3), fill=LCD_FG)
-    return image
+    pen.rounded_rectangle((0, 0, s - 1, s - 1), radius=64, fill=TILE)
+    pen.ellipse((s * 0.07, s * 0.07, s * 0.93, s * 0.93), fill=DISC)
+    k = s * 0.7 / 24  # casa um pouco acima e à esquerda: a bolinha de estado ocupa o canto de baixo à direita
+    at = lambda x, y: (s * 0.47 + (x - 12) * k, s * 0.47 + (y - 11.5) * k)  # noqa: E731
+    pen.polygon([at(x, y) for x, y in HOUSE_FILL], fill=INK)
+    pen.rectangle((*at(*HOUSE_DOOR[0]), *at(*HOUSE_DOOR[1])), fill=DISC)
+    return image.resize((64, 64), Image.LANCZOS)
 
 
 def with_status(base, state, count=0):
