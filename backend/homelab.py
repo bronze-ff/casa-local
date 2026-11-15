@@ -61,7 +61,37 @@ SERVICES = [
 # Continuam no modo jogo: leves, e os avisos do celular dependem deles. O Jellyfin fica para a
 # Lorena assistir enquanto você joga.
 KEEP_IN_GAME = {"ntfy", "uptime-kuma", "diun", "dozzle", "opengym-api", "opengym-web", "jellyfin", "adguard", "casalocal-adguard"}
+# Mídia no PC de casa (WSL do Windows), não neste servidor: com CASA_MEDIA_HOST (nome .ts.net do PC)
+# o estado desses serviços vem de uma checagem HTTPS pelo Tailscale Serve do PC e o link usa o nome do PC.
+# Unpackerr e FlareSolverr não têm página publicada: somem da lista nesse caso.
+MEDIA_HOST = (os.environ.get("CASA_MEDIA_HOST") or "").strip().rstrip(".") or None
+MEDIA_PROBES = {"jellyfin": "/jellyfin/health", "seerr": ":8446/api/v1/status", "qbittorrent": ":8448/", "radarr": ":8449/ping",
+                "sonarr": ":8450/ping", "prowlarr": ":8451/ping", "bazarr": ":8452/", "filebrowser": ":8453/"}
+MEDIA_HIDDEN = {"unpackerr", "flaresolverr"}
 HISTORY_EVERY, HISTORY_POINTS = 300, 288  # um ponto a cada 5 min, 24 h
+
+
+def probe_media(host, probes=MEDIA_PROBES, timeout=6):
+    """{serviço: estado} pelos endereços HTTPS do PC; qualquer resposta HTTP (até 401/403) conta como ligado."""
+    import ssl
+    import urllib.error
+    import urllib.request
+    from concurrent.futures import ThreadPoolExecutor
+
+    context = ssl.create_default_context()
+
+    def one(item):
+        name, path = item
+        try:
+            with urllib.request.urlopen(f"https://{host}{path}", timeout=timeout, context=context):
+                return name, ("running", "Ligado no PC de casa")
+        except urllib.error.HTTPError:
+            return name, ("running", "Ligado no PC de casa")
+        except Exception:
+            return name, ("exited", "Sem resposta do PC de casa")
+
+    with ThreadPoolExecutor(max_workers=len(probes)) as pool:
+        return {name: {"state": state, "status": status} for name, (state, status) in pool.map(one, probes.items())}
 # Backup noturno do home lab (timer homelab-backup no WSL): configs dos serviços e o .env no HD.
 BACKUP_DIR = Path(os.environ.get("CASA_HOMELAB_BACKUPS", r"D:\Homelab\backups"))
 DROP_CACHE_EVERY = 600  # o WSL demora a devolver o cache de disco ao Windows (após um reinício, ~4 GB)
@@ -264,6 +294,8 @@ class Homelab:
         if "restart" in body:
             if body["restart"] not in {s["id"] for s in SERVICES} | (KEEP_IN_GAME - {"adguard", "casalocal-adguard"}):
                 raise AppError("Serviço desconhecido.")
+            if MEDIA_HOST and body["restart"] in MEDIA_PROBES:
+                raise AppError("Esse serviço roda no PC de casa; reinicie por lá.", 409, "media_pc")
             if self.mode == "jogo" and body["restart"] not in KEEP_IN_GAME:
                 raise AppError("No modo jogo esse serviço fica parado.", 409, "game_mode")
             threading.Thread(target=self.compose, args=("restart", body["restart"]), kwargs={"timeout": 120}, daemon=True).start()
@@ -347,6 +379,9 @@ class Homelab:
             self.game_gone = None
         running = self.distro_running()
         containers = self.read_containers() if running else {}
+        if MEDIA_HOST:
+            # O PC de casa responde pela mídia; o Docker deste servidor não tem esses containers.
+            containers = {**(containers or {}), **probe_media(MEDIA_HOST)}
         if running and self.mode == "lab" and not self.busy.locked():
             self.restore_dns(containers)
         stats = {"cpu": self.machine.cpu(), "gpu": self.machine.gpu(), "disks": self.machine.disks(), "wslGb": self.machine.wsl_memory()}
@@ -360,7 +395,8 @@ class Homelab:
         # No boot o Docker religa os containers sozinho (restart policy), às vezes depois de o modo
         # jogo já ter parado tudo: no modo jogo, qualquer serviço pesado que aparecer ligado é parado de novo.
         if self.mode == "jogo" and not self.busy.locked():
-            awake = sorted(name for name, info in (containers or {}).items() if info.get("state") == "running" and name not in KEEP_IN_GAME)
+            awake = sorted(name for name, info in (containers or {}).items()
+                           if info.get("state") == "running" and name not in KEEP_IN_GAME and not (MEDIA_HOST and name in MEDIA_PROBES))
             if awake:
                 # São nomes de container (docker ps), não de serviço do compose.
                 self.run([*DOCKER, "stop", *awake], timeout=240)
@@ -392,9 +428,14 @@ class Homelab:
         with self.lock:
             services = []
             for service in SERVICES:
+                if MEDIA_HOST and service["id"] in MEDIA_HIDDEN:
+                    continue
                 state = self.containers.get(service["id"], {})
                 kind, target = service["link"] or (None, None)
-                services.append({"id": service["id"], "name": service["name"], "purpose": service["purpose"], "link": {"kind": kind, "target": target} if kind else None,
+                link = {"kind": kind, "target": target} if kind else None
+                if link and MEDIA_HOST and service["id"] in MEDIA_PROBES:
+                    link["host"] = MEDIA_HOST  # a página abre no PC de casa, não neste servidor
+                services.append({"id": service["id"], "name": service["name"], "purpose": service["purpose"], "link": link,
                                  "keep": service["id"] in KEEP_IN_GAME, "state": state.get("state") or ("stopped" if self.running is not None else "unknown"),
                                  "status": state.get("status")})
             return {"enabled": self.enabled, "mode": self.mode, "reason": self.reason, "since": int(self.changed), "step": self.step,

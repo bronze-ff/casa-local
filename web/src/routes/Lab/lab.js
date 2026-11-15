@@ -61,10 +61,12 @@ export function resultText(mode, services = []) {
   return `Home lab de volta: ${running} de ${total} serviços rodando.`;
 }
 
-/** Mesma regra do painel anterior: 'path' e 'https' pelo nome do Tailscale (quando há); 'tls' e 'http' pelo endereço atual. */
+/** Mesma regra do painel anterior: 'path' e 'https' pelo nome do Tailscale (quando há); 'tls' e 'http' pelo endereço atual.
+ *  link.host (mídia no PC de casa, fora do servidor do painel) troca o nome do Tailscale pelo da máquina do serviço. */
 export function serviceUrl(service, host, here) {
   const link = service.link;
   if (!link) return null;
+  if (link.host) host = link.host;
   if (link.kind === 'path') return `https://${host || here}${link.target}`;
   if (link.kind === 'https') return `https://${host || here}:${link.target}`;
   if (link.kind === 'tls') return `https://${here}:${link.target}`;
